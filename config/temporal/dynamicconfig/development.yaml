@@ -1,0 +1,19 @@
+# Temporal server dynamic configuration
+# See: https://docs.temporal.io/self-hosted-guide/dynamic-config
+
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+
+frontend.enableUpdateWorkflowExecution:
+  - value: true
+
+frontend.enableUpdateWorkflowExecutionAsyncAccepted:
+  - value: true
+
+# Workflow execution history size limits
+limit.maxIDLength:
+  - value: 1000
+
+# Enable advanced visibility (needed for workflow list queries)
+system.enableActivityEagerExecution:
+  - value: true

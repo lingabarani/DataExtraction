@@ -1,0 +1,171 @@
+version: "3.9"
+
+# DataExtraction — Full 7-container production stack
+# Usage: docker compose up -d
+# Temporal UI: http://localhost:8233
+# API Docs:    http://localhost:8000/api/docs
+# Frontend:    http://localhost:3000
+
+networks:
+  dataextraction:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  temporal_data:
+
+services:
+
+  # ── PostgreSQL 15 + PostGIS ──────────────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:15-3.4
+    container_name: dex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dataextraction}
+      POSTGRES_USER: ${POSTGRES_USER:-dex_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dex_user} -d ${POSTGRES_DB:-dataextraction}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dataextraction
+
+  # ── Temporal Server (auto-setup with PostgreSQL persistence) ─────────────────
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: dex-temporal
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-dex_user}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
+    volumes:
+      - ./config/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - dataextraction
+
+  # ── Temporal Web UI ──────────────────────────────────────────────────────────
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    container_name: dex-temporal-ui
+    restart: unless-stopped
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8233:8080"
+    networks:
+      - dataextraction
+
+  # ── FastAPI Backend ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: dex-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+    volumes:
+      - ./packages/api:/app/packages/api
+      - ./packages/infrastructure:/app/packages/infrastructure
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Federal Ingestion ───────────────────────────────────────
+  worker-federal:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-federal
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=federal
+    command: ["python", "-m", "packages.temporal.workers.federal_worker"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: GMaps Extraction ────────────────────────────────────────
+  worker-gmaps:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-gmaps
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=gmaps
+    command: ["python", "-m", "packages.temporal.workers.gmaps_worker"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Next.js Frontend ──────────────────────────────────────────────────────────
+  web:
+    build:
+      context: packages/frontend
+      dockerfile: ../../infra/docker/Dockerfile.frontend
+    container_name: dex-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - dataextraction

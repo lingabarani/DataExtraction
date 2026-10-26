@@ -1,0 +1,70 @@
+name: CI — Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"  # Weekly Monday 6am UTC
+
+jobs:
+  bandit:
+    name: Static Analysis (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install bandit[toml]
+      - name: Run bandit (HIGH severity fails CI)
+        run: |
+          bandit -r packages/ \
+            --severity-level high \
+            --confidence-level medium \
+            --exclude packages/scrapers/google_maps,packages/scrapers/open_map \
+            -f json -o bandit-report.json || true
+          python -c "
+          import json, sys
+          r = json.load(open('bandit-report.json'))
+          highs = [i for i in r['results'] if i['issue_severity'] == 'HIGH']
+          if highs:
+              print(f'FAIL: {len(highs)} HIGH severity findings')
+              for h in highs: print(f'  {h[\"filename\"]}:{h[\"line_number\"]} — {h[\"issue_text\"]}')
+              sys.exit(1)
+          print(f'PASS: Zero HIGH severity findings ({len(r[\"results\"])} total issues)')
+          "
+
+  pip-audit:
+    name: Dependency CVE Scan (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt --format json -o pip-audit-report.json
+      - run: |
+          python -c "
+          import json, sys
+          r = json.load(open('pip-audit-report.json'))
+          vulns = [d for d in r.get('dependencies',[]) if d.get('vulns')]
+          if vulns:
+              print(f'FAIL: {len(vulns)} packages with known CVEs')
+              for v in vulns: print(f'  {v[\"name\"]}=={v[\"version\"]}: {[x[\"id\"] for x in v[\"vulns\"]]}')
+              sys.exit(1)
+          print('PASS: Zero known CVEs in dependencies')
+          "
+
+  secrets-scan:
+    name: Secrets Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

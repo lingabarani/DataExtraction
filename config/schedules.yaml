@@ -1,0 +1,48 @@
+# Extraction schedule configuration
+# These define the cron schedules registered with Temporal on startup
+
+schedules:
+  daily_federal:
+    id: "daily-federal-ingestion"
+    workflow: "FederalIngestionWorkflow"
+    task_queue: "federal-ingestion"
+    cron: "0 2 * * *"          # 2:00 AM UTC daily
+    input:
+      mode: "incremental"
+    paused: false
+
+  weekly_gmaps:
+    id: "weekly-gmaps-extraction"
+    workflow: "GMapsExtractionWorkflow"
+    task_queue: "gmaps-extraction"
+    cron: "0 1 * * 0"          # Sunday 1:00 AM UTC
+    input:
+      mode: "incremental"
+      regions: "all"
+      categories:
+        - restaurant
+        - hotel
+        - retail
+        - healthcare
+        - professional_services
+    paused: false
+
+  monthly_osm:
+    id: "monthly-osm-extraction"
+    workflow: "OSMStateWorkflow"
+    task_queue: "osm-extraction"
+    cron: "0 3 1 * *"          # 1st of month, 3:00 AM UTC
+    input:
+      scope: "full"
+      states: "all_50_us"
+    paused: false
+
+  weekly_dlq_replay:
+    id: "weekly-dlq-replay"
+    workflow: "DLQReplayWorkflow"
+    task_queue: "storage-ops"
+    cron: "0 4 * * 1"          # Monday 4:00 AM UTC
+    input:
+      limit: 1000
+      mode: "auto"
+    paused: false

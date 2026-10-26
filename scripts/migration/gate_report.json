@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-10-26T09:47:23.852874+00:00",
+  "authorized": true,
+  "total_passed": 333,
+  "total_failed": 0,
+  "total_tests": 333,
+  "suites": [
+    {
+      "suite": "backend",
+      "description": "OneExtraction backend tests (122 tests)",
+      "status": "PASS",
+      "passed": 122,
+      "failed": 0,
+      "total": 122,
+      "returncode": 0
+    },
+    {
+      "suite": "gmaps",
+      "description": "Google Maps scraper suite (168 tests)",
+      "status": "PASS",
+      "passed": 168,
+      "failed": 0,
+      "total": 168,
+      "returncode": 0
+    },
+    {
+      "suite": "osm",
+      "description": "OpenMap spatial engine tests (31 tests)",
+      "status": "PASS",
+      "passed": 31,
+      "failed": 0,
+      "total": 31,
+      "returncode": 0
+    },
+    {
+      "suite": "agents",
+      "description": "Autonomous AI agent behavior tests (12 tests)",
+      "status": "PASS",
+      "passed": 12,
+      "failed": 0,
+      "total": 12,
+      "returncode": 0
+    }
+  ]
+}

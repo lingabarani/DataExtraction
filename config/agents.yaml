@@ -1,0 +1,41 @@
+# Agent behavior configuration
+
+agents:
+  data_quality:
+    enabled: true
+    cycle_interval_seconds: 300          # Check every 5 minutes
+    dlq_auto_replay_threshold: 100       # Auto-replay if DLQ < this
+    dlq_alert_threshold: 1000            # Alert if DLQ > this
+    require_human_approval: true         # Require approval for large replays
+
+  pipeline_coordinator:
+    enabled: true
+    cycle_interval_seconds: 300
+    auto_chain_workflows: true           # Automatically trigger downstream workflows
+    require_human_approval: false        # Chaining is low-risk, auto-approve
+
+  resource_manager:
+    enabled: true
+    cycle_interval_seconds: 60           # Check every minute (shorter cycle)
+    db_pool_throttle_threshold: 0.85     # Throttle at 85% pool utilization
+    db_pool_alert_threshold: 0.95        # Alert at 95%
+    require_human_approval: false        # Throttling is safe, auto-approve
+
+  federal_extraction:
+    enabled: true
+    cycle_interval_seconds: 3600         # Check every hour
+    incremental_staleness_hours: 24      # Run incremental if > 24h since last run
+    full_refresh_staleness_days: 30      # Run full refresh if > 30 days
+    require_human_approval: true         # Full refresh is high-impact
+
+  alert:
+    enabled: true
+    channels:
+      - sentry
+      # - slack   # configure SLACK_WEBHOOK_URL in .env to enable
+      # - email   # configure SMTP settings in .env to enable
+    severity_thresholds:
+      dlq_backlog: 1000
+      workflow_failure_rate_pct: 5.0
+      db_pool_pct: 95.0
+      api_error_rate_pct: 10.0

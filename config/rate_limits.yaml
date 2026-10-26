@@ -1,0 +1,48 @@
+# Per-source API rate limit configuration
+
+rate_limits:
+  sec_edgar:
+    requests_per_second: 10
+    requests_per_day: 500000
+    retry_after_429_seconds: 5
+    user_agent_required: true    # SEC requires proper User-Agent
+
+  cms_npi:
+    requests_per_second: 100
+    max_limit_per_run: 50000
+    retry_after_429_seconds: 2
+
+  sam_gov:
+    requests_per_second: 1       # Very conservative — API key required
+    requests_per_day: 10000
+    retry_after_429_seconds: 60
+
+  fdic:
+    requests_per_second: 20
+    requests_per_day: 100000
+    retry_after_429_seconds: 5
+
+  usaspending:
+    requests_per_second: 50
+    requests_per_day: 200000
+    retry_after_429_seconds: 5
+
+  propublica:
+    requests_per_second: 50
+    requests_per_day: 100000
+    retry_after_429_seconds: 5
+
+  google_maps_platform:
+    places_api_per_minute: 600
+    daily_budget_usd: 50.0       # Hard cap — exceeding this triggers automatic disable
+    cache_ttl_days: 30
+
+  gmaps_local:                   # Local Maps scraping (no external API)
+    concurrent_tiles: 4
+    tile_retry_count: 3
+    request_delay_ms: 500
+
+  osm:
+    overpass_api_per_minute: 60
+    nominatim_per_minute: 60
+    retry_delay_seconds: 10

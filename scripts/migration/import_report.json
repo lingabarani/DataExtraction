@@ -1,0 +1,203 @@
+{
+  "files_checked": 124,
+  "exempt_files": 71,
+  "syntax_errors": [],
+  "import_issues": [
+    {
+      "file": "packages\\api\\api_server.py",
+      "line": 36,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\api_server.py",
+      "line": 37,
+      "content": "from metrics import get_metrics_response, record_request_metrics",
+      "pattern": "from metrics import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\api_server.py",
+      "line": 145,
+      "content": "from db_connector import db_info",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\db_config.py",
+      "line": 7,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\db_connector.py",
+      "line": 6,
+      "content": "from db_connector import get_connection, release_connection, get_db_cursor",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\db_connector.py",
+      "line": 54,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\dead_letter_queue.py",
+      "line": 18,
+      "content": "from db_connector import get_cursor",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\http_client.py",
+      "line": 24,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\metrics.py",
+      "line": 120,
+      "content": "from db_connector import _pool, _pool_max",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\metrics.py",
+      "line": 130,
+      "content": "from dead_letter_queue import get_dlq_stats",
+      "pattern": "from dead_letter_queue import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\migrate_schema.py",
+      "line": 12,
+      "content": "from db_connector import get_connection, db_info",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\migrate_schema.py",
+      "line": 308,
+      "content": "from db_connector import release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\migrate_schema.py",
+      "line": 353,
+      "content": "from db_connector import release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\setup_postgres.py",
+      "line": 420,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\setup_postgres.py",
+      "line": 499,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\infrastructure\\structured_logger.py",
+      "line": 179,
+      "content": "from db_connector import _PG_POOL",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\ai_router.py",
+      "line": 22,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\auth_router.py",
+      "line": 26,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\deps.py",
+      "line": 22,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\dlq_router.py",
+      "line": 18,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\dlq_router.py",
+      "line": 19,
+      "content": "from dead_letter_queue import (",
+      "pattern": "from dead_letter_queue import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\dlq_router.py",
+      "line": 26,
+      "content": "from config_manager import config_manager",
+      "pattern": "from config_manager import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\dlq_router.py",
+      "line": 27,
+      "content": "from structured_logger import get_pipeline_health_metrics",
+      "pattern": "from structured_logger import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\duplicates_router.py",
+      "line": 17,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\export_router.py",
+      "line": 19,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\leads_router.py",
+      "line": 17,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\scraper_router.py",
+      "line": 22,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    },
+    {
+      "file": "packages\\api\\routers\\stats_router.py",
+      "line": 12,
+      "content": "from db_connector import get_connection, release_connection",
+      "pattern": "from db_connector import",
+      "fix": "sys.path injection in activity wrapper (do NOT modify this file)"
+    }
+  ]
+}

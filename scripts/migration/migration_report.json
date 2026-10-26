@@ -1,0 +1,374 @@
+{
+  "timestamp": "2026-10-26T07:22:54.432336+00:00",
+  "dry_run": false,
+  "copied": [
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\fetch_cms_npi.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\federal\\fetch_cms_npi.py",
+      "desc": "CMS NPI federal scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\fetch_sec_edgar.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\federal\\fetch_sec_edgar.py",
+      "desc": "SEC EDGAR federal scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\fetch_fdic.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\federal\\fetch_fdic.py",
+      "desc": "FDIC federal scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\fetch_usaspending.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\federal\\fetch_usaspending.py",
+      "desc": "USASpending federal scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\fetch_propublica.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\federal\\fetch_propublica.py",
+      "desc": "ProPublica federal scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\fetch_sam_gov.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\federal\\fetch_sam_gov.py",
+      "desc": "SAM.gov federal scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\normalizer.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\pipeline\\normalizer.py",
+      "desc": "Data normalizer"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\deduplicator.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\pipeline\\deduplicator.py",
+      "desc": "Record deduplicator"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\lead_builder.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\pipeline\\lead_builder.py",
+      "desc": "Lead builder"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\contact_validator.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\pipeline\\contact_validator.py",
+      "desc": "Contact validator"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tax_validator.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\pipeline\\tax_validator.py",
+      "desc": "Tax ID validator"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\geo_validator.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\pipeline\\geo_validator.py",
+      "desc": "Geographic validator"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\db_connector.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\db_connector.py",
+      "desc": "PostgreSQL connection pool"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\config_manager.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\config_manager.py",
+      "desc": "Configuration manager + AWS Secrets"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\structured_logger.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\structured_logger.py",
+      "desc": "Structured JSON logger"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\metrics.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\metrics.py",
+      "desc": "Prometheus metrics"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\dead_letter_queue.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\dead_letter_queue.py",
+      "desc": "Dead letter queue"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\http_client.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\http_client.py",
+      "desc": "HTTP client"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\db_config.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\db_config.py",
+      "desc": "DB config adapter"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\setup_postgres.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\setup_postgres.py",
+      "desc": "PostgreSQL setup"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\migrate_schema.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\migrate_schema.py",
+      "desc": "Database schema migration"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\init_db.sql",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\infrastructure\\init_db.sql",
+      "desc": "Initial DB DDL schema"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\scripts\\db\\backup_postgres.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\scripts\\db\\backup_postgres.py",
+      "desc": "DB backup script"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\scripts\\db\\restore_postgres.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\scripts\\db\\restore_postgres.py",
+      "desc": "DB restore script"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\scripts\\ops\\archive_cleanup.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\scripts\\ops\\archive_cleanup.py",
+      "desc": "Archive cleanup script"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\__init__.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\__init__.py",
+      "desc": "OpenMap engine init"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\checkpoint.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\checkpoint.py",
+      "desc": "OSM checkpoint"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\circuit_breaker.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\circuit_breaker.py",
+      "desc": "OSM circuit breaker"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\config.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\config.py",
+      "desc": "OSM config"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\connector.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\connector.py",
+      "desc": "OSM connector"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\quadtree.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\quadtree.py",
+      "desc": "OSM quadtree"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\openmap_engine\\taxonomy.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\open_map\\taxonomy.py",
+      "desc": "OSM taxonomy"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api_server.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\api_server.py",
+      "desc": "FastAPI application"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\__init__.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\__init__.py",
+      "desc": "API routers init"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\auth_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\auth_router.py",
+      "desc": "Auth router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\leads_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\leads_router.py",
+      "desc": "Leads router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\stats_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\stats_router.py",
+      "desc": "Stats router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\export_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\export_router.py",
+      "desc": "Export router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\duplicates_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\duplicates_router.py",
+      "desc": "Duplicates router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\scraper_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\scraper_router.py",
+      "desc": "Scraper router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\ai_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\ai_router.py",
+      "desc": "AI router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\map_extraction_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\map_extraction_router.py",
+      "desc": "Map extraction router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\dlq_router.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\dlq_router.py",
+      "desc": "DLQ router"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\api\\deps.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\api\\routers\\deps.py",
+      "desc": "API deps"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\conftest.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\conftest.py",
+      "desc": "Backend conftest"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\test_phase1_security_config.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\test_phase1_security_config.py",
+      "desc": "Security config tests"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\test_phase2_validation.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\test_phase2_validation.py",
+      "desc": "Validation tests"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\test_phase3_ingestion_dedup.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\test_phase3_ingestion_dedup.py",
+      "desc": "Ingestion/dedup tests"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\test_phase4_db_integrity.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\test_phase4_db_integrity.py",
+      "desc": "DB integrity tests"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\test_phase5_orchestration_dlq.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\test_phase5_orchestration_dlq.py",
+      "desc": "Orchestration/DLQ tests"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\botasaurus\\tests\\test_phase6_delivery.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\tests\\unit\\backend\\test_phase6_delivery.py",
+      "desc": "Delivery tests"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\__init__.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\__init__.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\__main__.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\__main__.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\checkpoint.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\checkpoint.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\cli.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\cli.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\config.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\config.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\db.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\db.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\details.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\details.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\export.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\export.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\fallback_browser.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\fallback_browser.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\http.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\http.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\jobs.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\jobs.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\logging_setup.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\logging_setup.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\models.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\models.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\orchestrator.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\orchestrator.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\parser_state.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\parser_state.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\photos.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\photos.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\reviews.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\reviews.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\scope.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\scope.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\search.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\search.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\taxonomy.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\taxonomy.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\src\\gmaps_scraper\\tiling.py",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\src\\gmaps_scraper\\tiling.py",
+      "desc": "gmaps-scraper"
+    },
+    {
+      "src": "D:\\Data Scraping Project POC\\OneExtraction\\gmaps-scraper\\gmaps-scraper\\pyproject.toml",
+      "dst": "D:\\Data Scraping Project POC\\DataExtraction\\packages\\scrapers\\google_maps\\pyproject.toml",
+      "desc": "gmaps-scraper"
+    }
+  ],
+  "skipped": [],
+  "missing_source": [],
+  "errors": []
+}
