@@ -23,7 +23,7 @@ param (
         "test", "test:backend", "test:gmaps", "test:osm", "test:agents", "test:e2e", "test:ui",
         "typecheck", "build", "up", "down",
         "worker:federal", "worker:gmaps", "worker:osm", "worker:pipeline",
-        "backup", "backup:verify", "restore", "restore:verify", "restore:list",
+        "db:migrate", "backup", "backup:verify", "restore", "restore:verify", "restore:list",
         "clean", "status", "help"
     )]
     [string]$Command = "help"
@@ -152,6 +152,11 @@ switch ($Command) {
         & $Python (Join-Path $Root "packages\temporal\workers\pipeline_worker.py")
     }
 
+    "db:migrate" {
+        Write-Host "==> Applying Knowledge Graph Schema Migrations (PostgreSQL)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "scripts\db\apply_kg_migration.py")
+    }
+
     "backup" {
         Write-Host "==> Executing PostgreSQL automated backup..." -ForegroundColor Cyan
         & $Python (Join-Path $Root "scripts\db\backup_postgres.py")
@@ -215,6 +220,7 @@ switch ($Command) {
         Write-Host "  worker:gmaps    Start Temporal Google Maps worker"
         Write-Host "  worker:osm      Start Temporal OSM worker"
         Write-Host "  worker:pipeline Start Temporal pipeline worker"
+        Write-Host "  db:migrate      Apply Knowledge Graph schema migrations to PostgreSQL"
         Write-Host "  backup          Execute pg_dump with SHA-256 verification"
         Write-Host "  backup:verify   Simulate database backup dry run"
         Write-Host "  restore         Restore PostgreSQL from latest verified backup"

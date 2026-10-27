@@ -247,6 +247,34 @@ class ConfigManager:
             return f"postgresql://{auth}{host}:{port}/{dbname}"
         return f"sqlite:///output/us/api/{cfg['dbname']}.db"
 
+    # ── Lakehouse & Object Storage (MinIO / AWS S3) ───────────────────────────
+
+    def get_lakehouse_config(self) -> Dict[str, Any]:
+        """
+        Retrieve Lakehouse & Object Storage configuration (MinIO / AWS S3).
+        Sourced from AWS Secrets Manager or environment variables.
+        """
+        endpoint_url = self.get("LAKEHOUSE_ENDPOINT_URL")
+        if endpoint_url:
+            endpoint_url = str(endpoint_url).strip()
+            if not endpoint_url:
+                endpoint_url = None
+
+        bucket_name = self.get("LAKEHOUSE_BUCKET_NAME", "dataextraction-lakehouse").strip()
+        access_key = self.get("LAKEHOUSE_ACCESS_KEY", "minioadmin").strip()
+        secret_key = self.get("LAKEHOUSE_SECRET_KEY", "miniopassword").strip()
+        region_name = self.get("LAKEHOUSE_REGION", "us-east-1").strip()
+        use_ssl = str(self.get("LAKEHOUSE_USE_SSL", "false")).lower() in ("true", "1", "yes")
+
+        return {
+            "endpoint_url": endpoint_url,
+            "bucket_name": bucket_name,
+            "access_key": access_key,
+            "secret_key": secret_key,
+            "region_name": region_name,
+            "use_ssl": use_ssl,
+        }
+
     # ── SEC EDGAR Compliance ──────────────────────────────────────────────────
 
     def validate_sec_user_agent(self, user_agent: Optional[str]) -> bool:
