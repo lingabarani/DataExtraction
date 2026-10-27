@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-10-27T13:11:53.206182+00:00",
+  "timestamp": "2026-10-27T14:46:01.160591+00:00",
   "authorized": true,
-  "total_passed": 373,
+  "total_passed": 387,
   "total_failed": 0,
-  "total_tests": 373,
+  "total_tests": 387,
   "suites": [
     {
       "suite": "backend",
-      "description": "Backend unit & lakehouse storage tests (146 tests)",
+      "description": "Backend unit, lakehouse & quality tests (160 tests)",
       "status": "PASS",
-      "passed": 146,
+      "passed": 160,
       "failed": 0,
-      "total": 146,
+      "total": 160,
       "returncode": 0
     },
     {

@@ -18,7 +18,7 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MIGRATION_SQL_PATH = REPO_ROOT / "packages" / "infrastructure" / "migrations" / "001_knowledge_graph_schema.sql"
+MIGRATIONS_DIR = REPO_ROOT / "packages" / "infrastructure" / "migrations"
 
 DB_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 DB_PORT = int(os.getenv("POSTGRES_PORT", 5432))
@@ -53,12 +53,14 @@ def ensure_database():
 
 
 def apply_migration():
-    if not MIGRATION_SQL_PATH.exists():
-        print(f"❌ Migration file not found: {MIGRATION_SQL_PATH}")
+    if not MIGRATIONS_DIR.exists():
+        print(f"❌ Migrations directory not found: {MIGRATIONS_DIR}")
         sys.exit(1)
 
-    print(f"==> Reading migration: {MIGRATION_SQL_PATH.name} ({MIGRATION_SQL_PATH.stat().st_size} bytes)")
-    sql_script = MIGRATION_SQL_PATH.read_text(encoding="utf-8")
+    migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    if not migration_files:
+        print(f"❌ No .sql migration files found in: {MIGRATIONS_DIR}")
+        sys.exit(1)
 
     print(f"==> Connecting to database '{DB_NAME}'...")
     conn = psycopg2.connect(
@@ -71,9 +73,12 @@ def apply_migration():
     conn.autocommit = True
     cur = conn.cursor()
 
-    print("==> Executing Knowledge Graph DDL statements...")
-    cur.execute(sql_script)
-    print("✅ Migration 001 executed successfully.")
+    for m_file in migration_files:
+        print(f"\n==> Reading migration: {m_file.name} ({m_file.stat().st_size} bytes)")
+        sql_script = m_file.read_text(encoding="utf-8")
+        print(f"==> Executing {m_file.name} DDL statements...")
+        cur.execute(sql_script)
+        print(f"✅ {m_file.name} executed successfully.")
 
     # Verification Query
     print("\n" + "=" * 70)
@@ -106,7 +111,7 @@ def apply_migration():
 
     cur.close()
     conn.close()
-    print("\n✅ PHASE 1 COMPLETE — Knowledge Graph database schema is fully operational!")
+    print("\n✅ Knowledge Graph database schemas & triggers are fully operational!")
 
 
 if __name__ == "__main__":

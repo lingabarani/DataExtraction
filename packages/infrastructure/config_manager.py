@@ -275,6 +275,37 @@ class ConfigManager:
             "use_ssl": use_ssl,
         }
 
+    # ── OpenSearch 2.x CDC Search Engine ──────────────────────────────────────
+
+    def get_opensearch_config(self) -> Dict[str, Any]:
+        """
+        Retrieve validated OpenSearch 2.x configuration.
+        """
+        host = self.get("OPENSEARCH_HOST", "127.0.0.1").strip()
+        port = int(self.get("OPENSEARCH_PORT", "9200"))
+        user = self.get("OPENSEARCH_USER", "admin").strip()
+        password = self.get("OPENSEARCH_PASSWORD", "admin").strip()
+        use_ssl = str(self.get("OPENSEARCH_USE_SSL", "false")).lower() in ("true", "1", "yes")
+        verify_certs = str(self.get("OPENSEARCH_VERIFY_CERTS", "false")).lower() in ("true", "1", "yes")
+        index_companies = self.get("OPENSEARCH_INDEX_COMPANIES", "kg_companies_v1").strip()
+        index_people = self.get("OPENSEARCH_INDEX_PEOPLE", "kg_people_v1").strip()
+        batch_size = int(self.get("OPENSEARCH_BULK_BATCH_SIZE", "1000"))
+        timeout = int(self.get("OPENSEARCH_TIMEOUT_SECONDS", "30"))
+
+        return {
+            "host": host,
+            "port": port,
+            "user": user,
+            "password": password,
+            "use_ssl": use_ssl,
+            "verify_certs": verify_certs,
+            "index_companies": index_companies,
+            "index_people": index_people,
+            "batch_size": batch_size,
+            "timeout": timeout,
+            "base_url": f"{'https' if use_ssl else 'http'}://{host}:{port}",
+        }
+
     # ── SEC EDGAR Compliance ──────────────────────────────────────────────────
 
     def validate_sec_user_agent(self, user_agent: Optional[str]) -> bool:

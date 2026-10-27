@@ -406,3 +406,38 @@ async def maintain_kg_partitions_activity() -> dict:
     finally:
         if conn:
             release_connection(conn)
+
+
+@activity.defn(name="sync_opensearch_cdc")
+async def sync_opensearch_cdc_activity(batch_limit: int = 1000) -> dict:
+    """
+    Synchronizes delta change projections to OpenSearch 2.x cluster.
+    """
+    activity.logger.info("Executing OpenSearch CDC synchronization: batch_limit=%d", batch_limit)
+    from packages.infrastructure.opensearch_cdc_sync import opensearch_client  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
+
+    conn = None
+    try:
+        conn = get_connection()
+        res = opensearch_client.sync_companies_cdc(conn, batch_limit=batch_limit)
+        return res
+    finally:
+        if conn:
+            release_connection(conn)
+
+
+@activity.defn(name="compute_bayesian_quality")
+async def compute_bayesian_quality_activity(payload: dict) -> dict:
+    """
+    Computes multi-dimensional Bayesian data quality score.
+    """
+    activity.logger.info("Computing Bayesian quality score for entity=%s", payload.get("entity_type", "organization"))
+    from packages.pipeline.bayesian_quality_engine import bayesian_quality_engine  # type: ignore
+
+    res = bayesian_quality_engine.compute_entity_quality_score(
+        entity_data=payload.get("entity_data", {}),
+        entity_type=payload.get("entity_type", "organization"),
+        contributing_sources=payload.get("contributing_sources", []),
+    )
+    return res

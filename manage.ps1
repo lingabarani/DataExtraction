@@ -23,7 +23,7 @@ param (
         "test", "test:backend", "test:gmaps", "test:osm", "test:agents", "test:e2e", "test:ui",
         "typecheck", "build", "up", "down",
         "worker:federal", "worker:gmaps", "worker:osm", "worker:pipeline",
-        "db:migrate", "db:partitions", "backup", "backup:verify", "restore", "restore:verify", "restore:list",
+        "db:migrate", "db:partitions", "search:sync", "backup", "backup:verify", "restore", "restore:verify", "restore:list",
         "clean", "status", "help"
     )]
     [string]$Command = "help"
@@ -160,6 +160,11 @@ switch ($Command) {
     "db:partitions" {
         Write-Host "==> Executing Automated Knowledge Graph Partition Maintenance..." -ForegroundColor Cyan
         & $Python (Join-Path $Root "scripts\db\maintain_partitions.py")
+    }
+
+    "search:sync" {
+        Write-Host "==> Streaming Change Data Capture (CDC) Projections to OpenSearch 2.x..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "scripts\db\sync_opensearch.py")
     }
 
     "backup" {
