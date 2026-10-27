@@ -2,9 +2,9 @@
 
 > **Production-grade monorepo** consolidating multi-source data scraping, Temporal durable orchestration, and AI agent-driven pipeline management.
 
-[![CI Backend](https://github.com/your-org/DataExtraction/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/your-org/DataExtraction/actions)
-[![CI Frontend](https://github.com/your-org/DataExtraction/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/your-org/DataExtraction/actions)
-[![Security](https://github.com/your-org/DataExtraction/actions/workflows/ci-security.yml/badge.svg)](https://github.com/your-org/DataExtraction/actions)
+[![CI Backend](https://github.com/lingabarani/DataExtraction/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/lingabarani/DataExtraction/actions)
+[![CI Frontend](https://github.com/lingabarani/DataExtraction/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/lingabarani/DataExtraction/actions)
+[![Security](https://github.com/lingabarani/DataExtraction/actions/workflows/ci-security.yml/badge.svg)](https://github.com/lingabarani/DataExtraction/actions)
 
 ---
 
