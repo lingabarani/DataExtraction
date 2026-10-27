@@ -790,6 +790,14 @@ class Deduplicator:
             except Exception:
                 pass
 
+    def resolve_company(self, record: dict) -> DedupResult:
+        """Alias for check_company for temporal pipeline activity compatibility."""
+        return self.check_company(record)
+
+    def resolve_person(self, record: dict) -> DedupResult:
+        """Alias for check_person for temporal pipeline activity compatibility."""
+        return self.check_person(record)
+
     def cache_stats(self) -> dict:
         return {
             'company_cache_size': len(self._company_cache),

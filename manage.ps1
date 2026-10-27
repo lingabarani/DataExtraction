@@ -23,7 +23,7 @@ param (
         "test", "test:backend", "test:gmaps", "test:osm", "test:agents", "test:e2e", "test:ui",
         "typecheck", "build", "up", "down",
         "worker:federal", "worker:gmaps", "worker:osm", "worker:pipeline",
-        "db:migrate", "backup", "backup:verify", "restore", "restore:verify", "restore:list",
+        "db:migrate", "db:partitions", "backup", "backup:verify", "restore", "restore:verify", "restore:list",
         "clean", "status", "help"
     )]
     [string]$Command = "help"
@@ -155,6 +155,11 @@ switch ($Command) {
     "db:migrate" {
         Write-Host "==> Applying Knowledge Graph Schema Migrations (PostgreSQL)..." -ForegroundColor Cyan
         & $Python (Join-Path $Root "scripts\db\apply_kg_migration.py")
+    }
+
+    "db:partitions" {
+        Write-Host "==> Executing Automated Knowledge Graph Partition Maintenance..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "scripts\db\maintain_partitions.py")
     }
 
     "backup" {
