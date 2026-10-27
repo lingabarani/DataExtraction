@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oneextraction
+  labels:
+    app.kubernetes.io/name: oneextraction
+    app.kubernetes.io/part-of: oneextraction-platform
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oneextraction-config
+  namespace: oneextraction
+data:
+  APP_ENV: "production"
+  PORT: "3001"
+  DB_POOL_MIN_CONN: "4"
+  DB_POOL_MAX_CONN: "25"
+  CORS_ALLOWED_ORIGINS: "https://app.oneextraction.io,https://oneextraction.io"
+  NEXT_PUBLIC_API_URL: "https://app.oneextraction.io/api"
+  OVERPASS_CONNECT_TIMEOUT_SEC: "15"
+  OVERPASS_READ_TIMEOUT_SEC: "60"
+  OVERPASS_CIRCUIT_BREAKER_COOLDOWN_SEC: "60.0"
+  DLQ_ALERT_THRESHOLD: "100"

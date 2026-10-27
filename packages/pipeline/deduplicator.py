@@ -139,10 +139,13 @@ def _has_statutory_id_conflict(existing: dict, incoming: dict) -> bool:
     Checks if existing and incoming records have conflicting statutory identifiers.
     Statutory IDs: ein, rfc, cik, npi.
     If both records define the same statutory ID with differing values,
-    they represent distinct legal entities and must not be merged.
+    OR if they have conflicting national statutory jurisdictions (US EIN vs Mexican RFC,
+    or different explicit countries), they represent distinct legal entities and must not be merged.
     """
     if not existing or not incoming:
         return False
+
+    # 1. Direct statutory ID value conflicts
     for f in ('ein', 'rfc', 'cik', 'npi'):
         ext_val = existing.get(f)
         inc_val = incoming.get(f)
@@ -151,6 +154,22 @@ def _has_statutory_id_conflict(existing: dict, incoming: dict) -> bool:
             s_inc = str(inc_val).strip().upper().replace("-", "").replace(" ", "")
             if s_ext and s_inc and s_ext != s_inc:
                 return True
+
+    # 2. Country jurisdiction conflict
+    ext_country = (existing.get('country') or existing.get('country_code') or '').strip().upper()
+    inc_country = (incoming.get('country') or incoming.get('country_code') or '').strip().upper()
+    if ext_country and inc_country and ext_country != inc_country:
+        return True
+
+    # 3. Cross-border statutory system conflict (US EIN/CIK vs MX RFC)
+    has_us_ext = bool(existing.get('ein') or existing.get('cik'))
+    has_mx_ext = bool(existing.get('rfc'))
+    has_us_inc = bool(incoming.get('ein') or incoming.get('cik'))
+    has_mx_inc = bool(incoming.get('rfc'))
+
+    if (has_us_ext and has_mx_inc and not has_mx_ext) or (has_mx_ext and has_us_inc and not has_us_ext):
+        return True
+
     return False
 
 

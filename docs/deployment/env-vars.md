@@ -18,3 +18,4 @@
 | `AGENT_DB_POOL_THROTTLE_THRESHOLD` | No | `0.85` | DB pool utilization threshold to trigger worker throttle |
 | `GOOGLE_MAPS_API_KEY` | No | - | Optional Google Maps API key for 3D marker enrichment |
 | `PROMETHEUS_PORT` | No | `9090` | Metrics telemetry exporter port |
+

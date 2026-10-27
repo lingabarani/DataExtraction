@@ -84,3 +84,4 @@ class FederalExtractionAgent(BaseAgent):
             rationale="All monitored federal sources are within acceptable freshness limits.",
             confidence=1.0,
         )
+

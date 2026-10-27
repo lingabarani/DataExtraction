@@ -85,3 +85,4 @@ class PipelineCoordinatorAgent(BaseAgent):
             rationale="All completed extraction runs have been enriched or already queued.",
             confidence=1.0,
         )
+

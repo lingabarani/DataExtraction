@@ -15,10 +15,28 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure botasaurus/ directory is on sys.path
+# Bootstrap DataExtraction monorepo package paths
 _BASE_DIR = Path(__file__).resolve().parent
-if str(_BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(_BASE_DIR))
+_REPO_ROOT = _BASE_DIR.parents[1]
+_PACKAGES = _REPO_ROOT / 'packages'
+
+for _p in [
+    _BASE_DIR,
+    _BASE_DIR / 'routers',
+    _PACKAGES / 'pipeline',
+    _PACKAGES / 'infrastructure',
+    _PACKAGES / 'scrapers',
+    _PACKAGES / 'scrapers' / 'federal',
+    _PACKAGES / 'scrapers' / 'open_map',
+    _PACKAGES / 'scrapers' / 'openmap_engine',
+    _PACKAGES / 'temporal',
+    _PACKAGES / 'agents',
+    _REPO_ROOT / 'scripts' / 'db',
+    _REPO_ROOT / 'scripts' / 'ops',
+    _REPO_ROOT,
+]:
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

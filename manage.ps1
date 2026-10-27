@@ -20,7 +20,7 @@
 param (
     [Parameter(Position=0)]
     [ValidateSet(
-        "test", "test:backend", "test:gmaps", "test:osm", "test:agents",
+        "test", "test:backend", "test:gmaps", "test:osm", "test:agents", "test:e2e", "test:ui",
         "typecheck", "build", "up", "down",
         "worker:federal", "worker:gmaps", "worker:osm", "worker:pipeline",
         "backup", "backup:verify", "restore", "restore:verify", "restore:list",
@@ -48,19 +48,22 @@ $env:PYTHONPATH = "$GmapsSrc;$Root"
 
 switch ($Command) {
     "test" {
-        Write-Host "==> [1/4] Running Phase 1-6 backend tests (122 tests)..." -ForegroundColor Cyan
+        Write-Host "==> [1/5] Running Phase 1-6 backend tests (122 tests)..." -ForegroundColor Cyan
         & $Python -m unittest discover -s "tests/unit/backend" -p "test_phase*.py"
 
-        Write-Host "`n==> [2/4] Running Google Maps scraper tests..." -ForegroundColor Cyan
+        Write-Host "`n==> [2/5] Running Google Maps scraper tests (168 tests)..." -ForegroundColor Cyan
         & $Python -m pytest tests/unit/gmaps -q
 
-        Write-Host "`n==> [3/4] Running OpenMap engine tests (31 tests)..." -ForegroundColor Cyan
+        Write-Host "`n==> [3/5] Running OpenMap engine tests (31 tests)..." -ForegroundColor Cyan
         & $Python -m unittest discover -s "tests/unit/osm" -p "test_*.py"
 
-        Write-Host "`n==> [4/4] Running Autonomous Agent tests..." -ForegroundColor Cyan
+        Write-Host "`n==> [4/5] Running Autonomous Agent tests (12 tests)..." -ForegroundColor Cyan
         & $Python -m unittest tests/integration/test_agent_behaviors.py
 
-        Write-Host "`n==> ALL DATAEXTRACTION TEST SUITES PASSED GREEN (100%)!" -ForegroundColor Green
+        Write-Host "`n==> [5/5] Running End-to-End Pipeline & Saga tests (16 tests)..." -ForegroundColor Cyan
+        & $Python -m pytest tests/e2e -q
+
+        Write-Host "`n==> ALL DATAEXTRACTION TEST SUITES PASSED GREEN (349/349 - 100%)!" -ForegroundColor Green
     }
 
     "test:backend" {
@@ -81,6 +84,23 @@ switch ($Command) {
     "test:agents" {
         Write-Host "==> Running autonomous agent behavior tests..." -ForegroundColor Cyan
         & $Python -m unittest tests/integration/test_agent_behaviors.py -v
+    }
+
+    "test:e2e" {
+        Write-Host "==> Running End-to-End pipeline & saga integration tests..." -ForegroundColor Cyan
+        & $Python -m pytest tests/e2e -v
+    }
+
+    "test:ui" {
+        Write-Host "==> Running Playwright E2E UI automation tests..." -ForegroundColor Cyan
+        $FrontendDir = Join-Path $Root "packages\frontend"
+        $env:NODE_PATH = Join-Path $FrontendDir "node_modules"
+        Push-Location $FrontendDir
+        try {
+            npx playwright test --config=../../tests/playwright/playwright.config.ts
+        } finally {
+            Pop-Location
+        }
     }
 
     "typecheck" {
@@ -180,11 +200,13 @@ switch ($Command) {
         Write-Host "DataExtraction Enterprise Monorepo CLI" -ForegroundColor Green
         Write-Host "Usage: .\manage.ps1 <command>"
         Write-Host "Commands:"
-        Write-Host "  test            Run all test suites (Backend + GMaps + OSM + Agents)"
+        Write-Host "  test            Run all test suites (Backend + GMaps + OSM + Agents + E2E - 349 tests)"
         Write-Host "  test:backend    Run Phase 1-6 backend unit tests"
         Write-Host "  test:gmaps      Run Google Maps scraper test suite"
         Write-Host "  test:osm        Run Overpass OpenMap engine tests"
         Write-Host "  test:agents     Run autonomous agent behavior tests"
+        Write-Host "  test:e2e        Run End-to-End pipeline & saga integration tests"
+        Write-Host "  test:ui         Run Playwright E2E UI automation tests"
         Write-Host "  typecheck       Validate frontend TypeScript types (tsc --noEmit)"
         Write-Host "  build           Build Next.js production standalone assets"
         Write-Host "  up              Launch multi-container stack"
@@ -202,3 +224,4 @@ switch ($Command) {
         Write-Host "  status          Inspect service availability and endpoints"
     }
 }
+

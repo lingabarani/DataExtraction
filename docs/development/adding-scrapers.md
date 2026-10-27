@@ -25,7 +25,7 @@ from pathlib import Path
 
 SCRAPER_PATH = Path(__file__).resolve().parents[2] / "scrapers" / "custom_source" / "fetch_custom.py"
 
-@activity.defn(name="run_custom_source")
+@activity.defn(name="run_custom_source") 
 async def run_custom_source_activity(args: dict) -> dict:
     result = subprocess.run(
         [sys.executable, str(SCRAPER_PATH), "--limit", str(args.get("limit", 1000))],
@@ -40,3 +40,4 @@ async def run_custom_source_activity(args: dict) -> dict:
 1. Add the activity to the corresponding worker in `packages/temporal/workers/`.
 2. Add the activity call to the relevant workflow definition.
 3. Configure rate limits in `config/rate_limits.yaml`.
+

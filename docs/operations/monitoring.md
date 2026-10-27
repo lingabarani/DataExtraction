@@ -22,3 +22,4 @@ DataExtraction exposes Prometheus metrics on port `9090` (`/metrics`):
 - `dataextraction_agent_cycles_total{agent}`: Execution loops completed.
 - `dataextraction_agent_decisions_total{agent, action}`: Count by action type (`noop`, `start_workflow`, `signal_workflow`, `alert`).
 - `dataextraction_agent_approvals_pending_total`: Decisions waiting for human sign-off.
+

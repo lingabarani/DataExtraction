@@ -39,3 +39,4 @@ docker compose -f infra/docker-compose.yml logs -f api
 ```bash
 docker compose -f infra/docker-compose.yml down
 ```
+

@@ -1,0 +1,47 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API mock test harness",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-27T00:00:00Z",
+    "copyright": "OpenStreetMap contributors"
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 1002003001,
+      "lat": 32.3777,
+      "lon": -86.3006,
+      "tags": {
+        "name": "Montgomery Regional Health Clinic",
+        "amenity": "clinic",
+        "healthcare": "clinic",
+        "addr:street": "North Ripley Street",
+        "addr:housenumber": "301",
+        "addr:city": "Montgomery",
+        "addr:state": "AL",
+        "addr:postcode": "36104",
+        "phone": "+1 334-293-6000",
+        "operator": "Alabama Department of Public Health"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1002003002,
+      "lat": 33.5186,
+      "lon": -86.8104,
+      "tags": {
+        "name": "Birmingham Pediatric Specialty Center",
+        "amenity": "doctors",
+        "healthcare": "doctor",
+        "addr:street": "University Blvd",
+        "addr:housenumber": "1600",
+        "addr:city": "Birmingham",
+        "addr:state": "AL",
+        "addr:postcode": "35233",
+        "phone": "+1 205-934-4011",
+        "website": "https://www.uabmedicine.org"
+      }
+    }
+  ]
+}
+

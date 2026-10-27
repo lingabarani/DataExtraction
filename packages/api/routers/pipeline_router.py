@@ -257,3 +257,4 @@ async def list_schedules(
     except Exception as exc:
         logger.warning("Schedule list query encountered error: %s", exc)
         return {"schedules": [], "total": 0, "notice": str(exc)}
+

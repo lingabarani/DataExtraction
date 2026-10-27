@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-10-26T09:47:23.852874+00:00",
+  "timestamp": "2026-10-27T01:45:29.898274+00:00",
   "authorized": true,
-  "total_passed": 333,
+  "total_passed": 349,
   "total_failed": 0,
-  "total_tests": 333,
+  "total_tests": 349,
   "suites": [
     {
       "suite": "backend",
@@ -39,6 +39,15 @@
       "passed": 12,
       "failed": 0,
       "total": 12,
+      "returncode": 0
+    },
+    {
+      "suite": "e2e",
+      "description": "End-to-End pipeline & saga integration tests (16 tests)",
+      "status": "PASS",
+      "passed": 16,
+      "failed": 0,
+      "total": 16,
       "returncode": 0
     }
   ]

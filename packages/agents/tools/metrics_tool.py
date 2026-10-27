@@ -64,3 +64,4 @@ async def get_current_metrics(metric_names: List[str]) -> Dict[str, Any]:
             results[name] = None
 
     return results
+

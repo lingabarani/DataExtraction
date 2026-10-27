@@ -36,3 +36,4 @@ If Temporal Server crashes:
 1. Restart Temporal containers (`infra/docker-compose.yml`).
 2. Workers automatically reconnect, re-register task queues, and resume pending workflows from their last recorded activity completion marker.
 3. In-flight activities with timeouts will retry automatically per workflow retry policies.
+

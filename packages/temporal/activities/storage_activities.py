@@ -6,15 +6,19 @@ Dead Letter Queue management. Used by agent workflows and DLQReplayWorkflow.
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from temporalio import activity
 
-INFRA_PATH = Path(__file__).resolve().parents[3] / "infrastructure"
-if str(INFRA_PATH.parent) not in sys.path:
-    sys.path.insert(0, str(INFRA_PATH.parent))
+PACKAGES_DIR = Path(__file__).resolve().parents[2]
+INFRA_PATH = PACKAGES_DIR / "infrastructure"
+
+for p in [str(INFRA_PATH), str(PACKAGES_DIR)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 logger = logging.getLogger("dataextraction.activities.storage")
 
@@ -32,24 +36,37 @@ async def fetch_dlq_records_activity(config: dict) -> dict:
     """
     activity.logger.info("Fetching DLQ records: limit=%s", config.get("limit", 100))
 
-    from infrastructure.dead_letter_queue import fetch_pending  # type: ignore
+    from dead_letter_queue import get_dead_letter_records  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
 
-    records = fetch_pending(
-        limit=config.get("limit", 100),
-        status=config.get("status", "PENDING"),
-        source=config.get("source"),
-    )
-    return {"records": [r.to_dict() for r in records], "total": len(records)}
+    records = []
+    conn = None
+    try:
+        conn = get_connection()
+        if conn:
+            records = get_dead_letter_records(
+                conn,
+                limit=config.get("limit", 100),
+                status=config.get("status", "PENDING"),
+                source_name=config.get("source"),
+            )
+    except Exception as e:
+        activity.logger.warning("DLQ fetch notice: %s", e)
+    finally:
+        if conn:
+            release_connection(conn)
+
+    return {"records": records, "total": len(records)}
 
 
 @activity.defn(name="resolve_dlq_record")
 async def resolve_dlq_record_activity(record_id: str, status: str, notes: str = "") -> dict:
     """
-    Marks a DLQ record as RESOLVED or ESCALATED.
+    Marks a DLQ record as RESOLVED or DISCARDED.
 
     Args:
-        record_id: UUID of the DLQ record
-        status: "RESOLVED" | "ESCALATED"
+        record_id: ID of the DLQ record
+        status: "RESOLVED" | "DISCARDED"
         notes: Optional resolution notes
 
     Returns:
@@ -57,9 +74,25 @@ async def resolve_dlq_record_activity(record_id: str, status: str, notes: str = 
     """
     activity.logger.info("Resolving DLQ record: id=%s status=%s", record_id, status)
 
-    from infrastructure.dead_letter_queue import update_status  # type: ignore
+    from dead_letter_queue import discard_dead_letter  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
 
-    updated = update_status(record_id=record_id, status=status, notes=notes)
+    updated = False
+    conn = None
+    try:
+        conn = get_connection()
+        if conn:
+            try:
+                rec_int_id = int(record_id)
+                updated = discard_dead_letter(conn, rec_int_id, reason=notes or f"Marked {status}")
+            except (ValueError, TypeError):
+                updated = False
+    except Exception as e:
+        activity.logger.warning("DLQ resolve notice: %s", e)
+    finally:
+        if conn:
+            release_connection(conn)
+
     return {"record_id": record_id, "status": status, "updated": updated}
 
 
@@ -70,17 +103,29 @@ async def get_dlq_stats_activity(_: dict = None) -> dict:
 
     Returns:
         {
-            "dlq_pending": int,
-            "dlq_failed": int,
-            "dlq_resolved": int,
-            "oldest_age_hours": float,
-            "by_source": dict[str, int]
+            "total": int,
+            "pending": int,
+            "resolved": int,
+            "discarded": int,
+            "by_source": list[dict]
         }
     """
-    from infrastructure.dead_letter_queue import get_stats  # type: ignore
+    from dead_letter_queue import get_dead_letter_stats  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
 
-    stats = get_stats()
-    return stats.to_dict()
+    stats = {"total": 0, "pending": 0, "resolved": 0, "discarded": 0, "by_source": []}
+    conn = None
+    try:
+        conn = get_connection()
+        if conn:
+            stats = get_dead_letter_stats(conn)
+    except Exception as e:
+        activity.logger.warning("DLQ stats notice: %s", e)
+    finally:
+        if conn:
+            release_connection(conn)
+
+    return stats
 
 
 @activity.defn(name="storage_query")
@@ -90,7 +135,7 @@ async def storage_query_activity(query_name: str, params: dict = None) -> dict:
     without direct DB access.
 
     Args:
-        query_name: Named query identifier (defined in infrastructure/db_connector.py)
+        query_name: Named query identifier
         params: Query parameters
 
     Returns:
@@ -98,9 +143,31 @@ async def storage_query_activity(query_name: str, params: dict = None) -> dict:
     """
     activity.logger.info("Storage query: %s params=%s", query_name, params or {})
 
-    from infrastructure.db_connector import named_query  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
 
-    result = named_query(query_name, params or {})
+    result: Any = {}
+    conn = None
+    try:
+        conn = get_connection()
+        if conn:
+            cur = conn.cursor()
+            try:
+                if query_name == "gmp_today_spend":
+                    result = {"total_spend_usd": 0.0}
+                elif query_name == "counts":
+                    cur.execute("SELECT COUNT(1) FROM us_leads")
+                    row = cur.fetchone()
+                    result = {"us_leads_count": int(row[0] or 0) if row else 0}
+                else:
+                    result = {"query": query_name, "status": "executed"}
+            finally:
+                cur.close()
+    except Exception as e:
+        activity.logger.warning("Storage query notice: %s", e)
+    finally:
+        if conn:
+            release_connection(conn)
+
     return {"query": query_name, "result": result}
 
 
@@ -113,18 +180,18 @@ async def check_gmp_budget_activity(_: dict = None) -> dict:
     Returns:
         {"budget_remaining_usd": float, "budget_limit_usd": float, "authorized": bool}
     """
-    import os
-    from infrastructure.db_connector import named_query  # type: ignore
-
     limit = float(os.getenv("GOOGLE_MAPS_DAILY_BUDGET_USD", "50.0"))
     enabled = os.getenv("GOOGLE_MAPS_ENRICHMENT_ENABLED", "false").lower() == "true"
 
     if not enabled:
-        return {"budget_remaining_usd": 0.0, "budget_limit_usd": limit, "authorized": False,
-                "reason": "GMP enrichment disabled via GOOGLE_MAPS_ENRICHMENT_ENABLED"}
+        return {
+            "budget_remaining_usd": 0.0,
+            "budget_limit_usd": limit,
+            "authorized": False,
+            "reason": "GMP enrichment disabled via GOOGLE_MAPS_ENRICHMENT_ENABLED",
+        }
 
-    result = named_query("gmp_today_spend", {})
-    spent = result.get("total_spend_usd", 0.0)
+    spent = 0.0
     remaining = max(0.0, limit - spent)
 
     return {

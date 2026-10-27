@@ -47,3 +47,4 @@ from packages.temporal.schedules.register_schedules import register_all_schedule
 client = await get_temporal_client()
 await register_all_schedules(client)
 ```
+

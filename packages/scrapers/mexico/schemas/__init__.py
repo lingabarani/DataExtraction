@@ -1,0 +1,1 @@
+from .canonical_company import deserialize_company

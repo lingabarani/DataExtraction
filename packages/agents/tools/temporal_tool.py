@@ -77,3 +77,4 @@ async def list_schedules() -> List[Dict[str, Any]]:
     except Exception as exc:
         logger.warning("Error querying schedules: %s", exc)
     return schedules
+

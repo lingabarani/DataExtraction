@@ -52,7 +52,7 @@ class TestFrontendNamespaceAndBrandIntegrity(unittest.TestCase):
     """Verifies complete eradication of legacy project drift in the frontend codebase."""
 
     def setUp(self):
-        self.frontend_dir = _project_root / "frontend"
+        self.frontend_dir = (_packages / "frontend") if (_packages / "frontend").exists() else (_project_root / "frontend")
 
     def test_package_json_naming(self):
         pkg_file = self.frontend_dir / "package.json"
@@ -254,7 +254,7 @@ class TestOperationalDashboardIntegration(unittest.TestCase):
     """Verifies frontend components, routes, and operational UI integration."""
 
     def setUp(self):
-        self.frontend_dir = _project_root / "frontend"
+        self.frontend_dir = (_packages / "frontend") if (_packages / "frontend").exists() else (_project_root / "frontend")
 
     def test_pipeline_route_exists(self):
         pipeline_page = self.frontend_dir / "src" / "app" / "(dashboard)" / "pipeline" / "page.tsx"

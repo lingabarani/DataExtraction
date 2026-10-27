@@ -77,3 +77,4 @@ async def get_source_freshness() -> Dict[str, Any]:
     except Exception as exc:
         logger.warning("Failed to query source freshness: %s", exc)
     return freshness
+

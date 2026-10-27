@@ -16,9 +16,16 @@ from pathlib import Path
 
 from temporalio import activity
 
-SCRAPERS_DIR = Path(__file__).resolve().parents[3] / "scrapers" / "federal"
+PACKAGES_DIR = Path(__file__).resolve().parents[2]
+SCRAPERS_DIR = PACKAGES_DIR / "scrapers" / "federal"
 PYTHON = sys.executable
 logger = logging.getLogger("dataextraction.activities.federal")
+
+# Ensure packages and infrastructure are on sys.path and PYTHONPATH
+if str(PACKAGES_DIR) not in sys.path:
+    sys.path.insert(0, str(PACKAGES_DIR))
+if str(PACKAGES_DIR / "infrastructure") not in sys.path:
+    sys.path.insert(0, str(PACKAGES_DIR / "infrastructure"))
 
 # ── Default timeout values (seconds) — can override per env ──────────────────
 SCRAPER_TIMEOUT = int(os.getenv("FEDERAL_SCRAPER_TIMEOUT_SECONDS", "7200"))  # 2h

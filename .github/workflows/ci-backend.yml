@@ -26,6 +26,7 @@ jobs:
           - unit-gmaps
           - unit-osm
           - integration
+          - e2e
     services:
       postgres:
         image: postgis/postgis:15-3.4
@@ -90,6 +91,11 @@ jobs:
           ENVIRONMENT: test
         run: |
           pytest tests/integration/ -v --tb=short -m "not requires_temporal"
+
+      - name: Run end-to-end integration tests (16 tests)
+        if: matrix.suite == 'e2e'
+        run: |
+          pytest tests/e2e/ -v --tb=short
 
       - name: Upload coverage report
         if: matrix.suite == 'unit-backend'

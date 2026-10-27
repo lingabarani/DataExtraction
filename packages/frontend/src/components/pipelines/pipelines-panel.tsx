@@ -315,3 +315,4 @@ export function PipelinesPanel() {
     </div>
   );
 }
+

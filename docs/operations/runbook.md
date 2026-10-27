@@ -56,3 +56,4 @@ Automated database backups run daily via pg_dump with SHA-256 integrity hashing 
   ```powershell
   .\manage.ps1 worker:federal
   ```
+

@@ -76,3 +76,10 @@ temporal-data/
 # ── Build artifacts ───────────────────────────────────────────────────────────
 *.whl
 *.tar.gz
+
+# ── Test & E2E Artifacts ──────────────────────────────────────────────────────
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+

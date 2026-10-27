@@ -1,0 +1,57 @@
+{
+  "us_parent": {
+    "company_id": "comp-us-001",
+    "legal_name": "Apex Manufacturing Technologies LLC",
+    "trade_name": "Apex Tech",
+    "normalized_name": "APEX MANUFACTURING TECHNOLOGIES",
+    "ein": "12-3456789",
+    "domain": "apexmanufacturing.com",
+    "website": "https://www.apexmanufacturing.com",
+    "entity_type": "LLC",
+    "state_code": "DE",
+    "country": "United States",
+    "address": {
+      "street": "1209 Orange St",
+      "city": "Wilmington",
+      "state": "Delaware",
+      "state_code": "DE",
+      "zip_code": "19801"
+    },
+    "person": {
+      "first_name": "Marcus",
+      "last_name": "Vance",
+      "full_name": "Marcus Vance",
+      "title": "Chief Executive Officer",
+      "email": "m.vance@apexmanufacturing.com",
+      "phone": "+1 302-555-0199"
+    }
+  },
+  "mexico_subsidiary": {
+    "company_id": "comp-mx-001",
+    "legal_name": "Apex Manufacturing de Mexico S.A. de C.V.",
+    "trade_name": "Apex Mexico",
+    "normalized_name": "APEX MANUFACTURING DE MEXICO",
+    "rfc": "AMM050615XYZ",
+    "domain": "apexmanufacturing.com",
+    "website": "https://www.apexmanufacturing.com/mx",
+    "entity_type": "SA DE CV",
+    "state_code": "NLE",
+    "country": "Mexico",
+    "address": {
+      "street": "Av. Fundidora 501",
+      "city": "Monterrey",
+      "state": "Nuevo Leon",
+      "state_code": "NLE",
+      "zip_code": "64010"
+    },
+    "person": {
+      "first_name": "Alejandro",
+      "last_name": "Garza",
+      "full_name": "Alejandro Garza",
+      "title": "Director General Mexico",
+      "email": "agarza@apexmanufacturing.com",
+      "phone": "+52 81-8123-4567"
+    }
+  }
+}
+

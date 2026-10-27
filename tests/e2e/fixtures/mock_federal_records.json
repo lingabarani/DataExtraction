@@ -1,0 +1,116 @@
+{
+  "sec_edgar": [
+    {
+      "cik": "0000320193",
+      "company_name": "Apple Inc.",
+      "ein": "94-2404110",
+      "sic": "3571",
+      "fiscal_year_end": "0930",
+      "state_location": "CA",
+      "state_incorporation": "CA",
+      "business_address": {
+        "street": "One Apple Park Way",
+        "city": "Cupertino",
+        "state": "CA",
+        "zip_code": "95014"
+      }
+    },
+    {
+      "cik": "0001018724",
+      "company_name": "Amazon.com, Inc.",
+      "ein": "91-1646860",
+      "sic": "5961",
+      "fiscal_year_end": "1231",
+      "state_location": "WA",
+      "state_incorporation": "DE",
+      "business_address": {
+        "street": "410 Terry Avenue North",
+        "city": "Seattle",
+        "state": "WA",
+        "zip_code": "98109"
+      }
+    }
+  ],
+  "cms_npi": [
+    {
+      "npi": "1497782190",
+      "entity_type": "2",
+      "provider_organization_name": "Memorial Sloan Kettering Cancer Center",
+      "ein": "13-1624190",
+      "authorized_official_first_name": "Craig",
+      "authorized_official_last_name": "Thompson",
+      "authorized_official_title": "President & CEO",
+      "practice_location_address": {
+        "address_1": "1275 York Ave",
+        "city_name": "New York",
+        "state_name": "NY",
+        "postal_code": "100656007",
+        "telephone_number": "212-639-2000"
+      },
+      "taxonomies": [
+        {"code": "282N00000X", "desc": "General Acute Care Hospital", "primary": true}
+      ]
+    }
+  ],
+  "fdic": [
+    {
+      "cert_id": 3510,
+      "bank_name": "JPMorgan Chase Bank, National Association",
+      "city": "Columbus",
+      "state": "OH",
+      "charter_class": "N",
+      "total_assets": 3395000000,
+      "fdic_insured": true,
+      "address": "1111 Polaris Parkway",
+      "zip_code": "43240"
+    }
+  ],
+  "usaspending": [
+    {
+      "award_id": "CONT_AWD_0001_9700",
+      "recipient_name": "Lockheed Martin Corporation",
+      "recipient_uei": "KZL1JHG41BN3",
+      "recipient_parent_uei": "KZL1JHG41BN3",
+      "award_amount": 125000000.0,
+      "action_date": "2026-03-15",
+      "awarding_agency": "Department of Defense",
+      "naics_code": "336411",
+      "naics_description": "Aircraft Manufacturing",
+      "recipient_address": {
+        "street": "6801 Rockledge Dr",
+        "city": "Bethesda",
+        "state": "MD",
+        "zip": "20817"
+      }
+    }
+  ],
+  "sam_gov": [
+    {
+      "uei": "XN8MBH29VCL6",
+      "cage_code": "1ABC2",
+      "legal_business_name": "Raytheon Technologies Defense Solutions",
+      "registration_status": "ACTIVE",
+      "expiration_date": "2027-01-31",
+      "physical_address": {
+        "address_line_1": "870 Winter St",
+        "city": "Waltham",
+        "state_or_province": "MA",
+        "zip_code": "02451"
+      }
+    }
+  ],
+  "propublica": [
+    {
+      "ein": "53-0196605",
+      "name": "American National Red Cross",
+      "sub_name": "Disaster Relief Operations",
+      "city": "Washington",
+      "state": "DC",
+      "subsection_code": "03",
+      "totrevenue": 3800000000,
+      "totfuncexpns": 3650000000,
+      "tax_prd_yr": 2025
+    }
+  ]
+}
+
