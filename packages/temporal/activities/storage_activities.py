@@ -441,3 +441,39 @@ async def compute_bayesian_quality_activity(payload: dict) -> dict:
         contributing_sources=payload.get("contributing_sources", []),
     )
     return res
+
+
+@activity.defn(name="ingest_kg_observation")
+async def ingest_kg_observation_activity(payload: dict) -> dict:
+    """Standard alias for persist_raw_observation_activity."""
+    return await persist_raw_observation_activity(payload)
+
+
+@activity.defn(name="ingest_kg_employment")
+async def ingest_kg_employment_activity(payload: dict) -> dict:
+    """
+    Ingests person and bitemporal employment tenure into `kg_core` and `kg_graph`.
+    """
+    activity.logger.info("Ingesting employment relationship into kg_graph: %s", payload)
+    from kg_ingestion_bridge import kg_ingestion_bridge  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
+
+    conn = None
+    try:
+        conn = get_connection()
+        person_id = kg_ingestion_bridge.ingest_person_and_employment(
+            conn=conn,
+            person_data=payload.get("person_data", {
+                "full_name": payload.get("full_name", "Unknown Professional"),
+                "primary_email": payload.get("email"),
+                "primary_phone": payload.get("phone"),
+                "linkedin_url": payload.get("linkedin_url"),
+            }),
+            org_id=payload.get("org_id"),
+            source_name=payload.get("source_name", "pipeline"),
+            observation_id=payload.get("observation_id"),
+        )
+        return {"person_id": person_id, "status": "ingested"}
+    finally:
+        if conn:
+            release_connection(conn)

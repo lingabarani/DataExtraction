@@ -2,13 +2,13 @@
 DataExtraction — Comprehensive Test Validation Gate
 ===================================================
 Runs all five test suites in the monorepo:
-1. Backend Unit, Lakehouse & Quality Tests (160 tests)
+1. Backend Unit, Lakehouse, Quality & 6-Agent Orchestration Tests (168 tests)
 2. Google Maps Scraper Tests (168 tests)
 3. OpenMap Spatial Engine Tests (31 tests)
 4. Autonomous Agent Behavior Tests (12 tests)
 5. End-to-End Pipeline & Saga Tests (16 tests)
 
-Total: 387 tests. ALL must pass (100% green).
+Total: 395 tests. ALL must pass (100% green).
 
 Usage:
     python scripts/migration/03_validate_tests.py
@@ -38,9 +38,9 @@ PYTHON = sys.executable
 
 SUITES = {
     "backend": {
-        "description": "Backend unit, lakehouse & quality tests (160 tests)",
+        "description": "Backend unit, lakehouse, quality & 6-agent orchestration tests (168 tests)",
         "cmd": [PYTHON, "-m", "unittest", "discover", "-s", "tests/unit/backend", "-p", "test_*.py"],
-        "expected_count": 160,
+        "expected_count": 168,
         "env": {"ENVIRONMENT": "test"},
     },
     "gmaps": {

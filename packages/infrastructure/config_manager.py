@@ -306,6 +306,29 @@ class ConfigManager:
             "base_url": f"{'https' if use_ssl else 'http'}://{host}:{port}",
         }
 
+    # ── Temporal Orchestration & Agent Task Queues ────────────────────────────
+
+    QUEUE_REGISTRY = "registry-ingestion-queue"
+    QUEUE_GEOSPATIAL = "geospatial-domain-queue"
+    QUEUE_IDENTITY = "identity-clustering-queue"
+    QUEUE_EXECUTIVE = "executive-contact-queue"
+    QUEUE_GOVERNANCE = "governance-quality-queue"
+    QUEUE_SEARCH = "search-persistence-queue"
+
+    def get_temporal_queues(self) -> Dict[str, str]:
+        """
+        Retrieve standardized Temporal Task Queue mapping for all 6 agents.
+        Can be overridden via environment variables for custom deployment topologies.
+        """
+        return {
+            "agent_1_registry": self.get("QUEUE_REGISTRY", self.QUEUE_REGISTRY),
+            "agent_2_geospatial": self.get("QUEUE_GEOSPATIAL", self.QUEUE_GEOSPATIAL),
+            "agent_3_identity": self.get("QUEUE_IDENTITY", self.QUEUE_IDENTITY),
+            "agent_4_executive": self.get("QUEUE_EXECUTIVE", self.QUEUE_EXECUTIVE),
+            "agent_5_governance": self.get("QUEUE_GOVERNANCE", self.QUEUE_GOVERNANCE),
+            "agent_6_search": self.get("QUEUE_SEARCH", self.QUEUE_SEARCH),
+        }
+
     # ── SEC EDGAR Compliance ──────────────────────────────────────────────────
 
     def validate_sec_user_agent(self, user_agent: Optional[str]) -> bool:

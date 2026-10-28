@@ -152,7 +152,139 @@ services:
     networks:
       - dataextraction
 
-  # ── Temporal Worker: Federal Ingestion ───────────────────────────────────────
+  # ── Temporal Worker: Agent 1 - Official Registry Intelligence ────────────────
+  worker-registry:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-registry
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=registry
+    command: ["python", "-m", "packages.temporal.workers.worker_registry"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 2 - Geospatial & Domain Intelligence ──────────────
+  worker-geospatial:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-geospatial
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=geospatial
+    command: ["python", "-m", "packages.temporal.workers.worker_geospatial"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 3 - Identity Resolution & Clustering ──────────────
+  worker-identity:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-identity
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=identity
+    command: ["python", "-m", "packages.temporal.workers.worker_identity"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 4 - Executive Discovery & Contact Intelligence ─────
+  worker-executive:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-executive
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=executive
+    command: ["python", "-m", "packages.temporal.workers.worker_executive"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 5 - Governance, Quality & Confidence Engine ────────
+  worker-governance:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-governance
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=governance
+    command: ["python", "-m", "packages.temporal.workers.worker_governance"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 6 - Persistence, CDC & Search Synchronization ──────
+  worker-search:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-search
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=search
+    command: ["python", "-m", "packages.temporal.workers.worker_search"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Federal Ingestion (Legacy compatibility) ────────────────
   worker-federal:
     build:
       context: .
@@ -174,7 +306,7 @@ services:
     networks:
       - dataextraction
 
-  # ── Temporal Worker: GMaps Extraction ────────────────────────────────────────
+  # ── Temporal Worker: GMaps Extraction (Legacy compatibility) ─────────────────
   worker-gmaps:
     build:
       context: .

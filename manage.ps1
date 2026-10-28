@@ -23,6 +23,7 @@ param (
         "test", "test:backend", "test:gmaps", "test:osm", "test:agents", "test:e2e", "test:ui",
         "typecheck", "build", "up", "down",
         "worker:federal", "worker:gmaps", "worker:osm", "worker:pipeline",
+        "worker:registry", "worker:geospatial", "worker:identity", "worker:executive", "worker:governance", "worker:search",
         "db:migrate", "db:partitions", "search:sync", "backup", "backup:verify", "restore", "restore:verify", "restore:list",
         "clean", "status", "help"
     )]
@@ -150,6 +151,36 @@ switch ($Command) {
     "worker:pipeline" {
         Write-Host "==> Launching Temporal Pipeline & Normalizer Worker..." -ForegroundColor Cyan
         & $Python (Join-Path $Root "packages\temporal\workers\pipeline_worker.py")
+    }
+
+    "worker:registry" {
+        Write-Host "==> Launching Worker 1: Official Registry Intelligence (Agent 1)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_registry.py")
+    }
+
+    "worker:geospatial" {
+        Write-Host "==> Launching Worker 2: Geospatial & Domain Intelligence (Agent 2)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_geospatial.py")
+    }
+
+    "worker:identity" {
+        Write-Host "==> Launching Worker 3: Identity Resolution & Clustering (Agent 3)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_identity.py")
+    }
+
+    "worker:executive" {
+        Write-Host "==> Launching Worker 4: Executive Discovery & Contact Intelligence (Agent 4)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_executive.py")
+    }
+
+    "worker:governance" {
+        Write-Host "==> Launching Worker 5: Governance, Quality & Confidence Engine (Agent 5)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_governance.py")
+    }
+
+    "worker:search" {
+        Write-Host "==> Launching Worker 6: Persistence, CDC & Search Synchronization (Agent 6)..." -ForegroundColor Cyan
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_search.py")
     }
 
     "db:migrate" {
