@@ -3,6 +3,9 @@ DataExtraction — PipelineCoordinatorAgent
 ==========================================
 Monitors workflow completion events and automatically triggers downstream
 enrichment and deduplication pipelines when upstream extractions finish.
+
+Guards against competing orchestration: If MasterOrchestrationWorkflow is
+active or managing the execution, this coordinator yields to the master saga.
 """
 
 import logging
@@ -26,22 +29,32 @@ class PipelineCoordinatorAgent(BaseAgent):
 
     async def observe(self) -> Dict[str, Any]:
         """
-        Observes completed workflows and currently active workflows.
+        Observes completed workflows, currently active workflows, and master orchestrator status.
         """
         completed_federal = await list_completed_workflows("FederalIngestionWorkflow", limit=20)
         completed_gmaps = await list_completed_workflows("GMapsExtractionWorkflow", limit=20)
         active_enrichment = await list_active_workflows("LeadEnrichmentWorkflow")
+        active_master = await list_active_workflows("MasterOrchestrationWorkflow")
 
         return {
             "completed_federal_ids": [wf["id"] for wf in completed_federal],
             "completed_gmaps_ids": [wf["id"] for wf in completed_gmaps],
             "active_enrichment_count": len(active_enrichment),
+            "has_active_master_saga": len(active_master) > 0,
         }
 
     async def decide(self, observations: Dict[str, Any]) -> AgentDecision:
         """
         Determines if any newly completed extraction workflow needs downstream enrichment.
+        Yields to MasterOrchestrationWorkflow if active to avoid duplicate execution.
         """
+        if observations.get("has_active_master_saga", False):
+            return AgentDecision(
+                action="noop",
+                rationale="MasterOrchestrationWorkflow is managing downstream phases natively.",
+                confidence=1.0,
+            )
+
         active_count = observations.get("active_enrichment_count", 0)
         if active_count > 0:
             return AgentDecision(
@@ -85,4 +98,3 @@ class PipelineCoordinatorAgent(BaseAgent):
             rationale="All completed extraction runs have been enriched or already queued.",
             confidence=1.0,
         )
-

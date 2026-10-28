@@ -4,6 +4,7 @@ DataExtraction — Pipeline Activities
 Temporal activity wrappers for all data transformation steps.
 These call the pipeline modules (normalizer, deduplicator, validators, lead builder)
 via cleanly resolved sys.path injection — source files are never modified.
+Enforces strict SQL identifier sanitization and structured error handling.
 """
 
 import logging
@@ -21,6 +22,8 @@ INFRA_PATH = PACKAGES_PATH / "infrastructure"
 for p in [str(PACKAGES_PATH), str(PIPELINE_PATH), str(INFRA_PATH)]:
     if p not in sys.path:
         sys.path.insert(0, p)
+
+from packages.infrastructure.db_connector import _assert_safe_identifier  # type: ignore
 
 logger = logging.getLogger("dataextraction.activities.pipeline")
 
@@ -45,6 +48,7 @@ async def normalize_batch_activity(source: str, table: str, batch_size: int = 50
     from packages.pipeline.normalizer import normalize_company, normalize_person  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
 
+    safe_table = _assert_safe_identifier(table)
     conn = None
     normalized_count = 0
     try:
@@ -53,12 +57,12 @@ async def normalize_batch_activity(source: str, table: str, batch_size: int = 50
             cur = conn.cursor()
             try:
                 # Query records that need normalization if applicable
-                cur.execute(f"SELECT id, raw_data FROM {table} WHERE normalized_at IS NULL LIMIT %s", (batch_size,))
+                cur.execute(f"SELECT id, raw_data FROM {safe_table} WHERE normalized_at IS NULL LIMIT %s", (batch_size,))
                 rows = cur.fetchall()
                 for row in rows:
                     rec_id, raw_data = row[0], row[1]
                     norm = normalize_company(raw_data, source=source)
-                    cur.execute(f"UPDATE {table} SET normalized_name = %s, normalized_at = NOW() WHERE id = %s",
+                    cur.execute(f"UPDATE {safe_table} SET normalized_name = %s, normalized_at = NOW() WHERE id = %s",
                                 (norm.get("name"), rec_id))
                     normalized_count += 1
                 conn.commit()
@@ -100,6 +104,7 @@ async def deduplicate_batch_activity(table: str, batch_size: int = 1000) -> dict
     from packages.pipeline.deduplicator import Deduplicator  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
 
+    safe_table = _assert_safe_identifier(table)
     merged_count = 0
     removed_count = 0
     conn = None
@@ -107,10 +112,9 @@ async def deduplicate_batch_activity(table: str, batch_size: int = 1000) -> dict
         conn = get_connection()
         if conn:
             dedup = Deduplicator(get_connection)
-            # Process pending records
             cur = conn.cursor()
             try:
-                cur.execute(f"SELECT * FROM {table} WHERE deduplicated_at IS NULL LIMIT %s", (batch_size,))
+                cur.execute(f"SELECT * FROM {safe_table} WHERE deduplicated_at IS NULL LIMIT %s", (batch_size,))
                 rows = cur.fetchall()
                 for r in rows:
                     row_dict = dict(r) if hasattr(r, "_asdict") else dict(zip([c[0] for c in cur.description], r))
@@ -157,6 +161,7 @@ async def validate_contacts_activity(table: str, limit: int = 5000) -> dict:
     from packages.pipeline.contact_validator import validate_email, validate_phone  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
 
+    safe_table = _assert_safe_identifier(table)
     validated = 0
     failed = 0
     conn = None
@@ -165,7 +170,7 @@ async def validate_contacts_activity(table: str, limit: int = 5000) -> dict:
         if conn:
             cur = conn.cursor()
             try:
-                cur.execute(f"SELECT id, email, phone FROM {table} WHERE contact_validated_at IS NULL LIMIT %s", (limit,))
+                cur.execute(f"SELECT id, email, phone FROM {safe_table} WHERE contact_validated_at IS NULL LIMIT %s", (limit,))
                 rows = cur.fetchall()
                 for row in rows:
                     rec_id, email, phone = row[0], row[1], row[2]
@@ -214,6 +219,8 @@ async def build_leads_activity(source_table: str, target_table: str) -> dict:
     from packages.pipeline.lead_builder import build_us_lead, build_mexico_lead  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
 
+    safe_source = _assert_safe_identifier(source_table)
+    safe_target = _assert_safe_identifier(target_table)
     built_count = 0
     conn = None
     try:
@@ -221,7 +228,7 @@ async def build_leads_activity(source_table: str, target_table: str) -> dict:
         if conn:
             cur = conn.cursor()
             try:
-                cur.execute(f"SELECT COUNT(1) FROM {source_table}")
+                cur.execute(f"SELECT COUNT(1) FROM {safe_source}")
                 row = cur.fetchone()
                 built_count = int(row[0] or 0) if row else 0
             except Exception as q_err:
@@ -259,6 +266,7 @@ async def validate_tax_ids_activity(table: str, limit: int = 10000) -> dict:
     from packages.pipeline.tax_validator import validate_ein, validate_rfc  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
 
+    safe_table = _assert_safe_identifier(table)
     validated = 0
     failed = 0
     conn = None
@@ -267,7 +275,7 @@ async def validate_tax_ids_activity(table: str, limit: int = 10000) -> dict:
         if conn:
             cur = conn.cursor()
             try:
-                cur.execute(f"SELECT id, ein FROM {table} WHERE ein IS NOT NULL LIMIT %s", (limit,))
+                cur.execute(f"SELECT id, ein FROM {safe_table} WHERE ein IS NOT NULL LIMIT %s", (limit,))
                 rows = cur.fetchall()
                 for row in rows:
                     rec_id, ein = row[0], row[1]
@@ -311,6 +319,7 @@ async def validate_geo_activity(table: str, limit: int = 10000) -> dict:
     from packages.pipeline.geo_validator import normalize_postal_code, validate_coordinates  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
 
+    safe_table = _assert_safe_identifier(table)
     validated = 0
     failed = 0
     conn = None
@@ -319,7 +328,7 @@ async def validate_geo_activity(table: str, limit: int = 10000) -> dict:
         if conn:
             cur = conn.cursor()
             try:
-                cur.execute(f"SELECT id, latitude, longitude, zip_code FROM {table} LIMIT %s", (limit,))
+                cur.execute(f"SELECT id, latitude, longitude, zip_code FROM {safe_table} LIMIT %s", (limit,))
                 rows = cur.fetchall()
                 for row in rows:
                     rec_id, lat, lon, zip_c = row[0], row[1], row[2], row[3]

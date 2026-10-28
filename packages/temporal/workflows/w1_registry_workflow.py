@@ -132,3 +132,4 @@ class Agent1RegistryWorkflow:
             "sources_failed": len([s for s, r in self._results.items() if r.get("status") == "FAILED"]),
             "results": self._results,
         }
+
