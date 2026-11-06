@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataExtraction Enterprise — Certified Master Data Architecture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #06090F;
+      color: #F8FAFC;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #0B0F19;
+      border-bottom: 1px solid #1E293B;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .header-title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 800;
+      background: linear-gradient(90deg, #38BDF8, #818CF8, #C084FC);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 0.5px;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: #064E3B;
+      color: #34D399;
+      border: 1px solid #059669;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    button {
+      background: #1E293B;
+      color: #E2E8F0;
+      border: 1px solid #334155;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    button:hover {
+      background: #334155;
+      color: #FFFFFF;
+      border-color: #475569;
+    }
+    button.primary {
+      background: #0284C7;
+      border-color: #0369A1;
+      color: #FFFFFF;
+    }
+    button.primary:hover {
+      background: #0369A1;
+    }
+    button.success {
+      background: #059669;
+      border-color: #047857;
+      color: #FFFFFF;
+    }
+    button.success:hover {
+      background: #047857;
+    }
+    .diagram-viewport {
+      flex: 1;
+      overflow: auto;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background: #06090F;
+    }
+    .canvas-card {
+      background: #0B0F19;
+      border: 1px solid #1E293B;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      width: 100%;
+      max-width: 1920px;
+      overflow: hidden;
+      transform-origin: top center;
+      transition: transform 0.2s ease-out;
+    }
+    .canvas-card svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    footer {
+      background: #0B0F19;
+      border-top: 1px solid #1E293B;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <div class="title-row">
+      <h1>DataExtraction Enterprise B2B Platform</h1>
+      <span class="badge">Approved MDM Target Architecture</span>
+    </div>
+    <div class="subtitle">Decoupled Pre-Master Canvas • Atomic Promotion Gate • PostgreSQL 18 Master Vault • Autonomous Freshness Lifecycle</div>
+  </div>
+
+  <div class="controls">
+    <button onclick="zoomOut()"><span>−</span> Zoom Out</button>
+    <button onclick="resetZoom()">100% Reset</button>
+    <button onclick="zoomIn()"><span>+</span> Zoom In</button>
+    <button class="primary" onclick="downloadSVG()">⬇ Download Vector SVG</button>
+    <button class="success" onclick="downloadPNG()">🖼 Download High-Res PNG</button>
+  </div>
+</header>
+
+<div class="diagram-viewport" id="viewport">
+  <div class="canvas-card" id="card">
+    <!-- Embed External SVG Object -->
+    <object id="svg-object" data="enterprise_b2b_certified_architecture.svg" type="image/svg+xml" style="width: 100%; height: auto; min-height: 1200px; display: block;">
+      <img src="enterprise_b2b_certified_architecture_flowchart.png" alt="Architecture Diagram" style="width: 100%; height: auto;" />
+    </object>
+  </div>
+</div>
+
+<footer>
+  <div>DataExtraction • Enterprise MDM & Intelligence Architecture • Apollo / ZoomInfo / People Data Labs Standard</div>
+  <div>Format: 1920 x 1480 UHD Vector • Status: Production Target Approved</div>
+</footer>
+
+<script>
+  let currentZoom = 1.0;
+  const card = document.getElementById('card');
+
+  function updateZoom() {
+    card.style.transform = `scale(${currentZoom})`;
+  }
+
+  function zoomIn() {
+    currentZoom = Math.min(2.5, currentZoom + 0.15);
+    updateZoom();
+  }
+
+  function zoomOut() {
+    currentZoom = Math.max(0.5, currentZoom - 0.15);
+    updateZoom();
+  }
+
+  function resetZoom() {
+    currentZoom = 1.0;
+    updateZoom();
+  }
+
+  function downloadSVG() {
+    const a = document.createElement('a');
+    a.href = 'enterprise_b2b_certified_architecture.svg';
+    a.download = 'DataExtraction_Certified_Enterprise_Architecture.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  async function downloadPNG() {
+    try {
+      const resp = await fetch('enterprise_b2b_certified_architecture.svg');
+      const svgText = await resp.text();
+      const img = new Image();
+      const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1920 * 2; // 2x Retina UHD
+        canvas.height = 1480 * 2;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#0B0F19';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = 'DataExtraction_Certified_Enterprise_Architecture_UHD.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      img.src = url;
+    } catch (e) {
+      // Fallback: direct download of PNG file
+      const a = document.createElement('a');
+      a.href = 'enterprise_b2b_certified_architecture_flowchart.png';
+      a.download = 'DataExtraction_Architecture_Diagram.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  }
+</script>
+
+</body>
+</html>
+

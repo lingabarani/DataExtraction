@@ -12,7 +12,7 @@ import {
 import {
   Download, FileText, FileSpreadsheet, FileJson,
   Globe2, Filter, CheckSquare, Square, Loader2,
-  Database, ShieldCheck, Phone, Users, AlertCircle,
+  Database, ShieldCheck, Phone, Users, AlertCircle, Send,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -86,7 +86,7 @@ const PRESETS: Record<string, string[]> = {
 // ── Estimated record count from filters ──────────────────────────────────────
 
 interface FilterState {
-  table:        "us_leads" | "mexico_leads";
+  table:        "master_organizations" | "us_leads" | "mexico_leads";
   seniority:    string;
   industry:     string;
   state_code:   string;
@@ -98,7 +98,7 @@ interface FilterState {
 
 export function ExportManager() {
   const [filters, setFilters] = useState<FilterState>({
-    table: "us_leads", seniority: "all", industry: "all",
+    table: "master_organizations", seniority: "all", industry: "all",
     state_code: "all", email_status: "all", api_source: "all",
   });
   const [selectedCols, setSelectedCols] = useState<Set<string>>(
@@ -108,6 +108,7 @@ export function ExportManager() {
   const [estimating,  setEstimating]  = useState(false);
   const [estimate,    setEstimate]    = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [dispatchingOneReach, setDispatchingOneReach] = useState(false);
 
   // ── Fetch record estimate when filters change ─────────────────────────────
   useEffect(() => {
@@ -164,13 +165,32 @@ export function ExportManager() {
       if (filters.email_status !== "all") params.set("email_status", filters.email_status);
       if (filters.api_source   !== "all") params.set("api_source",   filters.api_source);
 
-      const filename = `oneextraction_${filters.table}_${new Date().toISOString().slice(0,10)}.${format}`;
+      const filename = `dataextraction_${filters.table}_${new Date().toISOString().slice(0,10)}.${format}`;
       await api.download(`/export/leads?${params}`, filename);
       toast.success(`Downloaded ${filename}`);
     } catch (e) {
       toast.error(`Export failed: ${e}`);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleOneReachDispatch = async () => {
+    setDispatchingOneReach(true);
+    try {
+      const res = await api.post<{ dispatched_count: number; message: string }>("/export/onereach", {
+        table: filters.table,
+        limit: 500,
+        industry: filters.industry !== "all" ? filters.industry : undefined,
+        seniority: filters.seniority !== "all" ? filters.seniority : undefined,
+      });
+      toast.success("OneReach Outbound Webhook Triggered", {
+        description: res.message || `Dispatched ${res.dispatched_count} verified leads to OneReach`,
+      });
+    } catch (e) {
+      toast.error(`OneReach dispatch failed: ${e}`);
+    } finally {
+      setDispatchingOneReach(false);
     }
   };
 
@@ -218,9 +238,14 @@ export function ExportManager() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="master_organizations">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-3.5 h-3.5 text-teal-500" /> Master Vault Golden Records (210K+)
+                      </div>
+                    </SelectItem>
                     <SelectItem value="us_leads">
                       <div className="flex items-center gap-2">
-                        <Globe2 className="w-3.5 h-3.5 text-blue-500" /> US Leads (906K+)
+                        <Globe2 className="w-3.5 h-3.5 text-blue-500" /> US Leads (MDM View)
                       </div>
                     </SelectItem>
                     <SelectItem value="mexico_leads">
@@ -467,13 +492,43 @@ export function ExportManager() {
                   </div>
                 </div>
 
-                <Button
-                  variant="gradient"
-                  size="lg"
-                  className="ml-auto"
-                  onClick={handleDownload}
-                  disabled={downloading || selectedCols.size === 0}
-                >
+                <div className="flex items-center gap-2 ml-auto">
+
+                  <Button
+
+                    variant="outline"
+
+                    size="lg"
+
+                    onClick={handleOneReachDispatch}
+
+                    disabled={dispatchingOneReach || downloading}
+
+                    className="border-primary/40 hover:bg-primary/10 text-xs font-medium"
+
+                  >
+
+                    {dispatchingOneReach
+
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Dispatching...</>
+
+                      : <><Send className="w-4 h-4 mr-2 text-primary" /> Dispatch to OneReach</>
+
+                    }
+
+                  </Button>
+
+                  <Button
+
+                    variant="gradient"
+
+                    size="lg"
+
+                    onClick={handleDownload}
+
+                    disabled={downloading || selectedCols.size === 0}
+
+                  >
                   {downloading
                     ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
                     : <><Download className="w-4 h-4 mr-2" />
@@ -481,13 +536,15 @@ export function ExportManager() {
                       </>
                   }
                 </Button>
+
+                </div>
               </div>
 
               {/* Summary */}
               <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Database className="w-3 h-3" />
-                  {filters.table === "us_leads" ? "US Leads" : "Mexico Leads"}
+                  {filters.table === "master_organizations" ? "Master Vault (210K+)" : filters.table === "us_leads" ? "US Leads" : "Mexico Leads"}
                 </span>
                 <span className="flex items-center gap-1">
                   <CheckSquare className="w-3 h-3" />

@@ -1,0 +1,213 @@
+- generic [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - complementary [ref=f2e13]:
+      - generic [ref=f2e14]:
+        - generic [ref=f2e19]:
+          - generic [ref=f2e20]: DataExtraction
+          - generic [ref=f2e21]: v2.1
+        - button "On OneExtraction" [ref=f2e23] [cursor=pointer]:
+          - generic [ref=f2e24]: "On"
+          - generic [ref=f2e26]: OneExtraction
+        - navigation [ref=f2e29]:
+          - paragraph [ref=f2e30]: Data
+          - link "Dashboard" [ref=f2e31] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f2e38] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f2e44]: US Leads
+            - generic [ref=f2e45]: 906K
+          - link "MX Leads 50K" [ref=f2e46] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f2e52]: MX Leads
+            - generic [ref=f2e53]: 50K
+          - link "AI Query" [ref=f2e54] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f2e58]: Orchestration
+          - link "Pipelines" [ref=f2e59] [cursor=pointer]:
+            - /url: /pipelines
+          - link "Agents 7" [ref=f2e65] [cursor=pointer]:
+            - /url: /agents
+            - generic [ref=f2e69]: Agents
+            - generic [ref=f2e70]: "7"
+          - link "Schedules" [ref=f2e71] [cursor=pointer]:
+            - /url: /schedules
+          - paragraph [ref=f2e77]: Tools
+          - link "Scraper" [ref=f2e78] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f2e87] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f2e91] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f2e96] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f2e101] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f2e107] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@oneextraction.internal" [ref=f2e113] [cursor=pointer]:
+          - generic [ref=f2e114]: A
+          - generic [ref=f2e116]:
+            - paragraph [ref=f2e117]: Admin
+            - paragraph [ref=f2e118]: admin@oneextraction.internal
+    - generic [ref=f2e119]:
+      - banner [ref=f2e120]:
+        - navigation [ref=f2e121]:
+          - generic [ref=f2e122]: Agents
+        - generic [ref=f2e124]:
+          - button "Search... ⌘ K" [ref=f2e125] [cursor=pointer]:
+            - generic [ref=f2e129]: Search...
+            - generic [ref=f2e130]:
+              - generic [ref=f2e131]: ⌘
+              - generic [ref=f2e132]: K
+          - button "Toggle theme" [ref=f2e133] [cursor=pointer]
+          - button [ref=f2e135] [cursor=pointer]
+      - main [ref=f2e137]:
+        - generic [ref=f2e138]:
+          - generic [ref=f2e139]:
+            - generic [ref=f2e140]:
+              - heading "Autonomous Agent Supervision & Pipeline Observability" [level=1] [ref=f2e141]
+              - paragraph [ref=f2e142]: Mission control orchestrating 7 Temporal-native AI agents across statutory scraping, identity resolution, email verification, and OpenSearch CDC.
+            - generic [ref=f2e143]: 7 Agents Online (0 In-Flight)
+          - generic [ref=f2e146]:
+            - generic [ref=f2e147]:
+              - generic [ref=f2e148]:
+                - generic [ref=f2e151]: "ID:"
+                - generic [ref=f2e152]: master-saga-1793578287
+              - generic [ref=f2e153]: SAGA COMPLETED
+            - generic [ref=f2e155]:
+              - button "Trigger Saga Run" [ref=f2e156] [cursor=pointer]
+              - button "3s Polling" [ref=f2e157] [cursor=pointer]
+              - button "Refresh telemetry" [ref=f2e158] [cursor=pointer]
+          - generic [ref=f2e159]:
+            - generic [ref=f2e161]:
+              - heading "Human Approval Decision Gate (1 Action Pending)" [level=3] [ref=f2e165]
+              - generic [ref=f2e166]: SRE Quarantine Policy
+            - generic [ref=f2e168]:
+              - generic [ref=f2e169]:
+                - generic [ref=f2e170]:
+                  - generic [ref=f2e171]: Replay 450 Quarantined Records
+                  - generic [ref=f2e172]: DataQualityAgent (Agent 5)
+                  - generic [ref=f2e173]: 12 mins ago
+                - paragraph [ref=f2e174]: DLQ backlog (450 records) exceeds auto-replay threshold of 100. Manual operator confirmation required before storage batch commit.
+              - generic [ref=f2e175]:
+                - button "Reject" [ref=f2e176] [cursor=pointer]
+                - button "Approve Batch Replay" [ref=f2e177] [cursor=pointer]
+          - generic [ref=f2e178]:
+            - tablist [ref=f2e179]:
+              - tab "Execution DAG & Agents Roster" [ref=f2e180] [cursor=pointer]
+              - tab "Data Journey & Storage Layers" [active] [selected] [ref=f2e185] [cursor=pointer]
+              - tab "DLQ Quarantined Anomalies" [ref=f2e190] [cursor=pointer]
+            - tabpanel "Data Journey & Storage Layers" [ref=f2e636]:
+              - generic [ref=f2e637]:
+                - generic [ref=f2e638]:
+                  - generic [ref=f2e639]:
+                    - generic [ref=f2e640]: US Staged Leads
+                    - paragraph [ref=f2e643]: 906,240
+                  - generic [ref=f2e644]:
+                    - generic [ref=f2e645]: Canonical Orgs
+                    - paragraph [ref=f2e650]: 742,100
+                  - generic [ref=f2e651]:
+                    - generic [ref=f2e652]: SMTP Verified
+                    - paragraph [ref=f2e656]: 384,500
+                  - generic [ref=f2e657]:
+                    - generic [ref=f2e658]: Phone Coverage
+                    - paragraph [ref=f2e664]: 812,900
+                  - generic [ref=f2e665]:
+                    - generic [ref=f2e666]: CDC Index State
+                    - paragraph [ref=f2e670]: SYNCED (0ms lag)
+                  - generic [ref=f2e672]:
+                    - generic [ref=f2e673]: DLQ Quarantined
+                    - paragraph [ref=f2e676]: "0"
+                - generic [ref=f2e677]:
+                  - generic [ref=f2e678]:
+                    - heading "Storage Lifecycle & Schema Transformation Pipeline" [level=3] [ref=f2e679]
+                    - button "Refresh Counts" [ref=f2e684] [cursor=pointer]
+                  - generic [ref=f2e685]:
+                    - button "L01 BRONZE Raw Landing & Ingestion Buffer data/raw/" [ref=f2e686] [cursor=pointer]:
+                      - generic [ref=f2e687]:
+                        - generic [ref=f2e688]: L01
+                        - generic [ref=f2e689]: BRONZE
+                      - generic [ref=f2e690]: Raw Landing & Ingestion Buffer
+                      - generic [ref=f2e691]: data/raw/
+                    - button "L02 SILVER PostgreSQL Staging Entities businesses" [ref=f2e692] [cursor=pointer]:
+                      - generic [ref=f2e693]:
+                        - generic [ref=f2e694]: L02
+                        - generic [ref=f2e695]: SILVER
+                      - generic [ref=f2e696]: PostgreSQL Staging Entities
+                      - generic [ref=f2e697]: businesses
+                    - button "L03 GOLD Identity Resolution & Golden Records canonical_organizations" [ref=f2e698] [cursor=pointer]:
+                      - generic [ref=f2e699]:
+                        - generic [ref=f2e700]: L03
+                        - generic [ref=f2e701]: GOLD
+                      - generic [ref=f2e702]: Identity Resolution & Golden Records
+                      - generic [ref=f2e703]: canonical_organizations
+                    - button "L04 GOLD Post-Dedup Contact & Email Graph people" [ref=f2e704] [cursor=pointer]:
+                      - generic [ref=f2e705]:
+                        - generic [ref=f2e706]: L04
+                        - generic [ref=f2e707]: GOLD
+                      - generic [ref=f2e708]: Post-Dedup Contact & Email Graph
+                      - generic [ref=f2e709]: people
+                    - button "L05 COMPLIANCE Governance & Lineage Audit data_quality_scores" [ref=f2e710] [cursor=pointer]:
+                      - generic [ref=f2e711]:
+                        - generic [ref=f2e712]: L05
+                        - generic [ref=f2e713]: COMPLIANCE
+                      - generic [ref=f2e714]: Governance & Lineage Audit
+                      - generic [ref=f2e715]: data_quality_scores
+                    - button "L06 OPENSEARCH Downstream Search & CDC Projection /companies_search" [ref=f2e716] [cursor=pointer]:
+                      - generic [ref=f2e717]:
+                        - generic [ref=f2e718]: L06
+                        - generic [ref=f2e719]: OPENSEARCH
+                      - generic [ref=f2e720]: Downstream Search & CDC Projection
+                      - generic [ref=f2e721]: /companies_search
+                - generic [ref=f2e722]:
+                  - generic [ref=f2e723]:
+                    - generic [ref=f2e724]:
+                      - generic [ref=f2e725]:
+                        - generic [ref=f2e726]:
+                          - generic [ref=f2e727]: "LAYER 2: SILVER STAGING"
+                          - generic [ref=f2e728]:
+                            - text: "Target:"
+                            - strong [ref=f2e729]: businesses, us_leads
+                        - heading "PostgreSQL Staging Entities" [level=3] [ref=f2e730]
+                      - generic [ref=f2e731]:
+                        - generic [ref=f2e736]: "Primary Key:"
+                        - strong [ref=f2e737]: company_id (e.g. sam_123456789, gmaps_ChIJ...)
+                    - paragraph [ref=f2e738]: Normalized transactional staging table. Sanitizes phone numbers to E.164, normalizes state codes to ISO-3166-2, and calculates geographical coordinates.
+                  - generic [ref=f2e740]:
+                    - heading "Schema Blueprint & Sample Field Manifest" [level=4] [ref=f2e741]
+                    - table [ref=f2e748]:
+                      - rowgroup [ref=f2e749]:
+                        - row [ref=f2e750]:
+                          - columnheader "Column / Field" [ref=f2e751]
+                          - columnheader "SQL / Wire Type" [ref=f2e752]
+                          - columnheader "Representative Value" [ref=f2e753]
+                          - columnheader "Transformation Purpose" [ref=f2e754]
+                      - rowgroup [ref=f2e755]:
+                        - row [ref=f2e756]:
+                          - cell "company_id" [ref=f2e757]
+                          - cell "VARCHAR(128)" [ref=f2e758]
+                          - cell "sam_114892019" [ref=f2e759]
+                          - cell "Deterministic source-prefixed primary key" [ref=f2e760]
+                        - row [ref=f2e761]:
+                          - cell "name" [ref=f2e762]
+                          - cell "VARCHAR(255)" [ref=f2e763]
+                          - cell "Acme Cyber Defense LLC" [ref=f2e764]
+                          - cell "Cleaned entity operating name" [ref=f2e765]
+                        - row [ref=f2e766]:
+                          - cell "domain" [ref=f2e767]
+                          - cell "VARCHAR(255)" [ref=f2e768]
+                          - cell "acmedefense.com" [ref=f2e769]
+                          - cell "Normalized apex web domain" [ref=f2e770]
+                        - row [ref=f2e771]:
+                          - cell "naics_code" [ref=f2e772]
+                          - cell "VARCHAR(16)" [ref=f2e773]
+                          - cell "541512" [ref=f2e774]
+                          - cell "Primary 6-digit industry classification" [ref=f2e775]
+                        - row [ref=f2e776]:
+                          - cell "latitude / longitude" [ref=f2e777]
+                          - cell "DOUBLE PRECISION" [ref=f2e778]
+                          - cell "37.7749 / -122.4194" [ref=f2e779]
+                          - cell "Validated spatial point coordinates" [ref=f2e780]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f2e9] [cursor=pointer]
+  - alert [ref=f2e571]

@@ -1,0 +1,389 @@
+- generic:
+  - generic [aria-hidden]:
+    - complementary:
+      - generic:
+        - generic:
+          - generic:
+            - generic: DataExtraction
+            - generic: v2.1
+        - generic:
+          - button:
+            - generic: "On"
+            - generic: OneExtraction
+        - navigation:
+          - paragraph: Data
+          - link:
+            - /url: /dashboard
+            - generic: Dashboard
+          - link:
+            - /url: /leads
+            - generic: US Leads
+            - generic: 906K
+          - link:
+            - /url: /leads/mexico
+            - generic: MX Leads
+            - generic: 50K
+          - link:
+            - /url: /analytics
+            - generic: AI Query
+          - paragraph: Orchestration
+          - link:
+            - /url: /pipelines
+            - generic: Pipelines
+          - link:
+            - /url: /agents
+            - generic: Agents
+            - generic: "7"
+          - link:
+            - /url: /schedules
+            - generic: Schedules
+          - paragraph: Tools
+          - link:
+            - /url: /scraper
+            - generic: Scraper
+          - link:
+            - /url: /pipeline
+            - generic: Pipeline & DLQ
+          - link:
+            - /url: /map-extraction
+            - generic: Map Extraction
+          - link:
+            - /url: /duplicates
+            - generic: Duplicates
+          - link:
+            - /url: /export
+            - generic: Export
+        - generic:
+          - link:
+            - /url: /settings
+            - generic: Settings
+        - generic:
+          - button:
+            - generic: A
+            - generic:
+              - paragraph: Admin
+              - paragraph: admin@oneextraction.internal
+    - generic:
+      - banner:
+        - navigation:
+          - generic: Agents
+        - generic:
+          - button:
+            - generic: Search...
+            - generic:
+              - generic: ⌘
+              - generic: K
+          - button:
+            - generic: Toggle theme
+          - button
+      - main:
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=1]: Autonomous Agent Supervision & Pipeline Observability
+              - paragraph: Mission control orchestrating 7 Temporal-native AI agents across statutory scraping, identity resolution, email verification, and OpenSearch CDC.
+            - generic: 7 Agents Online (0 In-Flight)
+          - generic:
+            - generic:
+              - generic:
+                - generic: "ID:"
+                - generic: master-saga-latest
+              - generic: STANDBY (Idle)
+            - generic:
+              - button: Trigger Saga Run
+              - button: 3s Polling
+              - button
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=3]: Human Approval Decision Gate (1 Action Pending)
+                - generic: SRE Quarantine Policy
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Replay 450 Quarantined Records
+                    - generic: DataQualityAgent (Agent 5)
+                    - generic: 12 mins ago
+                  - paragraph: DLQ backlog (450 records) exceeds auto-replay threshold of 100. Manual operator confirmation required before storage batch commit.
+                - generic:
+                  - button: Reject
+                  - button: Approve Batch Replay
+          - generic:
+            - tablist:
+              - tab [selected]: Execution DAG & Agents Roster
+              - tab: Data Journey & Storage Layers
+              - tab: DLQ Quarantined Anomalies
+            - tabpanel:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - heading [level=3]: End-to-End Agent Execution Topology (7-Phase DAG)
+                      - paragraph: Real-time stage tracking from statutory scraping to PostgreSQL deduplication and OpenSearch CDC. Click any node to inspect data origins & storage tables.
+                    - generic:
+                      - generic: Active
+                      - generic: Completed
+                      - generic: Paused
+                      - generic: Standby
+                  - generic:
+                    - generic:
+                      - button:
+                        - generic: "01"
+                        - generic:
+                          - heading [level=4]: Registry Ingestion
+                          - paragraph: Sovereign & Open Data
+                        - generic:
+                          - generic: businesses
+                          - generic: →
+                      - button:
+                        - generic: "02"
+                        - generic:
+                          - heading [level=4]: Geospatial Discovery
+                          - paragraph: Physical Stores & Polygons
+                        - generic:
+                          - generic: businesses (lat, lng, place_id)
+                          - generic: →
+                      - button:
+                        - generic: "03"
+                        - generic:
+                          - heading [level=4]: Identity & Clusters
+                          - paragraph: Probabilistic Deduplication
+                        - generic:
+                          - generic: canonical_organizations
+                          - generic: →
+                      - button:
+                        - generic: "04"
+                        - generic:
+                          - heading [level=4]: Email & SMTP Probe
+                          - paragraph: Post-Dedup Verification
+                        - generic:
+                          - generic: businesses (work_email, smtp_valid)
+                          - generic: →
+                      - button:
+                        - generic: "05"
+                        - generic:
+                          - heading [level=4]: Executive Graph
+                          - paragraph: Leadership & Hierarchy
+                        - generic:
+                          - generic: people
+                          - generic: →
+                      - button:
+                        - generic: "06"
+                        - generic:
+                          - heading [level=4]: Bayesian Governance
+                          - paragraph: Confidence & DLQ Engine
+                        - generic:
+                          - generic: data_quality_scores
+                          - generic: →
+                      - button:
+                        - generic: "07"
+                        - generic:
+                          - heading [level=4]: Search & CDC Sync
+                          - paragraph: OpenSearch 2.x Indexing
+                        - generic:
+                          - generic: "OpenSearch: /companies_search"
+                          - generic: →
+              - generic:
+                - generic:
+                  - heading [level=3]: Active Agent Supervision Roster
+                  - generic: Temporal gRPC Queues
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_1
+                            - heading [level=3]: Registry Ingestion Agent
+                          - paragraph: Sovereign & Regulatory Ingestion (SEC, CMS, FDIC, SAM.gov, Open Data)
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: registry-ingestion-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: businesses
+                      - generic:
+                        - generic: 10m
+                        - generic: 96% trust
+                        - generic: 3m ago
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_2
+                            - heading [level=3]: Geospatial & Domain Agent
+                          - paragraph: Physical Storefront & Polygon Crawling (Google Maps & OSM Overpass)
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: geospatial-domain-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: businesses (lat/lng/place_id)
+                      - generic:
+                        - generic: 15m
+                        - generic: 96% trust
+                        - generic: 3m ago
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_3
+                            - heading [level=3]: Identity Resolution Agent
+                          - paragraph: Fellegi-Sunter Probabilistic Deduplication & Golden Entity Clusters
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: identity-clustering-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: canonical_organizations
+                      - generic:
+                        - generic: 5m
+                        - generic: 96% trust
+                        - generic: 3m ago
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_7
+                            - heading [level=3]: Email Discovery & SMTP Agent
+                          - paragraph: Post-Deduplication Keyset Batching, MX DNS Checks & Active SMTP Handshakes
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: email-enrichment-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: businesses (work_email, smtp_valid)
+                      - generic:
+                        - generic: 5m
+                        - generic: 96% trust
+                        - generic: 3m ago
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_4
+                            - heading [level=3]: Executive & Contact Graph Agent
+                          - paragraph: Bitemporal Career Graphs, Hierarchy Linking & 5-Tier Contact Validation
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: executive-contact-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: people
+                      - generic:
+                        - generic: 10m
+                        - generic: 96% trust
+                        - generic: 3m ago
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_5
+                            - heading [level=3]: Bayesian Governance & DLQ Agent
+                          - paragraph: Bayesian Multi-Source Confidence Scoring (0-100) & DLQ Anomaly Backpressure
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: governance-quality-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: data_quality_scores
+                      - generic:
+                        - generic: 5m
+                        - generic: 96% trust
+                        - generic: 3m ago
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: AGENT_6
+                            - heading [level=3]: Persistence & CDC Sync Agent
+                          - paragraph: PostgreSQL Partition Maintenance & OpenSearch 2.x CDC Ingestion
+                        - generic: NOMINAL
+                    - generic:
+                      - generic:
+                        - generic: "Telemetry Rationale:"
+                        - paragraph: Observing message queues under nominal load conditions
+                      - generic:
+                        - generic:
+                          - generic: "Task Queue:"
+                          - generic: search-persistence-queue
+                        - generic:
+                          - generic: "Primary Target:"
+                          - generic: "OpenSearch: /companies_search"
+                      - generic:
+                        - generic: 5m
+                        - generic: 96% trust
+                        - generic: 3m ago
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f2e9] [cursor=pointer]
+  - alert
+  - dialog [ref=f2e573]:
+    - generic [ref=f2e574]:
+      - 'heading "Mission Control: Trigger Execution" [level=2] [ref=f2e578]'
+      - paragraph [ref=f2e579]: Launch durable Temporal orchestrations, single-source scrapers, or batch SMTP verifications.
+    - generic [ref=f2e580]:
+      - tablist [ref=f2e581]:
+        - tab "Master Saga" [active] [selected] [ref=f2e582] [cursor=pointer]
+        - tab "Single Scraper" [ref=f2e583] [cursor=pointer]
+        - tab "Email Batch" [ref=f2e584] [cursor=pointer]
+      - tabpanel "Master Saga" [ref=f2e585]:
+        - generic [ref=f2e586]:
+          - generic [ref=f2e587]: 7-Phase End-to-End Execution
+          - paragraph [ref=f2e588]: Coordinates statutory ingestion, Google Maps, identity clustering, email discovery, executive graph, Bayesian governance, and OpenSearch CDC.
+        - generic [ref=f2e589]:
+          - text: Execution Mode
+          - combobox [ref=f2e590] [cursor=pointer]:
+            - generic: Incremental (Recommended - Delta Sync)
+        - generic [ref=f2e593]:
+          - generic [ref=f2e594] [cursor=pointer]:
+            - generic [ref=f2e595]: Dry Run Simulation
+            - paragraph [ref=f2e598]: Simulates workflow progression without committing records to PostgreSQL.
+          - checkbox "Dry Run Simulation Simulates workflow progression without committing records to PostgreSQL." [ref=f2e599] [cursor=pointer]
+        - generic [ref=f2e600]:
+          - button "Cancel" [ref=f2e601] [cursor=pointer]
+          - button "Launch Master Saga" [ref=f2e602] [cursor=pointer]
+    - button "Close" [ref=f2e603] [cursor=pointer]

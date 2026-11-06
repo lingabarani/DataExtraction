@@ -46,3 +46,21 @@ rate_limits:
     overpass_api_per_minute: 60
     nominatim_per_minute: 60
     retry_delay_seconds: 10
+
+  email_enrichment:
+    requests_per_second: 50.0
+    per_host_limit: 2
+    total_timeout_seconds: 10.0
+    max_body_size_bytes: 5242880
+
+  smtp_probe:
+    timeout_seconds: 5.0
+    max_mx_hosts: 3
+    candidate_prefixes:
+      - info
+      - contact
+      - sales
+      - hello
+      - office
+      - support
+      - inquiries

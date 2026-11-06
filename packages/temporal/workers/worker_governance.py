@@ -21,16 +21,23 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
         sys.path.insert(0, p)
 
 from packages.temporal.client import get_temporal_client
-from packages.infrastructure.config_manager import config_manager
+from packages.temporal.config import QUEUE_GOVERNANCE, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.storage_activities import (
     compute_bayesian_quality_activity,
     fetch_dlq_records_activity,
     resolve_dlq_record_activity,
     get_dlq_stats_activity,
     storage_query_activity,
+    evaluate_working_governance_activity,
+    promote_certified_to_master_activity,
+    apply_freshness_decay_activity,
+    fetch_overdue_revalidations_activity,
+    stage_overdue_for_reharvest_activity,
 )
 from packages.temporal.workflows.w5_governance_workflow import Agent5GovernanceWorkflow
 from packages.temporal.workflows.dlq_replay_workflow import DLQReplayWorkflow
+from packages.temporal.workflows.promotion_gate_workflow import PromotionGateWorkflow
+from packages.temporal.workflows.revalidation_sweep_workflow import RevalidationSweepWorkflow
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
@@ -38,8 +45,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dataextraction.worker.governance")
 
-TASK_QUEUE = config_manager.QUEUE_GOVERNANCE
-MAX_ACTIVITIES = int(os.getenv("GOVERNANCE_WORKER_MAX_CONCURRENT_ACTIVITIES", "8"))
+TASK_QUEUE = QUEUE_GOVERNANCE
+MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_GOVERNANCE, 8)
 
 
 async def run_worker():
@@ -52,10 +59,17 @@ async def run_worker():
         resolve_dlq_record_activity,
         get_dlq_stats_activity,
         storage_query_activity,
+        evaluate_working_governance_activity,
+        promote_certified_to_master_activity,
+        apply_freshness_decay_activity,
+        fetch_overdue_revalidations_activity,
+        stage_overdue_for_reharvest_activity,
     ]
     workflows = [
         Agent5GovernanceWorkflow,
         DLQReplayWorkflow,
+        PromotionGateWorkflow,
+        RevalidationSweepWorkflow,
     ]
 
     primary_worker = Worker(

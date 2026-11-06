@@ -294,7 +294,7 @@ export function MapExtractionPanel() {
 
   const handleIngest = async () => {
     setIsIngesting(true);
-    toast.info(`Ingesting ${ingestState} (${ingestField}) into OneExtraction DB...`);
+    toast.info(`Ingesting ${ingestState} (${ingestField}) into DataExtraction DB...`);
     try {
       const res = await api.post<{
         status: string;
@@ -808,7 +808,7 @@ export function MapExtractionPanel() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold">13 Business Categories</CardTitle>
                 <CardDescription className="text-xs">
-                  Unified POI schema mapped to OneExtraction company models.
+                  Unified POI schema mapped to DataExtraction company models.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-1.5 p-3">
@@ -994,7 +994,7 @@ export function MapExtractionPanel() {
                   Canonical Database Ingestion
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Loads extracted OSM datasets, normalizes fields, and deduplicates against existing records via OneExtraction Deduplicator.
+                  Loads extracted OSM datasets, normalizes fields, and deduplicates against existing records via DataExtraction Deduplicator.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

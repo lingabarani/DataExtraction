@@ -1,0 +1,544 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1480" width="100%" height="100%" style="background-color: #0B0F19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Background Grid -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1E293B" stroke-width="0.7" opacity="0.4"/>
+    </pattern>
+
+    <!-- Glow Filters -->
+    <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="glow-purple" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Card Shadow -->
+    <filter id="card-shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#818CF8" />
+      <stop offset="100%" stop-color="#C084FC" />
+    </linearGradient>
+    <linearGradient id="master-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064E3B" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#022C22" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="gate-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#78350F" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#451A03" stop-opacity="0.9" />
+    </linearGradient>
+
+    <!-- Arrow Markers -->
+    <marker id="arr-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#06B6D4" />
+    </marker>
+    <marker id="arr-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#A855F7" />
+    </marker>
+    <marker id="arr-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#F59E0B" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10B981" />
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#EF4444" />
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#3B82F6" />
+    </marker>
+  </defs>
+
+  <!-- Background Rect -->
+  <rect width="100%" height="100%" fill="#0B0F19" />
+  <rect width="100%" height="100%" fill="url(#grid)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 0. TOP TITLE & METRICS BAR                                                -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="header" transform="translate(60, 40)">
+    <text x="0" y="32" font-size="28" font-weight="800" fill="url(#header-grad)" letter-spacing="1">
+      DATAEXTRACTION ENTERPRISE — B2B INTELLIGENCE PLATFORM
+    </text>
+    <text x="0" y="58" font-size="14" font-weight="500" fill="#94A3B8">
+      Certified Master Data Architecture: Decoupled Pre-Master Canvas, Atomic Promotion Gate & Autonomous Freshness Lifecycle
+    </text>
+
+    <!-- Parity Badges -->
+    <g transform="translate(1120, 10)">
+      <rect x="0" y="0" width="160" height="30" rx="6" fill="#1E293B" stroke="#334155" />
+      <circle cx="16" cy="15" r="4" fill="#10B981" />
+      <text x="28" y="20" font-size="11" font-weight="600" fill="#E2E8F0">Apollo.io Parity</text>
+
+      <rect x="175" y="0" width="160" height="30" rx="6" fill="#1E293B" stroke="#334155" />
+      <circle cx="191" cy="15" r="4" fill="#38BDF8" />
+      <text x="203" y="20" font-size="11" font-weight="600" fill="#E2E8F0">ZoomInfo Parity</text>
+
+      <rect x="350" y="0" width="170" height="30" rx="6" fill="#1E293B" stroke="#334155" />
+      <circle cx="366" cy="15" r="4" fill="#C084FC" />
+      <text x="378" y="20" font-size="11" font-weight="600" fill="#E2E8F0">People Data Labs Parity</text>
+
+      <rect x="535" y="0" width="145" height="30" rx="6" fill="#064E3B" stroke="#059669" />
+      <circle cx="551" cy="15" r="4" fill="#34D399" />
+      <text x="563" y="20" font-size="11" font-weight="700" fill="#A7F3D0">PostgreSQL 18 + MDM</text>
+    </g>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 1. TIER 1: SOVEREIGN & SPATIAL HARVESTERS                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="tier-1" transform="translate(60, 120)">
+    <!-- Container -->
+    <rect x="0" y="0" width="1180" height="130" rx="12" fill="#0F172A" stroke="#1E293B" stroke-width="1.5" filter="url(#card-shadow)"/>
+    <rect x="0" y="0" width="1180" height="28" rx="12" fill="#1E293B" />
+    <rect x="0" y="16" width="1180" height="12" fill="#1E293B" />
+    <text x="16" y="19" font-size="12" font-weight="700" fill="#38BDF8" letter-spacing="0.5">TIER 1: SOVEREIGN REGISTRY &amp; SPATIAL HARVESTERS</text>
+    <text x="1000" y="19" font-size="11" font-weight="500" fill="#64748B">Temporal Queues: registry-queue, geospatial-queue</text>
+
+    <!-- Agent 1 Card -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="550" height="72" rx="8" fill="#1E293B" stroke="#0284C7" stroke-width="1.2" />
+      <circle cx="28" cy="36" r="14" fill="#0369A1" />
+      <text x="24" y="41" font-size="13" font-weight="800" fill="#FFFFFF">1</text>
+      <text x="52" y="28" font-size="14" font-weight="700" fill="#F8FAFC">Agent 1: Sovereign &amp; Registry Harvester</text>
+      <text x="52" y="46" font-size="11" fill="#94A3B8">SEC EDGAR (10 req/s), CMS NPI Medical, SAM.gov Federal, FDIC Banking</text>
+      <text x="52" y="62" font-size="10" font-weight="600" fill="#38BDF8">Extracts: Legal Name, Statutory Tax IDs (EIN/RFC), Filings, SIC/NAICS</text>
+    </g>
+
+    <!-- Agent 2 Card -->
+    <g transform="translate(610, 42)">
+      <rect x="0" y="0" width="550" height="72" rx="8" fill="#1E293B" stroke="#0284C7" stroke-width="1.2" />
+      <circle cx="28" cy="36" r="14" fill="#0369A1" />
+      <text x="24" y="41" font-size="13" font-weight="800" fill="#FFFFFF">2</text>
+      <text x="52" y="28" font-size="14" font-weight="700" fill="#F8FAFC">Agent 2: Spatial &amp; Domain Harvester</text>
+      <text x="52" y="46" font-size="11" fill="#94A3B8">OpenStreetMap Quadtree Tiles (all 50 US States) &amp; Google Places Profiles</text>
+      <text x="52" y="62" font-size="10" font-weight="600" fill="#38BDF8">Extracts: Physical Lat/Lon, Normalized Addresses, Corporate Web Domains, Logos</text>
+    </g>
+  </g>
+
+  <!-- Connectors Tier 1 -> Tier 2 -->
+  <path d="M 650 250 L 650 280" fill="none" stroke="#06B6D4" stroke-width="2" marker-end="url(#arr-cyan)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 2. TIER 2: RAW STAGING & OBSERVATION PARTITIONS                           -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="tier-2" transform="translate(60, 280)">
+    <rect x="0" y="0" width="1180" height="90" rx="10" fill="#0F172A" stroke="#334155" stroke-width="1.2" filter="url(#card-shadow)"/>
+    <text x="16" y="22" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="0.5">TIER 2: IMMUTABLE OBSERVATION LAKEHOUSE &amp; RAW STAGING</text>
+
+    <!-- Staging Companies Table -->
+    <g transform="translate(20, 32)">
+      <rect x="0" y="0" width="550" height="46" rx="6" fill="#1E293B" stroke="#475569" stroke-width="1" />
+      <text x="16" y="20" font-size="12" font-weight="700" fill="#E2E8F0">staging_dataextraction.staging_companies</text>
+      <text x="16" y="36" font-size="10" fill="#94A3B8">200,147 raw corporate filings &amp; place observations • Ingested with unparsed payloads</text>
+    </g>
+
+    <!-- Observation Meta Parquet -->
+    <g transform="translate(610, 32)">
+      <rect x="0" y="0" width="550" height="46" rx="6" fill="#1E293B" stroke="#475569" stroke-width="1" />
+      <text x="16" y="20" font-size="12" font-weight="700" fill="#E2E8F0">raw_dataextraction.scraper_payloads &amp; MinIO Parquet</text>
+      <text x="16" y="36" font-size="10" fill="#94A3B8">Immutable write-once historical raw payloads partitioned quarterly (2026_q1..q4)</text>
+    </g>
+  </g>
+
+  <!-- Connectors Tier 2 -> Tier 3 -->
+  <path d="M 650 370 L 650 405" fill="none" stroke="#A855F7" stroke-width="2.5" marker-end="url(#arr-purple)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 3. TIER 3: PRE-MASTER WORKING ENRICHMENT LAYER (NO PREMATURE WRITES!)     -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="tier-3" transform="translate(60, 405)">
+    <!-- Big Boundary Container -->
+    <rect x="0" y="0" width="1180" height="340" rx="14" fill="#0F172A" stroke="#7C3AED" stroke-width="2" stroke-dasharray="8 4" filter="url(#card-shadow)"/>
+    <rect x="0" y="0" width="1180" height="32" rx="14" fill="#2E1065" />
+    <rect x="0" y="20" width="1180" height="12" fill="#2E1065" />
+    <text x="16" y="22" font-size="12" font-weight="800" fill="#C084FC" letter-spacing="0.5">
+      TIER 3: PRE-MASTER WORKING ENRICHMENT CANVAS (STRICT ISOLATION — MASTER DATABASE IS NOT TOUCHED)
+    </text>
+    <text x="890" y="22" font-size="11" font-weight="600" fill="#F43F5E">⛔ NO DIRECT WRITES TO MASTER ALLOWED</text>
+
+    <!-- Sub-step 3: Identity Resolution (Agent 3) -->
+    <g transform="translate(20, 48)">
+      <rect x="0" y="0" width="360" height="135" rx="8" fill="#1E1B4B" stroke="#6366F1" stroke-width="1.2" />
+      <circle cx="24" cy="24" r="12" fill="#4338CA" />
+      <text x="20" y="28" font-size="11" font-weight="800" fill="#FFFFFF">3</text>
+      <text x="44" y="22" font-size="13" font-weight="700" fill="#E0E7FF">Agent 3: Identity Resolution</text>
+      <text x="44" y="38" font-size="10" fill="#A5B4FC">Splink 5.0 DuckDB Fellegi-Sunter</text>
+      <text x="16" y="60" font-size="10" fill="#CBD5E1">• Probabilistic &amp; Deterministic Linkage</text>
+      <text x="16" y="74" font-size="10" fill="#CBD5E1">• Statutory ID Precedence (EIN/RFC > Domain)</text>
+      <text x="16" y="88" font-size="10" fill="#CBD5E1">• Reversible Cluster Generation &amp; Disputes</text>
+      <rect x="16" y="98" width="328" height="26" rx="4" fill="#312E81" />
+      <text x="24" y="115" font-size="10" font-weight="700" fill="#38BDF8">Output: working_organizations (Cluster IDs)</text>
+    </g>
+
+    <!-- Flow Arrow 3 -> 7 -->
+    <path d="M 380 115 L 410 115" fill="none" stroke="#A855F7" stroke-width="2" marker-end="url(#arr-purple)" />
+
+    <!-- Sub-step 7: Email Discovery & 5-Tier Verification (Agent 7) -->
+    <g transform="translate(410, 48)">
+      <rect x="0" y="0" width="360" height="135" rx="8" fill="#1E1B4B" stroke="#8B5CF6" stroke-width="1.2" />
+      <circle cx="24" cy="24" r="12" fill="#6D28D9" />
+      <text x="20" y="28" font-size="11" font-weight="800" fill="#FFFFFF">7</text>
+      <text x="44" y="22" font-size="13" font-weight="700" fill="#EDE9FE">Agent 7: Email Discovery &amp; 5-Tier</text>
+      <text x="44" y="38" font-size="10" fill="#C4B5FD">Deliverability &amp; Pattern Verification</text>
+      <text x="16" y="60" font-size="10" fill="#CBD5E1">• Web Crawler &amp; Regex Obfuscation Decoder</text>
+      <text x="16" y="74" font-size="10" fill="#CBD5E1">• RFC 5322 Syntax + DNS MX + Catch-all Probe</text>
+      <text x="16" y="88" font-size="10" fill="#CBD5E1">• Real-time SMTP Handshake (No Spam Drops)</text>
+      <rect x="16" y="98" width="328" height="26" rx="4" fill="#4C1D95" />
+      <text x="24" y="115" font-size="10" font-weight="700" fill="#38BDF8">Output: working_emails (57,160 Verified)</text>
+    </g>
+
+    <!-- Flow Arrow 7 -> 4 -->
+    <path d="M 770 115 L 800 115" fill="none" stroke="#A855F7" stroke-width="2" marker-end="url(#arr-purple)" />
+
+    <!-- Sub-step 4: Executive Discovery & Hierarchy (Agent 4) -->
+    <g transform="translate(800, 48)">
+      <rect x="0" y="0" width="360" height="135" rx="8" fill="#1E1B4B" stroke="#A855F7" stroke-width="1.2" />
+      <circle cx="24" cy="24" r="12" fill="#7E22CE" />
+      <text x="20" y="28" font-size="11" font-weight="800" fill="#FFFFFF">4</text>
+      <text x="44" y="22" font-size="13" font-weight="700" fill="#F3E8FF">Agent 4: Executive Discovery</text>
+      <text x="44" y="38" font-size="10" fill="#D8B4FE">Decision Makers &amp; Leadership Graph</text>
+      <text x="16" y="60" font-size="10" fill="#CBD5E1">• C-Suite Leadership (CEO, CTO, VP Sales)</text>
+      <text x="16" y="74" font-size="10" fill="#CBD5E1">• Bitemporal Career Tenures &amp; Edges</text>
+      <text x="16" y="88" font-size="10" fill="#CBD5E1">• Corporate Hierarchy (Parent/Subsidiaries)</text>
+      <rect x="16" y="98" width="328" height="26" rx="4" fill="#581C87" />
+      <text x="24" y="115" font-size="10" font-weight="700" fill="#38BDF8">Output: working_persons &amp; career_edges</text>
+    </g>
+
+    <!-- Working Tables Consolidated Banner -->
+    <g transform="translate(20, 200)">
+      <rect x="0" y="0" width="1140" height="120" rx="8" fill="#172554" stroke="#1D4ED8" stroke-width="1.2" />
+      <text x="20" y="24" font-size="12" font-weight="700" fill="#60A5FA">
+        POSTGRESQL STAGING WORKING CANVAS: staging_dataextraction.working_*
+      </text>
+      <text x="20" y="42" font-size="11" fill="#BFDBFE">
+        All 3 enrichment agents collaborate here. Records accumulate emails, decision makers, and physical coordinates without touching production master tables.
+      </text>
+
+      <g transform="translate(20, 56)">
+        <rect x="0" y="0" width="345" height="48" rx="6" fill="#1E3A8A" />
+        <text x="12" y="20" font-size="11" font-weight="700" fill="#FFFFFF">working_organizations</text>
+        <text x="12" y="36" font-size="10" fill="#93C5FD">Accumulates enriched company firmographics</text>
+
+        <rect x="375" y="0" width="345" height="48" rx="6" fill="#1E3A8A" />
+        <text x="12" y="20" font-size="11" font-weight="700" fill="#FFFFFF">working_emails</text>
+        <text x="12" y="36" font-size="10" fill="#93C5FD">Holds deliverable mailboxes &amp; SMTP logs</text>
+
+        <rect x="750" y="0" width="345" height="48" rx="6" fill="#1E3A8A" />
+        <text x="12" y="20" font-size="11" font-weight="700" fill="#FFFFFF">working_persons</text>
+        <text x="12" y="36" font-size="10" fill="#93C5FD">Holds mapped executives &amp; linked roles</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Connectors Tier 3 -> Tier 4 -->
+  <path d="M 650 745 L 650 780" fill="none" stroke="#F59E0B" stroke-width="2.5" marker-end="url(#arr-gold)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 4. TIER 4: GOVERNANCE, CERTIFICATION & PROMOTION GATE                     -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="tier-4" transform="translate(60, 780)">
+    <!-- Container -->
+    <rect x="0" y="0" width="1180" height="210" rx="12" fill="url(#gate-grad)" stroke="#D97706" stroke-width="2" filter="url(#card-shadow)"/>
+    <rect x="0" y="0" width="1180" height="28" rx="12" fill="#78350F" />
+    <rect x="0" y="16" width="1180" height="12" fill="#78350F" />
+    <text x="16" y="20" font-size="12" font-weight="800" fill="#FDE68A" letter-spacing="0.5">
+      TIER 4: AGENT 5 GOVERNANCE ENGINE &amp; MANDATORY PROMOTION GATE
+    </text>
+
+    <!-- Agent 5 Card -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="520" height="145" rx="8" fill="#1C1917" stroke="#EA580C" stroke-width="1.2" />
+      <circle cx="24" cy="24" r="12" fill="#C2410C" />
+      <text x="20" y="28" font-size="11" font-weight="800" fill="#FFFFFF">5</text>
+      <text x="44" y="24" font-size="13" font-weight="700" fill="#FED7AA">Agent 5: Bayesian Governance &amp; Compliance</text>
+      <text x="16" y="52" font-size="11" fill="#E2E8F0">• Bayesian Multi-source Belief Updating (Completeness, Freshness, Authority)</text>
+      <text x="16" y="68" font-size="11" fill="#E2E8F0">• Trust Score Calculation (0.00 - 1.00 source authority weights)</text>
+      <text x="16" y="84" font-size="11" fill="#E2E8F0">• Cryptographic Lineage Hash (SHA-256 raw observation IDs)</text>
+      <text x="16" y="100" font-size="11" fill="#E2E8F0">• GDPR / CCPA Tombstoning &amp; OFAC Sanctions Filtering</text>
+      <text x="16" y="125" font-size="11" font-weight="700" fill="#38BDF8">Output: Certified Entity Approval or Quarantined DLQ Route</text>
+    </g>
+
+    <!-- The Promotion Gate Diamond / Decision Box -->
+    <g transform="translate(570, 42)">
+      <rect x="0" y="0" width="590" height="145" rx="8" fill="#0C0A09" stroke="#F59E0B" stroke-width="2" />
+      <text x="16" y="26" font-size="13" font-weight="800" fill="#FBBF24">★ ATOMIC PROMOTION GATE (POSTGRESQL MULTI-ROW CTE) ★</text>
+      <text x="16" y="46" font-size="11" fill="#FDE68A">Only records satisfying strict institutional standards are allowed passage:</text>
+
+      <g transform="translate(16, 56)">
+        <rect x="0" y="0" width="170" height="32" rx="4" fill="#292524" stroke="#059669" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#34D399">Quality Score &gt;= 80</text>
+
+        <rect x="185" y="0" width="170" height="32" rx="4" fill="#292524" stroke="#059669" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#34D399">Trust Score &gt;= 0.85</text>
+
+        <rect x="370" y="0" width="190" height="32" rx="4" fill="#292524" stroke="#059669" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#34D399">Suppression: CLEARED</text>
+      </g>
+
+      <text x="16" y="112" font-size="10" fill="#A8A29E">
+        PASS: Atomically promoted to master_dataextraction with initial Freshness = 1.0000
+      </text>
+      <text x="16" y="130" font-size="10" fill="#F87171">
+        FAIL: Routed to dead_letter_queue &amp; isolation_review_queue for dispute audit
+      </text>
+    </g>
+  </g>
+
+  <!-- Connectors Tier 4 -> Tier 5 (Pass) & DLQ (Fail) -->
+  <path d="M 865 990 L 865 1030" fill="none" stroke="#10B981" stroke-width="3" marker-end="url(#arr-green)" />
+  <path d="M 600 990 L 400 1040" fill="none" stroke="#EF4444" stroke-width="1.8" stroke-dasharray="4 4" marker-end="url(#arr-red)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 5. TIER 5: MASTER DATABASE — SINGLE SOURCE OF TRUTH                       -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="tier-5" transform="translate(60, 1030)">
+    <!-- Container -->
+    <rect x="0" y="0" width="1180" height="190" rx="14" fill="url(#master-grad)" stroke="#10B981" stroke-width="2.5" filter="url(#glow-gold)"/>
+    <rect x="0" y="0" width="1180" height="32" rx="14" fill="#064E3B" />
+    <rect x="0" y="20" width="1180" height="12" fill="#064E3B" />
+    <text x="16" y="22" font-size="13" font-weight="800" fill="#6EE7B7" letter-spacing="0.5">
+      TIER 5: MASTER DATABASE (master_dataextraction) — AUTHORITATIVE CERTIFIED GOLDEN VAULT
+    </text>
+    <text x="830" y="22" font-size="11" font-weight="700" fill="#FDE047">
+      🔒 100% CANONICAL • VALIDATED • READY FOR DELIVERY
+    </text>
+
+    <!-- DLQ Box on Left -->
+    <g transform="translate(20, 48)">
+      <rect x="0" y="0" width="230" height="120" rx="6" fill="#1C1917" stroke="#EF4444" stroke-width="1.2" />
+      <text x="12" y="22" font-size="11" font-weight="700" fill="#FCA5A5">Dead-Letter Queue (DLQ)</text>
+      <text x="12" y="40" font-size="10" fill="#D6D3D1">• Isolates sub-80 score entities</text>
+      <text x="12" y="54" font-size="10" fill="#D6D3D1">• Zero data loss disk fallback</text>
+      <text x="12" y="68" font-size="10" fill="#D6D3D1">• Manual replay &amp; unmerge</text>
+      <text x="12" y="98" font-size="10" font-weight="700" fill="#F87171">Quarantine Backlog: 0 Recs</text>
+    </g>
+
+    <!-- Master Golden Tables -->
+    <g transform="translate(270, 48)">
+      <!-- Master Organizations Table -->
+      <rect x="0" y="0" width="280" height="120" rx="6" fill="#064E3B" stroke="#34D399" stroke-width="1.2" />
+      <text x="14" y="22" font-size="12" font-weight="700" fill="#FFFFFF">master_dataextraction.organizations</text>
+      <text x="14" y="42" font-size="10" fill="#D1FAE5">• 210,838 Certified Golden Companies</text>
+      <text x="14" y="56" font-size="10" fill="#D1FAE5">• Canonical Legal &amp; Trade Names</text>
+      <text x="14" y="70" font-size="10" fill="#D1FAE5">• Statutory Tax IDs (EIN, RFC, LEI)</text>
+      <text x="14" y="84" font-size="10" fill="#D1FAE5">• Quality: 94/100 | Trust: 0.95</text>
+      <text x="14" y="104" font-size="10" font-weight="700" fill="#FDE047">Lifecycle: next_verification_at tracked</text>
+
+      <!-- Master Persons Table -->
+      <rect x="300" y="0" width="280" height="120" rx="6" fill="#064E3B" stroke="#34D399" stroke-width="1.2" />
+      <text x="14" y="22" font-size="12" font-weight="700" fill="#FFFFFF">master_dataextraction.persons</text>
+      <text x="14" y="42" font-size="10" fill="#D1FAE5">• 64,759 Certified Decision Makers</text>
+      <text x="14" y="56" font-size="10" fill="#D1FAE5">• Distinct Individual Identity</text>
+      <text x="14" y="70" font-size="10" fill="#D1FAE5">• Normalized Titles &amp; Seniority</text>
+      <text x="14" y="84" font-size="10" fill="#D1FAE5">• LinkedIn Verified Profiles</text>
+      <text x="14" y="104" font-size="10" font-weight="700" fill="#FDE047">SLA: 90-day executive refresh</text>
+
+      <!-- Master Emails & Locations -->
+      <rect x="600" y="0" width="290" height="120" rx="6" fill="#064E3B" stroke="#34D399" stroke-width="1.2" />
+      <text x="14" y="22" font-size="12" font-weight="700" fill="#FFFFFF">contact_emails &amp; locations</text>
+      <text x="14" y="42" font-size="10" fill="#D1FAE5">• 57,160 Deliverable Mailboxes</text>
+      <text x="14" y="56" font-size="10" fill="#D1FAE5">• High-confidence Mailbox Status</text>
+      <text x="14" y="70" font-size="10" fill="#D1FAE5">• Standardized Census Geocodes</text>
+      <text x="14" y="84" font-size="10" fill="#D1FAE5">• Phone E.164 Standards</text>
+      <text x="14" y="104" font-size="10" font-weight="700" fill="#FDE047">SLA: 90-day SMTP re-check</text>
+    </g>
+  </g>
+
+  <!-- Connectors Tier 5 -> Tier 6 -->
+  <path d="M 650 1220 L 650 1255" fill="none" stroke="#6366F1" stroke-width="2.5" marker-end="url(#arr-purple)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 6. TIER 6: POST-MASTER CDC, SEARCH & ONEREACH DELIVERY                    -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="tier-6" transform="translate(60, 1255)">
+    <!-- Container -->
+    <rect x="0" y="0" width="1180" height="175" rx="12" fill="#0F172A" stroke="#4F46E5" stroke-width="1.5" filter="url(#card-shadow)"/>
+    <rect x="0" y="0" width="1180" height="28" rx="12" fill="#312E81" />
+    <rect x="0" y="16" width="1180" height="12" fill="#312E81" />
+    <text x="16" y="20" font-size="12" font-weight="700" fill="#A5B4FC" letter-spacing="0.5">
+      TIER 6: AGENT 6 POST-MASTER PROCESSING (CONSUMES ONLY CERTIFIED MASTER RECORDS)
+    </text>
+
+    <!-- Agent 6 OpenSearch CDC -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="360" height="115" rx="6" fill="#1E1B4B" stroke="#6366F1" stroke-width="1" />
+      <text x="14" y="22" font-size="12" font-weight="700" fill="#FFFFFF">OpenSearch 2.x CDC Stream</text>
+      <text x="14" y="40" font-size="10" fill="#C7D2FE">• Watermark CDC Stream (kg_search)</text>
+      <text x="14" y="54" font-size="10" fill="#C7D2FE">• 210,838 Synced Golden Documents</text>
+      <text x="14" y="68" font-size="10" fill="#C7D2FE">• Sub-50ms Edge N-Gram Autocomplete</text>
+      <text x="14" y="82" font-size="10" fill="#C7D2FE">• Geo-distance Polygon Filtering</text>
+      <text x="14" y="100" font-size="10" font-weight="700" fill="#38BDF8">429 Throttling Halt Recovery: Active</text>
+    </g>
+
+    <!-- Knowledge Graph kg_graph -->
+    <g transform="translate(410, 42)">
+      <rect x="0" y="0" width="360" height="115" rx="6" fill="#1E1B4B" stroke="#8B5CF6" stroke-width="1" />
+      <text x="14" y="22" font-size="12" font-weight="700" fill="#FFFFFF">Knowledge Graph (kg_graph)</text>
+      <text x="14" y="40" font-size="10" fill="#DDD6FE">• 79,601 Bitemporal Employment Edges</text>
+      <text x="14" y="54" font-size="10" fill="#DDD6FE">• Partitioned by Years (2020..2044)</text>
+      <text x="14" y="68" font-size="10" fill="#DDD6FE">• Corporate Hierarchy Trees</text>
+      <text x="14" y="82" font-size="10" fill="#DDD6FE">• Enterprise Technology Profiles</text>
+      <text x="14" y="100" font-size="10" font-weight="700" fill="#38BDF8">Automated Quarterly Maintenance: Active</text>
+    </g>
+
+    <!-- OneReach Delivery Engine -->
+    <g transform="translate(800, 42)">
+      <rect x="0" y="0" width="360" height="115" rx="6" fill="#1E1B4B" stroke="#EC4899" stroke-width="1" />
+      <text x="14" y="22" font-size="12" font-weight="700" fill="#FFFFFF">OneReach Delivery Engine</text>
+      <text x="14" y="40" font-size="10" fill="#FBCFE8">• Outbound Webhook Delivery Service</text>
+      <text x="14" y="54" font-size="10" fill="#FBCFE8">• HMAC-SHA256 Cryptographic Signing</text>
+      <text x="14" y="68" font-size="10" fill="#FBCFE8">• 3x Exponential Backoff Retry Policy</text>
+      <text x="14" y="82" font-size="10" fill="#FBCFE8">• Audit Logging in onereach_delivery_log</text>
+      <text x="14" y="100" font-size="10" font-weight="700" fill="#38BDF8">DLQ Routing on Permanent Failure: Active</text>
+    </g>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- 7. RIGHT COLUMN: AUTONOMOUS FRESHNESS & REVALIDATION ENGINE               -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="freshness-engine" transform="translate(1280, 120)">
+    <!-- Container -->
+    <rect x="0" y="0" width="580" height="1310" rx="14" fill="#0F172A" stroke="#0284C7" stroke-width="2" filter="url(#card-shadow)"/>
+    <rect x="0" y="0" width="580" height="36" rx="14" fill="#0369A1" />
+    <rect x="0" y="24" width="580" height="12" fill="#0369A1" />
+    <text x="18" y="24" font-size="13" font-weight="800" fill="#FFFFFF" letter-spacing="0.5">
+      7. AUTONOMOUS FRESHNESS &amp; SLA REVALIDATION ENGINE
+    </text>
+
+    <!-- Mathematical Formula Box -->
+    <g transform="translate(20, 52)">
+      <rect x="0" y="0" width="540" height="110" rx="8" fill="#1E293B" stroke="#38BDF8" stroke-width="1.2" />
+      <text x="16" y="24" font-size="12" font-weight="700" fill="#38BDF8">MATHEMATICAL FRESHNESS DECAY MODEL</text>
+      <text x="16" y="48" font-size="15" font-weight="700" fill="#F8FAFC" font-family="monospace">
+        F(t) = exp( -lambda * delta_t )
+      </text>
+      <text x="16" y="70" font-size="11" fill="#94A3B8">
+        Half-life lambda = ln(2) / 48 days = 0.01444 day⁻¹
+      </text>
+      <text x="16" y="90" font-size="11" font-weight="600" fill="#E2E8F0">
+        When F(t) &lt; 0.70 or next_verification_at &lt;= NOW(), auto-scheduled for sweep.
+      </text>
+    </g>
+
+    <!-- Revalidation SLA Matrix Cards -->
+    <g transform="translate(20, 180)">
+      <text x="0" y="18" font-size="12" font-weight="800" fill="#E2E8F0" letter-spacing="0.5">
+        REVALIDATION SLA POLICY MATRIX
+      </text>
+
+      <!-- SLA 1: Website -->
+      <g transform="translate(0, 32)">
+        <rect x="0" y="0" width="540" height="70" rx="8" fill="#1E293B" stroke="#38BDF8" stroke-width="1" />
+        <rect x="0" y="0" width="6" height="70" rx="3" fill="#38BDF8" />
+        <text x="20" y="24" font-size="13" font-weight="700" fill="#F0F9FF">Website Verification: Every 30 Days</text>
+        <text x="20" y="42" font-size="11" fill="#94A3B8">Trigger: Agent 7 Headless Web Crawler</text>
+        <text x="20" y="58" font-size="10" fill="#64748B">Validates live domain status, SSL certificates &amp; corporate homepage changes</text>
+      </g>
+
+      <!-- SLA 2: Domain -->
+      <g transform="translate(0, 115)">
+        <rect x="0" y="0" width="540" height="70" rx="8" fill="#1E293B" stroke="#38BDF8" stroke-width="1" />
+        <rect x="0" y="0" width="6" height="70" rx="3" fill="#38BDF8" />
+        <text x="20" y="24" font-size="13" font-weight="700" fill="#F0F9FF">Domain DNS Verification: Every 48 Days</text>
+        <text x="20" y="42" font-size="11" fill="#94A3B8">Trigger: Agent 2 DNS &amp; Nameserver Verifier</text>
+        <text x="20" y="58" font-size="10" fill="#64748B">Checks domain registration, WHOIS privacy status, and DNS active A records</text>
+      </g>
+
+      <!-- SLA 3: Maps & Places -->
+      <g transform="translate(0, 198)">
+        <rect x="0" y="0" width="540" height="70" rx="8" fill="#1E293B" stroke="#38BDF8" stroke-width="1" />
+        <rect x="0" y="0" width="6" height="70" rx="3" fill="#38BDF8" />
+        <text x="20" y="24" font-size="13" font-weight="700" fill="#F0F9FF">Maps &amp; Places Verification: Every 48 Days</text>
+        <text x="20" y="42" font-size="11" fill="#94A3B8">Trigger: Agent 2 Google Places &amp; OSM Quadtree Harvester</text>
+        <text x="20" y="58" font-size="10" fill="#64748B">Refreshes physical business hours, operating status, geo-coordinates, and logos</text>
+      </g>
+
+      <!-- SLA 4: Government Registry -->
+      <g transform="translate(0, 281)">
+        <rect x="0" y="0" width="540" height="70" rx="8" fill="#1E293B" stroke="#38BDF8" stroke-width="1" />
+        <rect x="0" y="0" width="6" height="70" rx="3" fill="#38BDF8" />
+        <text x="20" y="24" font-size="13" font-weight="700" fill="#F0F9FF">Government Registry Verification: Every 48 Days</text>
+        <text x="20" y="42" font-size="11" fill="#94A3B8">Trigger: Agent 1 SEC EDGAR / CMS NPI / SAM.gov</text>
+        <text x="20" y="58" font-size="10" fill="#64748B">Re-checks active corporate legal filings, dissolution filings &amp; statutory tax IDs</text>
+      </g>
+
+      <!-- SLA 5: Email Verification -->
+      <g transform="translate(0, 364)">
+        <rect x="0" y="0" width="540" height="70" rx="8" fill="#1E293B" stroke="#8B5CF6" stroke-width="1" />
+        <rect x="0" y="0" width="6" height="70" rx="3" fill="#8B5CF6" />
+        <text x="20" y="24" font-size="13" font-weight="700" fill="#F5F3FF">Email Mailbox Verification: Every 90 Days</text>
+        <text x="20" y="42" font-size="11" fill="#C4B5FD">Trigger: Agent 7 5-Tier Verification Engine</text>
+        <text x="20" y="58" font-size="10" fill="#64748B">Re-executes zero-bounce SMTP handshakes; downgrades stale unconfirmed boxes</text>
+      </g>
+
+      <!-- SLA 6: Executive Leadership -->
+      <g transform="translate(0, 447)">
+        <rect x="0" y="0" width="540" height="70" rx="8" fill="#1E293B" stroke="#8B5CF6" stroke-width="1" />
+        <rect x="0" y="0" width="6" height="70" rx="3" fill="#8B5CF6" />
+        <text x="20" y="24" font-size="13" font-weight="700" fill="#F5F3FF">Executive Discovery Verification: Every 90 Days</text>
+        <text x="20" y="42" font-size="11" fill="#C4B5FD">Trigger: Agent 4 Executive Career Graph Crawler</text>
+        <text x="20" y="58" font-size="10" fill="#64748B">Audits C-Suite promotions, executive departures, and bitemporal career end-dates</text>
+      </g>
+    </g>
+
+    <!-- Temporal Cron Scheduler Implementation -->
+    <g transform="translate(20, 760)">
+      <rect x="0" y="0" width="540" height="230" rx="8" fill="#111827" stroke="#374151" stroke-width="1.2" />
+      <text x="16" y="24" font-size="12" font-weight="700" fill="#E2E8F0">
+        TEMPORAL SCHEDULES: RevalidationSweepWorkflow
+      </text>
+      <text x="16" y="46" font-size="11" fill="#9CA3AF">
+        Automated cron daemon sweeping master_dataextraction for expired entities:
+      </text>
+
+      <g transform="translate(16, 60)">
+        <rect x="0" y="0" width="508" height="150" rx="6" fill="#030712" />
+        <text x="12" y="20" font-size="10" font-family="monospace" fill="#38BDF8">-- Daily Sweep Daemon (0 2 * * *)</text>
+        <text x="12" y="36" font-size="10" font-family="monospace" fill="#F8FAFC">SELECT org_id, domain, next_verification_at</text>
+        <text x="12" y="52" font-family="monospace" font-size="10" fill="#F8FAFC">FROM master_dataextraction.organizations</text>
+        <text x="12" y="68" font-family="monospace" font-size="10" fill="#F8FAFC">WHERE next_verification_at &lt;= NOW()</text>
+        <text x="12" y="84" font-family="monospace" font-size="10" fill="#F8FAFC">ORDER BY next_verification_at ASC LIMIT 5000;</text>
+        <text x="12" y="108" font-family="monospace" font-size="10" fill="#A855F7">-- Routes expired entities to Working Layer</text>
+        <text x="12" y="124" font-family="monospace" font-size="10" fill="#10B981">-- Re-harvests &amp; atomically updates Master SLA</text>
+      </g>
+    </g>
+
+    <!-- Loopback Action Arrow -->
+    <g transform="translate(20, 1020)">
+      <rect x="0" y="0" width="540" height="140" rx="8" fill="#042F2E" stroke="#0D9488" stroke-width="1.2" />
+      <text x="16" y="24" font-size="12" font-weight="800" fill="#2DD4BF">AUTONOMOUS FEEDBACK LOOP (SELF-HEALING FLEET)</text>
+      <text x="16" y="48" font-size="11" fill="#CCFBF1">
+        1. Overdue records are fetched by RevalidationSweepWorkflow.
+      </text>
+      <text x="16" y="66" font-size="11" fill="#CCFBF1">
+        2. Placed back into staging_dataextraction.working_organizations.
+      </text>
+      <text x="16" y="84" font-size="11" fill="#CCFBF1">
+        3. Re-harvested by targeted Agent (1, 2, 7, or 4).
+      </text>
+      <text x="16" y="102" font-size="11" fill="#CCFBF1">
+        4. Re-certified by Agent 5 and promoted with refreshed 30d/48d/90d SLA.
+      </text>
+      <text x="16" y="122" font-size="10" font-weight="700" fill="#5EEAD4">
+        Guarantees zero manual maintenance &amp; permanent enterprise accuracy.
+      </text>
+    </g>
+
+    <!-- Feedback Arrow Indicator -->
+    <path d="M 290 1170 L 290 1230 L -40 1230 L -40 70 L -100 70" fill="none" stroke="#0284C7" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arr-blue)" />
+  </g>
+
+</svg>
+

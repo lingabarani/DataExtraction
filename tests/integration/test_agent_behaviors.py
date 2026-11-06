@@ -7,6 +7,7 @@ and human-approval barriers for all DataExtraction agents.
 
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -127,9 +128,10 @@ class TestAgentBehaviors(unittest.IsolatedAsyncioTestCase):
 
     async def test_federal_extraction_agent_fresh_sources_noop(self):
         agent = FederalExtractionAgent(config={"max_staleness_days": 7})
+        fresh_ts = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
         obs = {
             "freshness": {
-                "cms_npi": {"last_seen": "2026-10-25T00:00:00+00:00", "record_count": 1000}
+                "cms_npi": {"last_seen": fresh_ts, "record_count": 1000}
             },
             "has_active_federal_ingestion": False,
         }
@@ -138,9 +140,10 @@ class TestAgentBehaviors(unittest.IsolatedAsyncioTestCase):
 
     async def test_federal_extraction_agent_stale_source_triggers_ingestion(self):
         agent = FederalExtractionAgent(config={"max_staleness_days": 7})
+        stale_ts = (datetime.now(timezone.utc) - timedelta(days=15)).isoformat()
         obs = {
             "freshness": {
-                "cms_npi": {"last_seen": "2026-09-01T00:00:00+00:00", "record_count": 1000}
+                "cms_npi": {"last_seen": stale_ts, "record_count": 1000}
             },
             "has_active_federal_ingestion": False,
         }

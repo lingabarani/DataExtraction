@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CreateCampaignForm } from "@/components/campaigns/create-campaign-form";
 
-export const metadata: Metadata = { title: "New Campaign | OneExtraction" };
+export const metadata: Metadata = { title: "New Campaign | DataExtraction" };
 
 export default function NewCampaignPage() {
   return (

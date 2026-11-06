@@ -12,6 +12,7 @@ import time
 import requests
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+from ..config.settings import settings
 from ..models.company import USCanonicalCompany, USAddress, USPhoneItem, USEmailItem
 from ..models.person import USDecisionMaker
 from ..models.source_record import SourceProvenanceRecord, RawSourcePayload
@@ -87,7 +88,7 @@ class SamGovClient:
     SOURCE_NAME = "SAM.gov Federal Vendor Registry"
 
     def __init__(self, api_key: Optional[str] = None, rate_limit_rps: float = 1.0):
-        self.api_key = api_key or ""
+        self.api_key = api_key or getattr(settings, "SAM_GOV_API_KEY", "")
         self.delay = 1.0 / rate_limit_rps
         self.session = requests.Session()
         self.session.headers.update({

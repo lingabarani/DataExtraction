@@ -26,22 +26,16 @@ with workflow.unsafe.imports_passed_through():
         build_leads_activity,
     )
     from packages.temporal.activities.storage_activities import (
+        ingest_working_person_activity,
+        complete_executive_enrichment_activity,
         ingest_kg_person_activity,
         ingest_kg_employment_activity,
         ingest_kg_hierarchy_activity,
         ingest_kg_technology_activity,
     )
-    from packages.infrastructure.config_manager import config_manager
+    from packages.temporal.config import QUEUE_EXECUTIVE, EXECUTIVE_RETRY_POLICY
 
-TASK_QUEUE = config_manager.QUEUE_EXECUTIVE
-
-EXECUTIVE_RETRY_POLICY = RetryPolicy(
-    initial_interval=timedelta(seconds=15),
-    backoff_coefficient=2.0,
-    maximum_interval=timedelta(minutes=15),
-    maximum_attempts=3,
-    non_retryable_error_types=["PermissionError"],
-)
+TASK_QUEUE = QUEUE_EXECUTIVE
 
 
 @workflow.defn(name="Agent4ExecutiveWorkflow")
@@ -82,10 +76,10 @@ class Agent4ExecutiveWorkflow:
     async def run(self, config: dict = None) -> dict:
         config = config or {}
         self._status = "RUNNING"
-        table = config.get("source_table", "companies")
+        table = config.get("source_table", "staging_dataextraction.working_organizations")
         limit = config.get("contact_batch_limit", 5000)
 
-        workflow.logger.info("[Agent 4] Executive Contact Intelligence started on queue: %s", TASK_QUEUE)
+        workflow.logger.info("[Agent 4] Executive Contact Intelligence started on queue: %s (source=%s)", TASK_QUEUE, table)
 
         # ── Step 1: 5-Tier Contact Validation ─────────────────────────────────
         self._step = "CONTACT_VALIDATION"
@@ -106,7 +100,7 @@ class Agent4ExecutiveWorkflow:
         self._step = "BUILD_LEADS"
         await workflow.wait_condition(lambda: not self._paused)
         try:
-            target_table = config.get("target_table", "us_leads")
+            target_table = config.get("target_table", "staging_dataextraction.working_organizations")
             b_res = await workflow.execute_activity(
                 build_leads_activity,
                 args=[table, target_table],
@@ -118,7 +112,7 @@ class Agent4ExecutiveWorkflow:
         except Exception as exc:
             self._results["build_leads"] = {"status": "FAILED", "error": str(exc)}
 
-        # ── Step 3: Ingest Person Entities if provided ────────────────────────
+        # ── Step 3: Ingest Person Entities into Pre-Master Working Layer ───────
         self._step = "PERSON_INGESTION"
         persons = config.get("persons", [])
         if persons:
@@ -126,7 +120,7 @@ class Agent4ExecutiveWorkflow:
             for p in persons:
                 try:
                     p_res = await workflow.execute_activity(
-                        ingest_kg_person_activity,
+                        ingest_working_person_activity,
                         args=[p],
                         task_queue=TASK_QUEUE,
                         start_to_close_timeout=timedelta(minutes=10),
@@ -136,6 +130,19 @@ class Agent4ExecutiveWorkflow:
                 except Exception as exc:
                     person_outcomes.append({"status": "FAILED", "error": str(exc)})
             self._results["persons"] = person_outcomes
+
+        # Mark working organizations executive enrichment status
+        try:
+            await workflow.execute_activity(
+                complete_executive_enrichment_activity,
+                args=["ALL_PENDING"],
+                task_queue=TASK_QUEUE,
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=EXECUTIVE_RETRY_POLICY,
+            )
+            self._results["executive_enrichment_marked"] = True
+        except Exception as exc:
+            self._results["executive_enrichment_marked"] = False
 
         # ── Step 4: Ingest Employment & Hierarchy Relationships ───────────────
         self._step = "RELATIONSHIP_INGESTION"

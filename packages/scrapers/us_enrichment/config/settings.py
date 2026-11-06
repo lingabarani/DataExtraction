@@ -9,8 +9,13 @@ class USPipelineSettings:
     # ─── API Keys ────────────────────────────────────────────────────────────
     CENSUS_DATA_API_KEY = os.getenv("CENSUS_DATA_API_KEY", "")
     DATA_GOV_API_KEY = os.getenv("DATA_GOV_API_KEY", "")
-    SAM_GOV_API_KEY = os.getenv("SAM_GOV_API_KEY", "")  # optional — public data available without key
-    PEOPLEDATALABS_API_KEY = os.getenv("PEOPLEDATALABS_API_KEY", "9b4afc863602036ad087a9674d6071f0531f0f0d9de6d8995d9bdd1d3b5085db")
+    SAM_GOV_API_KEY = os.getenv("SAM_GOV_API_KEY", "")
+    BLS_API_KEY = os.getenv("BLS_API_KEY", "")
+    OPENFDA_API_KEY = os.getenv("OPENFDA_API_KEY", "")
+    BEA_DATA_API_KEY = os.getenv("BEA_DATA_API_KEY", "")
+    EIA_API_KEY = os.getenv("EIA_API_KEY", "")
+    USGS_WATER_API_KEY = os.getenv("USGS_WATER_API_KEY", "")
+    PEOPLEDATALABS_API_KEY = os.getenv("PEOPLEDATALABS_API_KEY", "")
 
     # ─── Directories ─────────────────────────────────────────────────────────
     BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent

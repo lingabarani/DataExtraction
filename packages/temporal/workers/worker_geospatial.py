@@ -23,7 +23,7 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
         sys.path.insert(0, p)
 
 from packages.temporal.client import get_temporal_client
-from packages.infrastructure.config_manager import config_manager
+from packages.temporal.config import QUEUE_GEOSPATIAL, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.gmaps_activities import (
     run_gmaps_collection_activity,
     run_gmaps_website_verification_activity,
@@ -51,8 +51,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dataextraction.worker.geospatial")
 
-TASK_QUEUE = config_manager.QUEUE_GEOSPATIAL
-MAX_ACTIVITIES = int(os.getenv("GEOSPATIAL_WORKER_MAX_CONCURRENT_ACTIVITIES", "12"))
+TASK_QUEUE = QUEUE_GEOSPATIAL
+MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_GEOSPATIAL, 10)
 
 
 async def run_worker():

@@ -26,18 +26,11 @@ with workflow.unsafe.imports_passed_through():
         run_usaspending_activity,
         run_propublica_activity,
         run_sam_gov_activity,
+        enrich_gleif_lei_activity,
     )
-    from packages.infrastructure.config_manager import config_manager
+    from packages.temporal.config import QUEUE_REGISTRY, REGISTRY_RETRY_POLICY
 
-TASK_QUEUE = config_manager.QUEUE_REGISTRY
-
-REGISTRY_RETRY_POLICY = RetryPolicy(
-    initial_interval=timedelta(seconds=15),
-    backoff_coefficient=2.0,
-    maximum_interval=timedelta(minutes=15),
-    maximum_attempts=3,
-    non_retryable_error_types=["PermissionError", "ConfigurationError"],
-)
+TASK_QUEUE = QUEUE_REGISTRY
 
 
 @workflow.defn(name="Agent1RegistryWorkflow")
@@ -111,7 +104,9 @@ class Agent1RegistryWorkflow:
             self._current_source = source_name
             workflow.logger.info("[Agent 1] Ingesting registry source: %s", source_name)
 
-            source_cfg = config.get(source_name, {"mode": "incremental"})
+            source_cfg = dict(config.get(source_name, {"mode": "incremental"}))
+            if "data_count" in config and "limit" not in source_cfg:
+                source_cfg["limit"] = config["data_count"]
             try:
                 res = await workflow.execute_activity(
                     activity_fn,
@@ -124,6 +119,25 @@ class Agent1RegistryWorkflow:
             except Exception as exc:
                 workflow.logger.error("[Agent 1] Registry source %s failed: %s", source_name, exc)
                 self._results[source_name] = {"status": "FAILED", "error": str(exc)}
+
+        # Optional GLEIF LEI Enrichment
+        enrich_lei_records = config.get("enrich_lei_records", [])
+        if enrich_lei_records:
+            workflow.logger.info("[Agent 1] Executing GLEIF LEI enrichment for %d entities", len(enrich_lei_records))
+            lei_results = []
+            for record_payload in enrich_lei_records:
+                try:
+                    lei_res = await workflow.execute_activity(
+                        enrich_gleif_lei_activity,
+                        args=[record_payload],
+                        task_queue=TASK_QUEUE,
+                        start_to_close_timeout=timedelta(minutes=15),
+                        retry_policy=REGISTRY_RETRY_POLICY,
+                    )
+                    lei_results.append(lei_res)
+                except Exception as exc:
+                    lei_results.append({"status": "FAILED", "error": str(exc)})
+            self._results["lei_enrichment"] = lei_results
 
         self._status = "COMPLETED"
         return {

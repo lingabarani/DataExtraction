@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
 import { AuthMotionWrapper } from "@/components/auth/auth-motion-wrapper";
 
-export const metadata: Metadata = { title: "Sign In | DataExtraction Project" };
+export const metadata: Metadata = { title: "Sign In | DataExtraction Platform" };
 
 export default function LoginPage() {
   return (
@@ -16,10 +16,10 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center shadow-glow">
               <span className="text-white font-bold text-sm">D</span>
             </div>
-            <span className="text-white font-semibold text-xl">DataExtraction Project</span>
+            <span className="text-white font-semibold text-xl">DataExtraction Platform</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Welcome back</h1>
-          <p className="text-slate-400 mt-1">Sign in to your workspace</p>
+          <h1 className="text-2xl font-bold text-white">Instant Workspace Access</h1>
+          <p className="text-slate-400 mt-1">Touch Sign In to open your enterprise workspace</p>
         </div>
         <LoginForm />
       </AuthMotionWrapper>

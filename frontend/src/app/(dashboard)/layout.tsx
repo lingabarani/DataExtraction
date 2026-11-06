@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Header } from "@/components/layout/header";
+import { PlatformTaskbar } from "@/components/layout/platform-taskbar";
 import { AuthGuard } from "@/components/auth/auth-guard";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -7,8 +8,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AuthGuard>
       <div className="flex h-screen bg-background overflow-hidden">
         <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           <Header />
+          <PlatformTaskbar />
           <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
         </div>
       </div>

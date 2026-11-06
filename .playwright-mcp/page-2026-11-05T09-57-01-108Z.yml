@@ -1,0 +1,138 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - complementary [ref=f7e13]:
+      - generic [ref=f7e14]:
+        - generic [ref=f7e21]:
+          - generic [ref=f7e22]: DataExtraction
+          - generic [ref=f7e23]: v2.1
+        - button "Da DataExtraction" [ref=f7e25] [cursor=pointer]:
+          - generic [ref=f7e26]: Da
+          - generic [ref=f7e28]: DataExtraction
+        - navigation [ref=f7e31]:
+          - paragraph [ref=f7e32]: Platform
+          - link "Temporal Orchestration LIVE" [ref=f7e33] [cursor=pointer]:
+            - /url: /orchestration
+            - generic [ref=f7e37]: Temporal Orchestration
+            - generic [ref=f7e39]: LIVE
+          - paragraph [ref=f7e40]: Data
+          - link "Dashboard" [ref=f7e41] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f7e48] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f7e54]: US Leads
+            - generic [ref=f7e55]: 906K
+          - link "MX Leads 50K" [ref=f7e56] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f7e62]: MX Leads
+            - generic [ref=f7e63]: 50K
+          - link "AI Query" [ref=f7e64] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f7e68]: Tools
+          - link "Scraper" [ref=f7e69] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f7e78] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f7e82] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f7e87] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f7e92] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f7e98] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@dataextraction.com" [ref=f7e104] [cursor=pointer]:
+          - generic [ref=f7e105]: A
+          - generic [ref=f7e107]:
+            - paragraph [ref=f7e108]: Admin
+            - paragraph [ref=f7e109]: admin@dataextraction.com
+    - generic [ref=f7e110]:
+      - banner [ref=f7e111]:
+        - navigation [ref=f7e112]:
+          - generic [ref=f7e113]: Pipeline & DLQ
+        - generic [ref=f7e115]:
+          - button "Search... ⌘ K" [ref=f7e116] [cursor=pointer]:
+            - generic [ref=f7e120]: Search...
+            - generic [ref=f7e121]:
+              - generic [ref=f7e122]: ⌘
+              - generic [ref=f7e123]: K
+          - button "Toggle theme" [ref=f7e124] [cursor=pointer]
+          - button [ref=f7e126] [cursor=pointer]
+      - generic [ref=f7e129]:
+        - link "Dashboard" [ref=f7e130] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Orchestration LIVE" [ref=f7e137] [cursor=pointer]:
+          - /url: /orchestration
+          - generic [ref=f7e141]: Orchestration
+          - generic [ref=f7e142]: LIVE
+        - link "Data Pipeline" [ref=f7e144] [cursor=pointer]:
+          - /url: /pipeline
+        - link "Observability" [ref=f7e151] [cursor=pointer]:
+          - /url: /orchestration#observability
+        - link "OneReach" [ref=f7e155] [cursor=pointer]:
+          - /url: /orchestration#onereach
+        - link "Freshness" [ref=f7e160] [cursor=pointer]:
+          - /url: /orchestration#freshness
+        - link "Administration" [ref=f7e165] [cursor=pointer]:
+          - /url: /settings
+      - main [ref=f7e170]:
+        - generic [ref=f7e171]:
+          - generic [ref=f7e172]:
+            - generic [ref=f7e173]:
+              - generic [ref=f7e174]:
+                - heading "Pipeline & DLQ Operations" [level=1] [ref=f7e175]
+                - generic [ref=f7e176]: v2.1
+              - paragraph [ref=f7e177]: Real-time pipeline health telemetry, connection pool monitoring, and dead-letter queue recovery.
+            - generic [ref=f7e178]:
+              - 'button "Auto-refresh: 10s" [ref=f7e179] [cursor=pointer]'
+              - button "Refresh" [ref=f7e180] [cursor=pointer]
+          - generic [ref=f7e181]:
+            - tablist [ref=f7e182]:
+              - tab "Health" [selected] [ref=f7e183] [cursor=pointer]
+              - tab "Promotion & Master" [ref=f7e186] [cursor=pointer]
+              - tab "DLQ Isolation 11" [ref=f7e190] [cursor=pointer]:
+                - text: DLQ Isolation
+                - generic [ref=f7e193]: "11"
+              - tab "7-Agent Stream" [ref=f7e194] [cursor=pointer]
+            - tabpanel "Health" [ref=f7e199]:
+              - generic [ref=f7e200]:
+                - generic [ref=f7e202]:
+                  - generic [ref=f7e203]: Engine Status
+                  - generic [ref=f7e206]:
+                    - generic [ref=f7e207]: ONLINE
+                    - generic [ref=f7e208]: 2.1.0
+                  - paragraph [ref=f7e209]: FastAPI backend + Async worker cluster
+                - generic [ref=f7e211]:
+                  - generic [ref=f7e212]: PostgreSQL Pool
+                  - generic [ref=f7e218]:
+                    - generic [ref=f7e219]: ACTIVE
+                    - generic [ref=f7e220]: 1.2 ms
+                  - paragraph [ref=f7e221]: "Capacity: 5 - 30 connections"
+                - generic [ref=f7e223]:
+                  - generic [ref=f7e224]: DLQ Backpressure
+                  - generic [ref=f7e228]:
+                    - generic [ref=f7e229]: "11"
+                    - generic [ref=f7e230]: pending items
+                  - paragraph [ref=f7e231]: Zero unhandled drops; resilient replay
+                - generic [ref=f7e233]:
+                  - generic [ref=f7e234]: Orchestrator
+                  - generic [ref=f7e239]:
+                    - generic [ref=f7e240]: ACTIVE
+                    - generic [ref=f7e241]: Isolated
+                  - paragraph [ref=f7e242]: 4 execution modes (full, inc, sample, dry)
+              - generic [ref=f7e243]:
+                - generic [ref=f7e244]:
+                  - heading "Telemetry & Architecture Specifications" [level=3] [ref=f7e245]
+                  - paragraph [ref=f7e249]: System invariants maintained across Ingestion, Entity Resolution, and Storage
+                - generic [ref=f7e251]:
+                  - generic [ref=f7e252]:
+                    - generic [ref=f7e253]: SEC EDGAR Fair Access
+                    - paragraph [ref=f7e257]: Strict connection pooling with User-Agent compliance and rate-limiting throttling.
+                  - generic [ref=f7e258]:
+                    - generic [ref=f7e259]: PostGIS & Trigram Indexes
+                    - paragraph [ref=f7e263]: GIST spatial indexes and pg_trgm similarity matching with deterministic resolution.
+                  - generic [ref=f7e264]:
+                    - generic [ref=f7e265]: Zero Data-Loss Storage
+                    - paragraph [ref=f7e269]: Atomic transaction boundaries with JSON disk fallback on DB network disconnection.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f7e9] [cursor=pointer]
+  - alert [ref=f7e270]

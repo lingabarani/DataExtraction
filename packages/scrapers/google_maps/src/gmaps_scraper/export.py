@@ -1,10 +1,16 @@
 import io
+import os
+import csv
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+import logging
 import pandas as pd
 from .db import Database
+
+logger = logging.getLogger("gmaps_scraper.export")
 
 SCHEMA_COLUMNS = [
     "cid", "ftid", "place_id", "name", "address", "street_address",
@@ -210,7 +216,10 @@ def format_region_folder_name(country_code: str, region_code: str, region_name: 
     """
     norm = unicodedata.normalize('NFKD', region_name).encode('ASCII', 'ignore').decode('utf-8')
     slug = re.sub(r'[^a-zA-Z0-9]+', '_', norm.strip()).strip('_')
-    return f"{slug}_{region_code.strip().upper()}"
+    rc = region_code.strip().upper()
+    if slug.upper().endswith(f"_{rc}"):
+        return slug
+    return f"{slug}_{rc}"
 
 
 def resolve_safe_export_path(base_dir: Path, requested_rel_path: str) -> Path:
@@ -511,4 +520,284 @@ def list_all_state_exports(base_exports_dir: Path) -> List[Dict[str, Any]]:
     # Sort by run_date descending, then country, then region
     results.sort(key=lambda x: (x.get("run_date", ""), x.get("country_code", ""), x.get("region_code", "")), reverse=True)
     return results
+
+
+RAW_EXPORT_COLUMNS = [
+    "cid", "raw_id", "name", "vertical", "category", "address",
+    "street_address", "city", "region", "country_code", "postal_code",
+    "phone", "phone_e164", "website", "latitude", "longitude",
+    "rating", "review_count", "tile_id", "search_task_id", "run_id", "collected_at"
+]
+
+
+DEFAULT_CONFIGURED_CATEGORIES = [
+    "healthcare", "hospitality", "food", "retail", "fitness",
+    "beauty", "automotive", "finance", "education", "real_estate"
+]
+
+
+def resolve_record_configured_category(
+    record: Dict[str, Any],
+    configured_categories: Optional[List[str]] = None
+) -> str:
+    """
+    Resolves the pipeline collection category for a raw business discovery record.
+    Matches search_task_id, tile_id, vertical, or taxonomy classification against
+    configured collection categories. Never returns individual business types as category names.
+    """
+    target_cats = list(configured_categories or DEFAULT_CONFIGURED_CATEGORIES)
+    valid_map = {c.strip().lower(): c.strip().lower() for c in target_cats if c.strip()}
+
+    # 1. Match search_task_id suffix/pattern (e.g. col_us_nv_healthcare, col_us_nv_real_estate, task_food)
+    task_id = (record.get("search_task_id") or "").strip().lower()
+    if task_id:
+        for c in sorted(valid_map.keys(), key=len, reverse=True):
+            if task_id.endswith(f"_{c}") or task_id.endswith(f":{c}") or task_id == c or f"_{c}_" in task_id:
+                return valid_map[c]
+
+    # 2. Match tile_id pattern (e.g. t_us_nv_healthcare_p0_y0_x0, tile_nv_healthcare_1)
+    tile_id = (record.get("tile_id") or "").strip().lower()
+    if tile_id:
+        for c in sorted(valid_map.keys(), key=len, reverse=True):
+            if f"_{c}_" in tile_id or tile_id.startswith(f"{c}_") or tile_id.endswith(f"_{c}"):
+                return valid_map[c]
+
+    # 3. Match record vertical directly
+    vert = (record.get("vertical") or "").strip().lower()
+    if vert and vert in valid_map:
+        return valid_map[vert]
+
+    # 4. Check category or vertical_raw
+    for cat_key in ("category", "vertical_raw"):
+        val = (record.get(cat_key) or "").strip()
+        if val:
+            if val.lower() in valid_map:
+                return valid_map[val.lower()]
+            try:
+                from .taxonomy import classify_vertical
+                m_vert, _ = classify_vertical(val)
+                if m_vert and m_vert.lower() in valid_map:
+                    return valid_map[m_vert.lower()]
+            except Exception:
+                pass
+
+    return "other"
+
+
+def export_live_raw_places(
+    db: Database,
+    base_exports_dir: Union[str, Path] = "data/exports",
+    country_code: str = "US",
+    region_code: str = "NV",
+    region_name: Optional[str] = None,
+    categories: Optional[List[str]] = None,
+    collection_date: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Exports newly committed raw records to date-wise, category-wise structure:
+    data/exports/live_raw/{date}/{country_code}/{region_name}_{region_code}/
+
+    Produces:
+    - all_businesses.csv and all_businesses.jsonl
+    - {category}.csv and {category}.jsonl for each configured category
+    - export_summary.json
+
+    Guarantees:
+    - Only configured categories get files (no individual business-type files).
+    - Multi-date support: earlier dates remain in their own directories.
+    - Zero duplicates on repeat exports / resumes.
+    - Atomic file writes using temp files.
+    - Primary SQLite database is never modified or corrupted.
+    """
+    if "base_dir" in kwargs:
+        base_exports_dir = kwargs["base_dir"]
+    cc = country_code.strip().upper()
+    rc = region_code.strip().upper()
+
+    # Resolve full region name if missing
+    resolved_reg_name = region_name or kwargs.get("region") or rc
+    if not resolved_reg_name or resolved_reg_name.upper() == rc:
+        try:
+            from .scope import get_region
+            reg_obj = get_region(cc, rc)
+            if reg_obj and reg_obj.name:
+                resolved_reg_name = reg_obj.name
+        except Exception:
+            resolved_reg_name = rc
+
+    region_folder = format_region_folder_name(cc, rc, resolved_reg_name)
+    configured_cats = list(categories or DEFAULT_CONFIGURED_CATEGORIES)
+    base_export_path = Path(base_exports_dir)
+
+    try:
+        # Fetch all records for this state from SQLite
+        with db.get_connection() as conn:
+            rows = conn.execute(f"""
+                SELECT {', '.join(RAW_EXPORT_COLUMNS)},
+                       COALESCE(date(collected_at, 'localtime'), substr(collected_at, 1, 10)) as col_date
+                FROM raw_places
+                WHERE UPPER(country_code) = ? AND UPPER(region) = ?
+                ORDER BY id ASC
+            """, (cc, rc)).fetchall()
+            all_records = [dict(r) for r in rows]
+
+        # Determine target collection dates to export
+        if collection_date:
+            target_dates = [collection_date]
+        else:
+            found_dates = sorted(list(set(r.get("col_date") for r in all_records if r.get("col_date"))))
+            if not found_dates:
+                target_dates = [datetime.now().strftime("%Y-%m-%d")]
+            else:
+                target_dates = found_dates
+
+        last_summary = {}
+        now_str = datetime.now().strftime("%H:%M:%S")
+
+        for date_str in target_dates:
+            target_dir = base_export_path / "live_raw" / date_str / cc / region_folder
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Filter records strictly for this collection date
+            date_records = [r for r in all_records if r.get("col_date") == date_str] if all_records else []
+            total_count = len(date_records)
+
+            # Clean and prepare records with resolved category
+            prepared_records = []
+            by_cat: Dict[str, List[Dict[str, Any]]] = {c: [] for c in configured_cats}
+
+            for r in date_records:
+                rec_copy = {col: r.get(col) for col in RAW_EXPORT_COLUMNS}
+                resolved_cat = resolve_record_configured_category(r, configured_cats)
+                rec_copy["vertical"] = resolved_cat
+                rec_copy["category"] = r.get("category") or r.get("vertical_raw") or resolved_cat
+                prepared_records.append(rec_copy)
+                if resolved_cat in by_cat:
+                    by_cat[resolved_cat].append(rec_copy)
+                else:
+                    by_cat.setdefault(resolved_cat, []).append(rec_copy)
+
+            # 1. State-level all_businesses.csv and all_businesses.jsonl
+            all_csv_path = target_dir / "all_businesses.csv"
+            all_jsonl_path = target_dir / "all_businesses.jsonl"
+            tmp_csv = target_dir / ".all_businesses.csv.tmp"
+            tmp_jsonl = target_dir / ".all_businesses.jsonl.tmp"
+
+            with open(tmp_csv, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=RAW_EXPORT_COLUMNS)
+                writer.writeheader()
+                if prepared_records:
+                    writer.writerows(prepared_records)
+            os.replace(tmp_csv, all_csv_path)
+
+            with open(tmp_jsonl, "w", encoding="utf-8") as f:
+                for r in prepared_records:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            os.replace(tmp_jsonl, all_jsonl_path)
+
+            # Compatible aliases for legacy consumers: all_raw_places.csv / all_raw_places.jsonl
+            alt_csv_path = target_dir / "all_raw_places.csv"
+            alt_jsonl_path = target_dir / "all_raw_places.jsonl"
+            tmp_alt_csv = target_dir / ".all_raw_places.csv.tmp"
+            tmp_alt_jsonl = target_dir / ".all_raw_places.jsonl.tmp"
+            with open(tmp_alt_csv, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=RAW_EXPORT_COLUMNS)
+                writer.writeheader()
+                if prepared_records:
+                    writer.writerows(prepared_records)
+            os.replace(tmp_alt_csv, alt_csv_path)
+
+            with open(tmp_alt_jsonl, "w", encoding="utf-8") as f:
+                for r in prepared_records:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            os.replace(tmp_alt_jsonl, alt_jsonl_path)
+
+            # 2. Per configured-category CSV and JSONL (ONLY configured categories!)
+            category_counts = {}
+            cat_files = [str(all_csv_path), str(all_jsonl_path)]
+
+            for cat_name in configured_cats:
+                cat_records = by_cat.get(cat_name, [])
+                cat_slug = re.sub(r'[^a-zA-Z0-9]+', '_', cat_name).strip('_') or "all"
+                category_counts[cat_name] = len(cat_records)
+
+                cat_csv_path = target_dir / f"{cat_slug}.csv"
+                cat_jsonl_path = target_dir / f"{cat_slug}.jsonl"
+                tmp_cat_csv = target_dir / f".{cat_slug}.csv.tmp"
+                tmp_cat_jsonl = target_dir / f".{cat_slug}.jsonl.tmp"
+
+                with open(tmp_cat_csv, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=RAW_EXPORT_COLUMNS)
+                    writer.writeheader()
+                    if cat_records:
+                        writer.writerows(cat_records)
+                os.replace(tmp_cat_csv, cat_csv_path)
+
+                with open(tmp_cat_jsonl, "w", encoding="utf-8") as f:
+                    for r in cat_records:
+                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                os.replace(tmp_cat_jsonl, cat_jsonl_path)
+
+                cat_files.extend([str(cat_csv_path), str(cat_jsonl_path)])
+
+            # 3. Export summary metadata
+            summary_path = target_dir / "export_summary.json"
+            tmp_summary = target_dir / ".export_summary.json.tmp"
+            summary_data = {
+                "date": date_str,
+                "country": cc,
+                "country_code": cc,
+                "region": rc,
+                "region_code": rc,
+                "region_name": resolved_reg_name,
+                "last_successful_export_time": now_str,
+                "last_export_timestamp": datetime.now().isoformat(),
+                "total_records": total_count,
+                "total_exported_rows": total_count,
+                "by_category": category_counts,
+                "category_counts": category_counts,
+                "export_directory": str(target_dir),
+            }
+            with open(tmp_summary, "w", encoding="utf-8") as f:
+                json.dump(summary_data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_summary, summary_path)
+
+            last_summary = {
+                "status": "success",
+                "date": date_str,
+                "export_dir": str(target_dir),
+                "export_path": str(target_dir),
+                "total_exported_rows": total_count,
+                "records_exported": total_count,
+                "last_export_time": now_str,
+                "last_successful_export_time": now_str,
+                "category_counts": category_counts,
+                "by_category": category_counts,
+                "files": cat_files,
+                "dates_exported": target_dates
+            }
+
+        return last_summary or {
+            "status": "success",
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "export_dir": str(base_export_path / "live_raw" / datetime.now().strftime("%Y-%m-%d") / cc / region_folder),
+            "export_path": str(base_export_path / "live_raw" / datetime.now().strftime("%Y-%m-%d") / cc / region_folder),
+            "total_exported_rows": 0,
+            "records_exported": 0,
+            "last_export_time": now_str,
+            "last_successful_export_time": now_str,
+            "category_counts": {c: 0 for c in configured_cats},
+            "by_category": {c: 0 for c in configured_cats},
+            "files": [],
+            "dates_exported": [datetime.now().strftime("%Y-%m-%d")]
+        }
+    except Exception as e:
+        logger.warning(f"Error during live raw export: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "export_dir": str(base_export_path / "live_raw" / datetime.now().strftime("%Y-%m-%d") / cc / region_folder),
+            "records_exported": 0
+        }
 

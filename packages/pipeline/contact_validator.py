@@ -40,7 +40,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-logger = logging.getLogger("oneextraction.validator")
+logger = logging.getLogger("dataextraction.validator")
 
 # DNS resolver support
 try:

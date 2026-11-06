@@ -11,23 +11,23 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
-logger = logging.getLogger("oneextraction.config")
+logger = logging.getLogger("dataextraction.config")
 if not logger.handlers:
     _handler = logging.StreamHandler(sys.stdout)
     _handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] [CONFIG] %(message)s"))
     logger.addHandler(_handler)
     logger.setLevel(logging.INFO)
 
-# Load local .env files if present (bottom-up: botasaurus/.env then root .env)
+# Load local .env files if present (bottom-up: config dir, packages, and repo root)
 _CURRENT_DIR = Path(__file__).resolve().parent
-_ROOT_DIR = _CURRENT_DIR.parent
-for env_path in [_CURRENT_DIR / ".env", _ROOT_DIR / ".env"]:
+_REPO_ROOT = _CURRENT_DIR.parent.parent
+for env_path in [_CURRENT_DIR / ".env", _CURRENT_DIR.parent / ".env", _REPO_ROOT / ".env"]:
     if env_path.exists():
-        load_dotenv(env_path, override=False)
+        load_dotenv(env_path, override=True)
 
 
 class ConfigurationError(Exception):
@@ -77,6 +77,8 @@ class ConfigManager:
     3. Local .env file
     4. Default values (with strict production guards)
     """
+
+    _ephemeral_rsa_pair: Optional[Tuple[str, str]] = None
 
     def __init__(self):
         self._secrets_cache: Optional[Dict[str, Any]] = None
@@ -179,6 +181,68 @@ class ConfigManager:
     def get_jwt_expiration_hours(self) -> int:
         return int(self.get("JWT_EXPIRATION_HOURS", 24))
 
+    def get_jwt_private_key(self) -> str:
+        """
+        Retrieves RSA Private Key for RS256 token signing.
+        Supports JWT_PRIVATE_KEY or file path via JWT_PRIVATE_KEY_PATH.
+        Generates ephemeral 2048-bit RSA keypair in development if not explicitly configured.
+        """
+        key = self.get("JWT_PRIVATE_KEY")
+        if not key:
+            key_path = self.get("JWT_PRIVATE_KEY_PATH")
+            if key_path and Path(key_path).exists():
+                key = Path(key_path).read_text(encoding="utf-8")
+
+        if key and "-----BEGIN" in key:
+            return key.strip()
+
+        if self.is_production:
+            raise ConfigurationError(
+                "FATAL: JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_PATH must be provided for RS256 in production!"
+            )
+
+        if ConfigManager._ephemeral_rsa_pair is None:
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            priv = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            priv_pem = priv.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            ).decode("utf-8")
+            pub_pem = priv.public_key().public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            ).decode("utf-8")
+            ConfigManager._ephemeral_rsa_pair = (priv_pem, pub_pem)
+
+        return ConfigManager._ephemeral_rsa_pair[0]
+
+    def get_jwt_public_key(self) -> str:
+        """
+        Retrieves RSA Public Key for RS256 token verification.
+        Supports JWT_PUBLIC_KEY or file path via JWT_PUBLIC_KEY_PATH.
+        """
+        key = self.get("JWT_PUBLIC_KEY")
+        if not key:
+            key_path = self.get("JWT_PUBLIC_KEY_PATH")
+            if key_path and Path(key_path).exists():
+                key = Path(key_path).read_text(encoding="utf-8")
+
+        if key and "-----BEGIN" in key:
+            return key.strip()
+
+        if self.is_production:
+            raise ConfigurationError(
+                "FATAL: JWT_PUBLIC_KEY or JWT_PUBLIC_KEY_PATH must be provided for RS256 in production!"
+            )
+
+        if ConfigManager._ephemeral_rsa_pair is not None:
+            return ConfigManager._ephemeral_rsa_pair[1]
+
+        self.get_jwt_private_key()
+        return ConfigManager._ephemeral_rsa_pair[1]
+
     def get_admin_credentials(self) -> Dict[str, str]:
         """
         Retrieve administrator credentials with production checks.
@@ -200,14 +264,24 @@ class ConfigManager:
         """
         Retrieve database configuration. Validates production password safety.
         """
-        db_type = self.get("DATABASE_TYPE", "postgresql").lower()
-        host = self.get("DATABASE_HOST", "127.0.0.1")
-        port = int(self.get("DATABASE_PORT", 5432))
-        dbname = self.get("DATABASE_NAME", "oneextraction")
-        user = self.get("DATABASE_USER", "postgres")
-        password = self.get("DATABASE_PASSWORD", "7903")
-        pool_min = int(self.get("DATABASE_POOL_MIN", 2))
-        pool_max = int(self.get("DATABASE_POOL_MAX", 20))
+        db_type = (self.get("DATABASE_TYPE") or self.get("POSTGRES_TYPE") or "postgresql").lower()
+        host = self.get("DATABASE_HOST") or self.get("POSTGRES_HOST") or "localhost"
+        port = int(self.get("DATABASE_PORT") or self.get("POSTGRES_PORT") or 5432)
+        dbname = self.get("DATABASE_NAME") or self.get("POSTGRES_DB") or "dataextraction"
+        user = self.get("DATABASE_USER") or self.get("POSTGRES_USER") or "postgres"
+        password = self.get("DATABASE_PASSWORD") or self.get("POSTGRES_PASSWORD") or "7903"
+        base_pool = int(self.get("DATABASE_POOL_MIN") or self.get("POSTGRES_POOL_SIZE") or 5)
+        max_overflow = int(self.get("DATABASE_POOL_MAX") or self.get("POSTGRES_MAX_OVERFLOW") or 20)
+        if self.get("DATABASE_POOL_MIN") and self.get("DATABASE_POOL_MAX"):
+            pool_min = int(self.get("DATABASE_POOL_MIN"))
+            pool_max = int(self.get("DATABASE_POOL_MAX"))
+        else:
+            # Base pool + overflow mapping for psycopg2 / pgbouncer
+            pool_min = min(base_pool, 5)
+            pool_max = base_pool + max_overflow
+
+        if pool_min > pool_max:
+            pool_min, pool_max = pool_max, pool_min
 
         if self.is_production and db_type == "postgresql":
             if not password or password in INSECURE_DB_PASSWORDS:
@@ -386,6 +460,111 @@ class ConfigManager:
             "http://localhost:3001",
             "http://127.0.0.1:3001",
         ]
+
+    # ── Email Enrichment & SMTP Probe Config ──────────────────────────────────
+
+    def get_email_enrichment_config(self) -> Dict[str, Any]:
+        """
+        Retrieve settings for asynchronous web crawl, contact page crawler,
+        and domain tech stack analysis.
+        """
+        return {
+            "rate_limit_per_second": float(self.get("EMAIL_ENRICHMENT_RATE_LIMIT", 50.0)),
+            "per_host_limit": int(self.get("EMAIL_ENRICHMENT_PER_HOST_LIMIT", 2)),
+            "total_timeout": float(self.get("EMAIL_ENRICHMENT_TIMEOUT_SECONDS", 10.0)),
+            "connect_timeout": float(self.get("EMAIL_ENRICHMENT_CONNECT_TIMEOUT", 3.0)),
+            "max_body_size": int(self.get("EMAIL_ENRICHMENT_MAX_BODY_SIZE_MB", 5)) * 1024 * 1024,
+            "max_concurrent": int(self.get("EMAIL_ENRICHMENT_MAX_CONCURRENT", 100)),
+            "user_agent": self.get("EMAIL_ENRICHMENT_USER_AGENT", "Mozilla/5.0 (compatible; DataExtractionBot/2.0; business-intelligence)"),
+        }
+
+    def get_smtp_probe_config(self) -> Dict[str, Any]:
+        """
+        Retrieve settings for active SMTP RCPT TO mailbox handshake and catch-all probing.
+        Includes cloud port-25 bypass, authenticated relay, and DNS fallback options.
+        """
+        return {
+            "probe_from": self.get("SMTP_PROBE_FROM", "verify@oneextraction.com"),
+            "probe_ehlo": self.get("SMTP_PROBE_EHLO", "mail.oneextraction.com"),
+            "timeout": float(self.get("SMTP_TIMEOUT_SECONDS", 5.0)),
+            "rate_limit_delay": float(self.get("SMTP_PROBE_RATE_LIMIT_DELAY", 0.5)),
+            "candidate_prefixes": [
+                p.strip() for p in self.get("SMTP_CANDIDATE_PREFIXES", "info,contact,hello,office,sales").split(",") if p.strip()
+            ],
+            "max_mx_hosts_to_try": int(self.get("SMTP_MAX_MX_HOSTS", 3)),
+            "relay_host": self.get("SMTP_RELAY_HOST", None),
+            "relay_port": int(self.get("SMTP_RELAY_PORT", 587)),
+            "relay_user": self.get("SMTP_RELAY_USER", None),
+            "relay_password": self.get("SMTP_RELAY_PASSWORD", None),
+            "probe_port": int(self.get("SMTP_PROBE_PORT", 25)),
+            "fallback_mx_on_blocked_port": str(self.get("SMTP_FALLBACK_MX_ON_BLOCKED_PORT", "true")).lower() == "true",
+        }
+
+    # ── Ollama LLM Configuration ──────────────────────────────────────────────
+
+    def get_ollama_config(self) -> Dict[str, Any]:
+        """
+        Retrieve settings for Ollama local/cluster LLM service integration.
+        Controls base URL, target model, request timeouts, keep-alive heartbeat,
+        and circuit breaker thresholds.
+        """
+        return {
+            "base_url": self.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/"),
+            "model": self.get("OLLAMA_MODEL", "llama3.1:8b"),
+            "timeout_seconds": float(self.get("OLLAMA_TIMEOUT_SECONDS", 5.0)),
+            "batch_timeout_seconds": float(self.get("OLLAMA_BATCH_TIMEOUT_SECONDS", 30.0)),
+            "keep_alive": self.get("OLLAMA_KEEP_ALIVE", "30m"),
+            "circuit_breaker_threshold": int(self.get("OLLAMA_CIRCUIT_BREAKER_THRESHOLD", 3)),
+            "circuit_breaker_recovery_seconds": float(self.get("OLLAMA_CIRCUIT_BREAKER_RECOVERY_SECONDS", 60.0)),
+            "enabled": str(self.get("OLLAMA_ENABLED", "true")).lower() in ("true", "1", "yes"),
+        }
+
+    # ── AI Agent & Normalization Capabilities ─────────────────────────────────
+
+    def get_agent_ai_config(self) -> Dict[str, Any]:
+        """
+        Retrieve settings for AI agent capabilities across Agent 3 (Entity Resolution Adjudicator),
+        Agent 4 (Executive Normalizer), and Agent 5 (Industry Classifier).
+        """
+        return {
+            "entity_adjudication_enabled": str(self.get("LLM_ENTITY_ADJUDICATION_ENABLED", "true")).lower() in ("true", "1", "yes"),
+            "entity_adjudication_timeout": float(self.get("LLM_ENTITY_ADJUDICATION_TIMEOUT", 10.0)),
+            "normalization_enabled": str(self.get("LLM_NORMALIZATION_ENABLED", "true")).lower() in ("true", "1", "yes"),
+            "normalization_timeout": float(self.get("LLM_NORMALIZATION_TIMEOUT", 5.0)),
+            "batch_concurrency": int(self.get("LLM_BATCH_CONCURRENCY", 5)),
+            "quarantine_min_threshold": float(self.get("SPLINK_QUARANTINE_MIN_PROB", 0.70)),
+            "quarantine_max_threshold": float(self.get("SPLINK_QUARANTINE_MAX_PROB", 0.95)),
+        }
+
+    # ── Promotion Gate & Governance Configuration ─────────────────────────────
+
+    def get_promotion_gate_config(self) -> Dict[str, Any]:
+        """
+        Configuration for Promotion Gate thresholds, batch chunks, and freshness initialization.
+        Eliminates hardcoded governance and certification parameters.
+        """
+        return {
+            "min_quality_score": int(self.get("PROMOTION_MIN_QUALITY_SCORE", 80)),
+            "min_trust_score": float(self.get("PROMOTION_MIN_TRUST_SCORE", 0.8500)),
+            "batch_chunk_size": int(self.get("PROMOTION_BATCH_CHUNK_SIZE", 5000)),
+            "freshness_initial_score": float(self.get("PROMOTION_INITIAL_FRESHNESS", 1.0000)),
+            "revalidation_interval_days": int(self.get("PROMOTION_REVALIDATION_INTERVAL_DAYS", 90)),
+        }
+
+    # ── Freshness Engine & Revalidation Configuration ──────────────────────────
+
+    def get_freshness_engine_config(self) -> Dict[str, Any]:
+        """
+        Configuration for continuous freshness scoring decay and SLA thresholds.
+        Eliminates hardcoded decay batch sizes, reharvest intervals, and stale score cutoffs.
+        """
+        return {
+            "decay_batch_size": int(self.get("FRESHNESS_DECAY_BATCH_SIZE", 5000)),
+            "overdue_fetch_limit": int(self.get("FRESHNESS_OVERDUE_LIMIT", 5000)),
+            "stale_threshold": float(self.get("FRESHNESS_STALE_THRESHOLD", 0.70)),
+            "reharvest_batch_size": int(self.get("FRESHNESS_REHARVEST_BATCH_SIZE", 1000)),
+        }
+
 
 
 # Global singleton instance

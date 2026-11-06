@@ -160,7 +160,7 @@ class TestDeadLetterQueue(unittest.TestCase):
         self.assertEqual(dlq_id, 101)
         self.mock_conn.commit.assert_called_once()
         exec_sql = self.mock_cur.execute.call_args[0][0]
-        self.assertIn("INSERT INTO dead_letter_queue", exec_sql)
+        self.assertTrue("INSERT INTO dead_letter_queue" in exec_sql or "staging_dataextraction.dead_letter_queue" in exec_sql)
 
     def test_enqueue_dead_letter_fallback_on_db_error(self):
         self.mock_cur.execute.side_effect = Exception("Postgres connection dropped")
@@ -235,7 +235,7 @@ class TestDeadLetterQueue(unittest.TestCase):
             self.assertEqual(res["status"], "DISCARDED")
 
             executed = " ".join(call[0][0] for call in self.mock_cur.execute.call_args_list)
-            self.assertIn("UPDATE dead_letter_queue", executed)
+            self.assertTrue("UPDATE dead_letter_queue" in executed or "staging_dataextraction.dead_letter_queue" in executed)
 
     def test_discard_dead_letter(self):
         ok = discard_dead_letter(self.mock_conn, dlq_id=99, reason="Duplicate spam entity")

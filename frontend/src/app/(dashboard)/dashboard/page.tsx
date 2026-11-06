@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { DashboardOverview } from "@/components/dashboard/overview";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata: Metadata = { title: "Dashboard | OneExtraction Project" };
+export const metadata: Metadata = { title: "Dashboard | DataExtraction Project" };
 
 function DashboardFallback() {
   return (

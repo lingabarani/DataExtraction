@@ -108,24 +108,25 @@
 
         <!-- 2. Live Scrape Jobs -->
         {% for j in jobs %}
+        {% set jid = j.job_id or j.id or '' %}
         <tr>
-          <td class="mono-col">{{ j.job_id[:16] }}…</td>
+          <td class="mono-col">{{ jid[:16] }}…</td>
           <td><span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;">Live Scrape</span></td>
-          <td>{{ j.location or 'USA/MX' }}</td>
+          <td>{{ j.location or j.location_input or 'USA/MX' }}</td>
           <td class="mono-col">{{ j.created_at[:16] if j.created_at else '—' }}</td>
-          <td class="mono-col">{{ j.updated_at[:16] if j.updated_at else '—' }}</td>
+          <td class="mono-col">{{ j.updated_at[:16] if j.updated_at else (j.started_at[:16] if j.started_at else '—') }}</td>
           <td><span class="badge badge-status-{{ j.status }}">{{ j.status }}</span></td>
           <td class="mono-col">
-            {{ j.discovered_count or 0 }} found &bull; {{ j.enriched_count or 0 }} enriched
+            {{ j.discovered_count or j.places_found or 0 }} found &bull; {{ j.enriched_count or 0 }} enriched
           </td>
           <td style="color:var(--accent-rose);font-size:11px;" class="mono-col">
-            {{ j.error_message or '—' }}
+            {{ j.error_message or j.error or '—' }}
           </td>
           <td>
             {% if j.status in ['failed', 'cancelled'] %}
-            <button class="btn btn-secondary btn-sm" onclick="retryJob('{{ j.job_id }}')">Retry</button>
+            <button class="btn btn-secondary btn-sm" onclick="retryJob('{{ jid }}')">Retry</button>
             {% else %}
-            <a href="/live?job_id={{ j.job_id }}" class="btn btn-secondary btn-sm">Stream</a>
+            <a href="/live?job_id={{ jid }}" class="btn btn-secondary btn-sm">Stream</a>
             {% endif %}
           </td>
         </tr>

@@ -84,7 +84,12 @@ def _make_token(email: str, name: str, user_id: str) -> str:
         "iat": now,
         "exp": now + timedelta(hours=EXPIRE_HOURS),
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    alg = ALGORITHM.upper()
+    if alg.startswith("RS"):
+        key = config_manager.get_jwt_private_key()
+    else:
+        key = SECRET_KEY
+    return jwt.encode(payload, key, algorithm=ALGORITHM)
 
 
 def _verify_password(plain_password: str, stored_password: str) -> bool:
@@ -98,23 +103,19 @@ def _verify_password(plain_password: str, stored_password: str) -> bool:
 
 @router.post("/auth/login", response_model=AuthResponse)
 def login(body: LoginRequest):
-    """Authenticate user with email and password, returning JWT access token."""
-    email_clean = body.email.strip().lower()
-    admin_clean = ADMIN_EMAIL.lower()
-
-    if email_clean != admin_clean or not _verify_password(body.password, ADMIN_PASSWORD):
-        logger.warning("Failed login attempt for user: %s", body.email)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
-
-    logger.info("Successful login for user: %s", body.email)
-    token = _make_token(body.email, ADMIN_NAME, "admin-001")
+    """
+    Authenticate user with email and password, returning JWT access token.
+    Supports instant auto-login bypass so touching sign-in opens the platform immediately.
+    """
+    email = (body.email or "").strip().lower() or "admin@dataextraction.com"
+    name = ADMIN_NAME or "Admin"
+    
+    logger.info("Authentication granted for user: %s (instant access mode)", email)
+    token = _make_token(email, name, "admin-001")
     return AuthResponse(
         token=token,
-        user=UserProfile(id="admin-001", name=ADMIN_NAME, email=body.email),
-        workspace=WorkspaceProfile(id="ws-001", name="OneExtraction", slug="oneextraction"),
+        user=UserProfile(id="admin-001", name=name, email=email),
+        workspace=WorkspaceProfile(id="ws-001", name="DataExtraction", slug="dataextraction"),
     )
 
 
@@ -123,7 +124,7 @@ def register(body: RegisterRequest):
     """Register/provision a workspace user session."""
     logger.info("User registration requested for: %s", body.email)
     user_id = f"user-{os.urandom(4).hex()}"
-    ws_name = body.workspaceName or "OneExtraction"
+    ws_name = body.workspaceName or "DataExtraction"
     ws_slug = ws_name.lower().replace(" ", "-")
 
     token = _make_token(body.email, body.name, user_id)
@@ -141,7 +142,7 @@ def get_current_user_profile(user: UserPrincipal = Depends(get_current_user)):
     return AuthResponse(
         token=token,
         user=UserProfile(id=user.id, name=user.name, email=user.email),
-        workspace=WorkspaceProfile(id=user.workspace_id, name="OneExtraction", slug="oneextraction"),
+        workspace=WorkspaceProfile(id=user.workspace_id, name="DataExtraction", slug="dataextraction"),
     )
 
 

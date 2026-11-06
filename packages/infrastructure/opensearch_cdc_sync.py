@@ -15,6 +15,7 @@ Capabilities:
 
 import json
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -261,8 +262,15 @@ class OpenSearchCDCSyncClient:
 
             bulk_payload = "\n".join(bulk_lines) + "\n"
 
-            # 4. Push bulk payload to OpenSearch (or simulate if offline)
+            # 4. Push bulk payload to OpenSearch (with strict data-integrity enforcement)
             synced_count = len(rows)
+            allow_offline = (
+                self.config.get("allow_offline", False)
+                or str(os.getenv("OPENSEARCH_ALLOW_OFFLINE_STUB", "false")).lower() in ("true", "1")
+            )
+
+            failed_indices = []
+            resp_json = None
             try:
                 resp = self.session.post(
                     f"{self.base_url}/_bulk",
@@ -273,13 +281,78 @@ class OpenSearchCDCSyncClient:
                     timeout=self.timeout,
                 )
                 if resp.status_code not in (200, 201):
-                    logger.warning("OpenSearch bulk returned non-200 (%s): %s", resp.status_code, resp.text[:200])
-            except Exception as e:
-                logger.info("OpenSearch cluster notice (%s); recording watermark checkpoint safely", e)
+                    err_msg = f"OpenSearch bulk push failed: HTTP {resp.status_code} - {resp.text[:300]}"
+                    logger.error(err_msg)
+                    if not allow_offline:
+                        raise RuntimeError(err_msg)
 
-            # 5. Commit watermark update
+                resp_json = resp.json()
+                if resp_json.get("errors"):
+                    items = resp_json.get("items", [])
+                    logger.warning("OpenSearch bulk indexing reported item errors; inspecting %d items", len(items))
+                    for idx, (row, item) in enumerate(zip(rows, items)):
+                        action_data = next(iter(item.values())) if item else {}
+                        item_status = action_data.get("status", 200)
+                        item_error = action_data.get("error")
+                        if item_status >= 400 or item_error:
+                            failed_indices.append(idx)
+                            org_id = str(row[0])
+                            logger.error(
+                                "OpenSearch item error for doc %s (status %s): %s",
+                                org_id, item_status, item_error
+                            )
+                            try:
+                                from packages.infrastructure.dead_letter_queue import enqueue_dead_letter
+                                enqueue_dead_letter(
+                                    source_name="opensearch_cdc",
+                                    error_type="OpenSearchBulkItemError",
+                                    error_message=str(item_error),
+                                    payload={"org_id": org_id, "name": row[2], "sync_version": row[14]},
+                                    failed_stage="SEARCH_INDEXING",
+                                )
+                            except Exception as dlq_err:
+                                logger.debug("DLQ notice on OpenSearch item error: %s", dlq_err)
+            except Exception as e:
+                if allow_offline:
+                    logger.warning("OpenSearch cluster notice (%s); OPENSEARCH_ALLOW_OFFLINE_STUB enabled, simulating watermark safely", e)
+                else:
+                    logger.error("OpenSearch CDC push failed (%s); aborting watermark commit to prevent data loss", e)
+                    raise RuntimeError(f"OpenSearch CDC push failed: {e}") from e
+
+            # 5. Compute Safe Monotonic Watermark (High-Watermark Invariant)
+            if failed_indices:
+                first_failed_idx = failed_indices[0]
+                if first_failed_idx == 0:
+                    # First document in batch failed -> cannot advance watermark at all!
+                    safe_watermark_version = last_version
+                    safe_watermark_time = last_time
+                    consecutive_synced = 0
+                else:
+                    # Watermark advances only up to the last consecutively succeeded document
+                    prev_row = rows[first_failed_idx - 1]
+                    safe_watermark_version = prev_row[14]
+                    safe_watermark_time = prev_row[15]
+                    consecutive_synced = first_failed_idx
+                status_str = "PARTIAL_FAILURE"
+                logger.warning(
+                    "OpenSearch watermark halted at safe version %s (before first failure at row #%d, org_id=%s)",
+                    safe_watermark_version, first_failed_idx, rows[first_failed_idx][0]
+                )
+            else:
+                safe_watermark_version = max_version
+                safe_watermark_time = max_time
+                consecutive_synced = synced_count
+                status_str = "SUCCESS"
+
+            # Enforce monotonic watermark advancement (never regress)
+            if safe_watermark_version < last_version:
+                safe_watermark_version = last_version
+            if safe_watermark_time < last_time:
+                safe_watermark_time = last_time
+
             duration_ms = int((time.time() - start_time) * 1000)
-            new_total = total_synced + synced_count
+            new_total = total_synced + consecutive_synced
+
             cur.execute(
                 """
                 UPDATE kg_search.cdc_watermarks
@@ -287,18 +360,19 @@ class OpenSearchCDCSyncClient:
                     last_synced_timestamp = %s,
                     records_synced_total = %s,
                     last_sync_duration_ms = %s,
-                    last_status = 'SUCCESS',
+                    last_status = %s,
                     updated_at = CLOCK_TIMESTAMP()
                 WHERE consumer_id = %s;
                 """,
-                (max_version, max_time, new_total, duration_ms, consumer_id),
+                (safe_watermark_version, safe_watermark_time, new_total, duration_ms, status_str, consumer_id),
             )
 
         return {
-            "status": "synced",
-            "records_synced": synced_count,
+            "status": "synced" if not failed_indices else "partial_failure",
+            "records_synced": consecutive_synced,
+            "failed_count": len(failed_indices),
             "total_synced": new_total,
-            "max_version": max_version,
+            "max_version": safe_watermark_version,
             "duration_ms": duration_ms,
         }
 
@@ -367,13 +441,68 @@ class OpenSearchCDCSyncClient:
 
         return {"total": 0, "hits": []}
 
+    def autocomplete(self, prefix: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Executes edge n-gram autocomplete on company names and domains in OpenSearch.
+        """
+        if not self.ping():
+            return []
+        try:
+            os_query = {
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"prefix": {"legal_name.raw": {"value": prefix.upper()}}},
+                            {"match_phrase_prefix": {"legal_name": {"query": prefix}}},
+                            {"prefix": {"primary_domain": {"value": prefix.lower()}}},
+                        ]
+                    }
+                },
+                "size": limit,
+                "_source": ["legal_name", "display_name", "primary_domain", "statutory_tax_id", "quality_score"],
+            }
+            resp = self.session.post(
+                f"{self.base_url}/{self.config['index_companies']}/_search",
+                json=os_query,
+                auth=self.auth,
+                verify=self.verify,
+                timeout=self.timeout,
+            )
+            if resp.status_code == 200:
+                hits = resp.json().get("hits", {}).get("hits", [])
+                suggestions = []
+                for h in hits:
+                    src = h.get("_source", {})
+                    suggestions.append({
+                        "name": src.get("display_name") or src.get("legal_name"),
+                        "domain": src.get("primary_domain"),
+                        "quality_score": src.get("quality_score"),
+                    })
+                return suggestions
+        except Exception as e:
+            logger.debug("OpenSearch autocomplete error: %s", e)
+        return []
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Returns OpenSearch CDC sync operational metrics."""
+        return {
+            "cluster_reachable": self.ping(),
+            "base_url": self.base_url,
+            "index_companies": self.config.get("index_companies", "dataextraction_companies"),
+            "index_people": self.config.get("index_people", "dataextraction_people"),
+            "docs_indexed": getattr(self, "_docs_indexed", 0),
+            "batches_synced": getattr(self, "_batches_synced", 0),
+        }
+
 
 # Global singleton instance
 opensearch_client = OpenSearchCDCSyncClient()
+opensearch_cdc_sync = opensearch_client
 
 __all__ = [
     "COMPANY_INDEX_MAPPING",
     "PERSON_INDEX_MAPPING",
     "OpenSearchCDCSyncClient",
     "opensearch_client",
+    "opensearch_cdc_sync",
 ]

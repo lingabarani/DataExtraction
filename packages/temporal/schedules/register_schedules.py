@@ -28,32 +28,49 @@ from temporalio.client import (
     ScheduleAlreadyRunningError,
 )
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+_repo_root = Path(__file__).resolve().parents[3]
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
 
 from packages.temporal.client import get_temporal_client
+from packages.temporal.config import QUEUE_EMAIL_ENRICHMENT, QUEUE_GOVERNANCE
 from packages.temporal.workflows.federal_ingestion_workflow import FederalIngestionWorkflow
 from packages.temporal.workflows.gmaps_extraction_workflow import GMapsExtractionWorkflow
 from packages.temporal.workflows.osm_state_workflow import OSMStateWorkflow
 from packages.temporal.workflows.dlq_replay_workflow import DLQReplayWorkflow
+from packages.temporal.workflows.w7_email_enrichment_workflow import (
+    EmailEnrichmentWorkflow,
+    Agent7EmailEnrichmentWorkflow,
+)
+from packages.temporal.workflows.revalidation_sweep_workflow import RevalidationSweepWorkflow
+from packages.temporal.workflows.promotion_gate_workflow import PromotionGateWorkflow
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
 logger = logging.getLogger("dataextraction.schedules")
 
-CONFIG_PATH = Path(__file__).resolve().parents[4] / "config" / "schedules.yaml"
+CONFIG_PATH = _repo_root / "config" / "schedules.yaml"
 
 WORKFLOW_MAP = {
-    "FederalIngestionWorkflow":  FederalIngestionWorkflow,
-    "GMapsExtractionWorkflow":   GMapsExtractionWorkflow,
-    "OSMStateWorkflow":          OSMStateWorkflow,
-    "DLQReplayWorkflow":         DLQReplayWorkflow,
+    "FederalIngestionWorkflow":     FederalIngestionWorkflow,
+    "GMapsExtractionWorkflow":      GMapsExtractionWorkflow,
+    "OSMStateWorkflow":             OSMStateWorkflow,
+    "DLQReplayWorkflow":            DLQReplayWorkflow,
+    "EmailEnrichmentWorkflow":       EmailEnrichmentWorkflow,
+    "Agent7EmailEnrichmentWorkflow": Agent7EmailEnrichmentWorkflow,
+    "RevalidationSweepWorkflow":    RevalidationSweepWorkflow,
+    "PromotionGateWorkflow":        PromotionGateWorkflow,
 }
 
 TASK_QUEUE_MAP = {
-    "FederalIngestionWorkflow":  "federal-ingestion",
-    "GMapsExtractionWorkflow":   "gmaps-extraction",
-    "OSMStateWorkflow":          "osm-extraction",
-    "DLQReplayWorkflow":         "storage-ops",
+    "FederalIngestionWorkflow":     "federal-ingestion",
+    "GMapsExtractionWorkflow":      "gmaps-extraction",
+    "OSMStateWorkflow":             "osm-extraction",
+    "DLQReplayWorkflow":            "storage-ops",
+    "EmailEnrichmentWorkflow":       QUEUE_EMAIL_ENRICHMENT,
+    "Agent7EmailEnrichmentWorkflow": QUEUE_EMAIL_ENRICHMENT,
+    "RevalidationSweepWorkflow":    QUEUE_GOVERNANCE,
+    "PromotionGateWorkflow":        QUEUE_GOVERNANCE,
 }
 
 

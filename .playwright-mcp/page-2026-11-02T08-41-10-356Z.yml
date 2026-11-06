@@ -1,0 +1,132 @@
+- generic [active] [ref=f8e1]:
+  - generic [ref=f8e2]:
+    - complementary [ref=f8e3]:
+      - generic [ref=f8e4]:
+        - generic [ref=f8e11]:
+          - generic [ref=f8e12]: OneExtraction
+          - generic [ref=f8e13]: v2.1
+        - button "On OneExtraction" [ref=f8e15] [cursor=pointer]:
+          - generic [ref=f8e16]: "On"
+          - generic [ref=f8e18]: OneExtraction
+        - navigation [ref=f8e21]:
+          - paragraph [ref=f8e22]: Data
+          - link "Dashboard" [ref=f8e23] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f8e30] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f8e36]: US Leads
+            - generic [ref=f8e37]: 906K
+          - link "MX Leads 50K" [ref=f8e38] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f8e44]: MX Leads
+            - generic [ref=f8e45]: 50K
+          - link "AI Query" [ref=f8e46] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f8e50]: Tools
+          - link "Scraper" [ref=f8e51] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f8e60] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f8e64] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f8e69] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f8e74] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f8e80] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@oneextraction.internal" [ref=f8e86] [cursor=pointer]:
+          - generic [ref=f8e87]: A
+          - generic [ref=f8e89]:
+            - paragraph [ref=f8e90]: Admin
+            - paragraph [ref=f8e91]: admin@oneextraction.internal
+    - generic [ref=f8e92]:
+      - banner [ref=f8e93]:
+        - navigation [ref=f8e94]:
+          - generic [ref=f8e95]: Dashboard
+        - generic [ref=f8e97]:
+          - button "Search... ⌘ K" [ref=f8e98] [cursor=pointer]:
+            - generic [ref=f8e102]: Search...
+            - generic [ref=f8e103]:
+              - generic [ref=f8e104]: ⌘
+              - generic [ref=f8e105]: K
+          - button "Toggle theme" [ref=f8e106] [cursor=pointer]
+          - button [ref=f8e108] [cursor=pointer]
+      - main [ref=f8e110]:
+        - generic [ref=f8e111]:
+          - generic [ref=f8e112]:
+            - generic [ref=f8e113]:
+              - heading "Overview" [level=1] [ref=f8e114]
+              - paragraph [ref=f8e115]: DataExtraction Project · US & Mexico B2B intelligence platform
+            - generic [ref=f8e116]:
+              - link "Scrapers" [ref=f8e117] [cursor=pointer]:
+                - /url: /scraper
+              - link "Export" [ref=f8e118] [cursor=pointer]:
+                - /url: /export
+          - generic [ref=f8e119]:
+            - heading "Key metrics" [level=2] [ref=f8e121]
+            - generic [ref=f8e122]:
+              - link "US Leads 0 us_leads table" [ref=f8e123] [cursor=pointer]:
+                - /url: /leads
+                - generic [ref=f8e124]:
+                  - generic [ref=f8e125]: US Leads
+                  - paragraph [ref=f8e130]: "0"
+                  - generic [ref=f8e131]: us_leads table
+              - link "Mexico Leads 0 mexico_leads table" [ref=f8e133] [cursor=pointer]:
+                - /url: /leads/mexico
+                - generic [ref=f8e134]:
+                  - generic [ref=f8e135]: Mexico Leads
+                  - paragraph [ref=f8e140]: "0"
+                  - generic [ref=f8e141]: mexico_leads table
+              - link "With Phone 0 0% of US records" [ref=f8e143] [cursor=pointer]:
+                - /url: /leads
+                - generic [ref=f8e144]:
+                  - generic [ref=f8e145]: With Phone
+                  - paragraph [ref=f8e150]: "0"
+                  - generic [ref=f8e151]: 0% of US records
+              - link "Verified Email 0 both markets combined" [ref=f8e153] [cursor=pointer]:
+                - /url: /export
+                - generic [ref=f8e154]:
+                  - generic [ref=f8e155]: Verified Email
+                  - paragraph [ref=f8e160]: "0"
+                  - generic [ref=f8e161]: both markets combined
+          - generic [ref=f8e163]:
+            - generic [ref=f8e165]:
+              - heading "Records by data source" [level=2] [ref=f8e166]
+              - generic [ref=f8e167]: 0 total
+            - generic [ref=f8e173]:
+              - heading "Contact coverage" [level=2] [ref=f8e175]
+              - generic [ref=f8e176]:
+                - generic [ref=f8e177]:
+                  - generic [ref=f8e178]: US — Phone
+                  - generic [ref=f8e180]: 0%
+                - generic [ref=f8e181]:
+                  - generic [ref=f8e182]: US — Email ✓
+                  - generic [ref=f8e184]: 0%
+                - generic [ref=f8e185]:
+                  - generic [ref=f8e186]: MX — Email ✓
+                  - generic [ref=f8e188]: 0%
+                - generic [ref=f8e189]:
+                  - generic [ref=f8e190]: MX — Phone
+                  - generic [ref=f8e192]: 0%
+              - generic [ref=f8e193]:
+                - generic [ref=f8e194]:
+                  - generic [ref=f8e195]: US total
+                  - generic [ref=f8e196]: "0"
+                - generic [ref=f8e197]:
+                  - generic [ref=f8e198]: MX total
+                  - generic [ref=f8e199]: "0"
+                - generic [ref=f8e200]:
+                  - generic [ref=f8e201]: Combined
+                  - generic [ref=f8e202]: "0"
+          - generic [ref=f8e203]:
+            - generic [ref=f8e205]:
+              - heading "Top industries" [level=2] [ref=f8e206]
+              - link "View all →" [ref=f8e207] [cursor=pointer]:
+                - /url: /leads
+            - generic [ref=f8e208]:
+              - heading "Top US states" [level=2] [ref=f8e210]
+              - paragraph [ref=f8e212]: Seniority breakdown
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f8e218] [cursor=pointer]
+  - alert [ref=f8e222]: Dashboard | OneExtraction Project

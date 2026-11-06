@@ -1,0 +1,396 @@
+# ==============================================================================
+# DataExtraction: Phase 5 Autoscaled Distributed Worker Fleet (HPA)
+# ==============================================================================
+# 7 Independent Worker Deployments decoupled by task queue with dedicated HPAs.
+# ==============================================================================
+
+# ── Worker 1: Registry Ingestion Fleet ─────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-registry
+  namespace: oneextraction
+  labels:
+    app: worker-registry
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-registry
+  template:
+    metadata:
+      labels:
+        app: worker-registry
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_registry"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: oneextraction-secrets
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1500m"
+              memory: "1.5Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-registry-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-registry
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── Worker 2: Geospatial Standardization Fleet ────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-geospatial
+  namespace: oneextraction
+  labels:
+    app: worker-geospatial
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-geospatial
+  template:
+    metadata:
+      labels:
+        app: worker-geospatial
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_geospatial"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-geospatial-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-geospatial
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+# ── Worker 3: Identity Resolution (Splink / High-Memory) Fleet ────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-identity
+  namespace: oneextraction
+  labels:
+    app: worker-identity
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-identity
+  template:
+    metadata:
+      labels:
+        app: worker-identity
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_identity"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "2500m"
+              memory: "4Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-identity-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-identity
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ── Worker 4: Executive Discovery Fleet ────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-executive
+  namespace: oneextraction
+  labels:
+    app: worker-executive
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-executive
+  template:
+    metadata:
+      labels:
+        app: worker-executive
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_executive"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-executive-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-executive
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── Worker 5: Governance & Sanctions Fleet ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-governance
+  namespace: oneextraction
+  labels:
+    app: worker-governance
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-governance
+  template:
+    metadata:
+      labels:
+        app: worker-governance
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_governance"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-governance-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-governance
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── Worker 6: OpenSearch CDC Search Fleet ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-search
+  namespace: oneextraction
+  labels:
+    app: worker-search
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-search
+  template:
+    metadata:
+      labels:
+        app: worker-search
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_search"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1500m"
+              memory: "1.5Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-search-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-search
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── Worker 7: Email Deliverability Enrichment Fleet ───────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-email-enrichment
+  namespace: oneextraction
+  labels:
+    app: worker-email-enrichment
+    tier: orchestration-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-email-enrichment
+  template:
+    metadata:
+      labels:
+        app: worker-email-enrichment
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/oneextraction/worker:latest
+          command: ["python", "-m", "packages.temporal.workers.worker_email_enrichment"]
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-email-enrichment-hpa
+  namespace: oneextraction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-email-enrichment
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+

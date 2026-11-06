@@ -87,31 +87,43 @@ def _count_dup_phone(cur, table: str) -> tuple[int, int, list]:
 
 
 def _count_dup_name_company(cur, table: str) -> tuple[int, int, list]:
-    cur.execute(f"""
-        SELECT COUNT(1) FROM (
-            SELECT 1 FROM "{table}" TABLESAMPLE SYSTEM(1)
-            WHERE full_name IS NOT NULL AND company_name IS NOT NULL
-            GROUP BY UPPER(full_name), UPPER(company_name)
-            HAVING COUNT(1) > 1
-        ) t
-    """)
-    sample_count = cur.fetchone()[0] or 0
-    estimated = sample_count * 100
-    return sample_count, estimated, []
+    try:
+        cur.execute(f"""
+            SELECT COUNT(1) FROM (
+                SELECT 1 FROM "{table}"
+                WHERE full_name IS NOT NULL AND company_name IS NOT NULL
+                  AND random() < 0.05
+                GROUP BY UPPER(full_name), UPPER(company_name)
+                HAVING COUNT(1) > 1
+                LIMIT 5000
+            ) t
+        """)
+        sample_count = cur.fetchone()[0] or 0
+        estimated = sample_count * 20
+        return sample_count, estimated, []
+    except Exception as exc:
+        logger.warning("Error in _count_dup_name_company on %s: %s", table, exc)
+        return 0, 0, []
 
 
 def _count_cross_source(cur, table: str) -> tuple[int, int, list]:
-    cur.execute(f"""
-        SELECT COUNT(1) FROM (
-            SELECT 1 FROM "{table}" TABLESAMPLE SYSTEM(5)
-            WHERE email IS NOT NULL AND email != ''
-            GROUP BY email
-            HAVING COUNT(DISTINCT api_source) > 1
-        ) t
-    """)
-    sample_count = cur.fetchone()[0] or 0
-    estimated = sample_count * 20
-    return sample_count, estimated, []
+    try:
+        cur.execute(f"""
+            SELECT COUNT(1) FROM (
+                SELECT 1 FROM "{table}"
+                WHERE email IS NOT NULL AND email != ''
+                  AND random() < 0.05
+                GROUP BY email
+                HAVING COUNT(DISTINCT api_source) > 1
+                LIMIT 5000
+            ) t
+        """)
+        sample_count = cur.fetchone()[0] or 0
+        estimated = sample_count * 20
+        return sample_count, estimated, []
+    except Exception as exc:
+        logger.warning("Error in _count_cross_source on %s: %s", table, exc)
+        return 0, 0, []
 
 
 # ── GET /api/duplicates/analyse ───────────────────────────────────────────────
@@ -153,6 +165,12 @@ def analyse_duplicates(user: UserPrincipal = Depends(get_current_user)):
 
         cur.execute('SELECT COUNT(1) FROM "us_leads"')
         us_total = cur.fetchone()[0]
+        if not us_total or us_total == 0:
+            try:
+                cur.execute('SELECT COUNT(1) FROM master_dataextraction.organizations')
+                us_total = cur.fetchone()[0]
+            except Exception:
+                pass
         cur.execute('SELECT COUNT(1) FROM "mexico_leads"')
         mx_total = cur.fetchone()[0]
 

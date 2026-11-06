@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { usePathname } from "next/navigation";
 import { Bell, Menu, Search, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,14 +18,16 @@ import { cn } from "@/lib/utils";
 // ── Breadcrumb builder ────────────────────────────────────────────────────────
 
 const LABELS: Record<string, string> = {
-  dashboard:  "Dashboard",
-  leads:      "US Leads",
-  mexico:     "MX Leads",
-  analytics:  "AI Query",
-  scraper:    "Scraper",
-  duplicates: "Duplicates",
-  export:     "Export",
-  settings:   "Settings",
+  dashboard:     "Dashboard",
+  orchestration: "Temporal Orchestration",
+  pipeline:      "Pipeline & DLQ",
+  leads:         "US Leads",
+  mexico:        "MX Leads",
+  analytics:     "AI Query",
+  scraper:       "Scraper",
+  duplicates:    "Duplicates",
+  export:        "Export",
+  settings:      "Settings",
 };
 
 function Breadcrumb() {
@@ -63,20 +67,26 @@ const NOTIFICATIONS = [
 // ── Header ────────────────────────────────────────────────────────────────────
 
 export function Header() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <header className="h-[52px] border-b border-border flex items-center gap-4 px-4 sm:px-5 bg-background flex-shrink-0 sticky top-0 z-30">
 
-      {/* Mobile hamburger */}
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="md:hidden h-8 w-8">
-            <Menu className="h-4 w-4" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-[220px]">
-          <SidebarContent />
-        </SheetContent>
-      </Sheet>
+      {/* Mobile hamburger - isolated from desktop portal layer */}
+      <div className="md:hidden">
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Menu className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          {mobileOpen && (
+            <SheetContent side="left" className="p-0 w-[220px]">
+              <SidebarContent />
+            </SheetContent>
+          )}
+        </Sheet>
+      </div>
 
       {/* Breadcrumb */}
       <Breadcrumb />

@@ -41,15 +41,28 @@ class SafeWebsiteCrawler:
         max_pages: int = 5,
         timeout_seconds: float = 10.0,
         user_agent: Optional[str] = None,
-        check_dns: bool = True
+        check_dns: bool = True,
+        timeout: Optional[float] = None,
     ):
         self.max_pages = max_pages
-        self.timeout = timeout_seconds
+        self.timeout = timeout if timeout is not None else timeout_seconds
         self.user_agent = user_agent or (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         )
         self.check_dns = check_dns
+
+    async def crawl_site(
+        self,
+        root_url: str,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> List[Dict[str, Any]]:
+        """Convenience method returning crawled pages as list of dicts with url, html, status_code."""
+        pages_dict = await self.crawl(root_url, http_client=http_client)
+        return [
+            {"url": u, "html": p.html, "status_code": p.status_code}
+            for u, p in pages_dict.items()
+        ]
 
     async def crawl(
         self,
@@ -189,3 +202,7 @@ class SafeWebsiteCrawler:
                 result.append(l)
 
         return result
+
+
+# Enterprise alias
+WebsiteCrawler = SafeWebsiteCrawler

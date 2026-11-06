@@ -23,11 +23,18 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).parent))
-from db_connector import get_connection, db_info
-from contact_validator import validate_contact, lead_score_from_contact
-from config_manager import get_secret
-from http_client import get_http_client
-from geo_validator import format_postal_code
+try:
+    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.domain.contact_validator import validate_contact, lead_score_from_contact
+    from packages.infrastructure.config_manager import get_secret
+    from packages.infrastructure.http_client import get_http_client
+    from packages.domain.geo_validator import format_postal_code
+except ImportError:
+    from db_connector import get_connection, db_info
+    from contact_validator import validate_contact, lead_score_from_contact
+    from config_manager import get_secret
+    from http_client import get_http_client
+    from geo_validator import format_postal_code
 
 SAM_API_KEY  = get_secret("SAM_GOV_API_KEY", "")
 SAM_BASE     = "https://api.sam.gov/entity-information/v3/entities"
@@ -50,15 +57,8 @@ NAICS_TARGETS = [
 
 
 def _upsert(cur, record: dict):
-    data = {k: v for k, v in record.items() if v is not None and v != ""}
-    cols = list(data.keys())
-    ph   = ", ".join(["%s"] * len(cols))
-    sets = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c not in ("id","created_at"))
-    cur.execute(
-        f"INSERT INTO us_leads ({', '.join(cols)}) VALUES ({ph}) "
-        f"ON CONFLICT (id) DO UPDATE SET {sets}, updated_at = NOW()",
-        [data[c] for c in cols]
-    )
+    from packages.infrastructure.staging_writer import upsert_staging_record
+    upsert_staging_record(cur, record, source="SAM_GOV")
 
 
 def _fetch_entities(naics: str, page_token: str = None) -> dict:

@@ -33,34 +33,52 @@ def _safe_json_dumps(obj: Any) -> str:
 
 
 def enqueue_dead_letter(
-    conn,
-    source_name: str,
-    entity_type: str,
-    raw_payload: Any,
-    error_reason: str,
+    conn: Optional[Any] = None,
+    source_name: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    raw_payload: Optional[Any] = None,
+    error_reason: Optional[str] = None,
     error_traceback: Optional[str] = None,
     run_id: Optional[str] = None,
+    **kwargs: Any,
 ) -> Optional[int]:
     """
     Persists a failed ingestion record into the dead_letter_queue table.
     Falls back to a disk-persisted JSONL log if the database is unreachable.
+    Supports both legacy positional parameters and modern keyword arguments.
     Returns the generated record ID, or None if logged to fallback.
     """
-    if not source_name:
-        source_name = "UNKNOWN_SOURCE"
-    if not entity_type:
-        entity_type = "company"
+    # Handle callers who pass source_name as first argument without conn
+    if isinstance(conn, str) and source_name is None:
+        source_name = conn
+        conn = None
+
+    source_name = source_name or kwargs.get("source_name") or "UNKNOWN_SOURCE"
+    entity_type = entity_type or kwargs.get("error_type") or kwargs.get("entity_type") or "company"
+    raw_payload = raw_payload if raw_payload is not None else kwargs.get("payload")
+    error_reason = error_reason or kwargs.get("error_message") or kwargs.get("error_reason") or "Unknown error"
+    error_traceback = error_traceback or kwargs.get("error_traceback")
+    run_id = run_id or kwargs.get("run_id")
 
     payload_json = _safe_json_dumps(raw_payload)
     reason_clean = str(error_reason)[:1000] if error_reason else "Unknown error"
     tb_clean = str(error_traceback)[:4000] if error_traceback else None
+
+    owned_conn = False
+    if conn is None:
+        try:
+            from packages.infrastructure.db_connector import get_connection
+            conn = get_connection()
+            owned_conn = True
+        except Exception:
+            conn = None
 
     # 1. Attempt database persistence
     if conn:
         try:
             cur = conn.cursor()
             cur.execute("""
-                INSERT INTO dead_letter_queue
+                INSERT INTO staging_dataextraction.dead_letter_queue
                     (run_id, source_name, entity_type, raw_payload, error_reason,
                      error_traceback, status, retry_count, created_at)
                 VALUES
@@ -79,6 +97,13 @@ def enqueue_dead_letter(
                 conn.rollback()
             except Exception:
                 pass
+        finally:
+            if owned_conn and conn:
+                try:
+                    from packages.infrastructure.db_connector import release_connection
+                    release_connection(conn)
+                except Exception:
+                    pass
 
     # 2. Resilient disk fallback (zero data loss guarantee)
     try:
@@ -207,7 +232,7 @@ def get_dead_letter_records(
             SELECT id, run_id, source_name, entity_type, raw_payload,
                    error_reason, status, retry_count, created_at,
                    last_retried_at, resolved_at
-            FROM dead_letter_queue
+            FROM staging_dataextraction.dead_letter_queue
             {where}
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
@@ -240,26 +265,36 @@ def get_dead_letter_stats(conn) -> Dict[str, Any]:
                 COUNT(1) FILTER (WHERE status = 'PENDING') AS pending,
                 COUNT(1) FILTER (WHERE status = 'RESOLVED') AS resolved,
                 COUNT(1) FILTER (WHERE status = 'DISCARDED') AS discarded
-            FROM dead_letter_queue
+            FROM staging_dataextraction.dead_letter_queue
         """)
         row = cur.fetchone()
+        tot = int(row[0] or 0)
+        pnd = int(row[1] or 0)
+        res = int(row[2] or 0)
+        dsc = int(row[3] or 0)
         stats = {
-            "total": int(row[0] or 0),
-            "pending": int(row[1] or 0),
-            "resolved": int(row[2] or 0),
-            "discarded": int(row[3] or 0),
+            "total": tot,
+            "total_records": tot,
+            "pending": pnd,
+            "pending_count": pnd,
+            "resolved": res,
+            "replayed_count": res,
+            "discarded": dsc,
+            "discarded_count": dsc,
         }
 
         # Breakdown by source
         cur.execute("""
             SELECT source_name, status, COUNT(1)
-            FROM dead_letter_queue
+            FROM staging_dataextraction.dead_letter_queue
             GROUP BY source_name, status
             ORDER BY source_name ASC
         """)
         by_source_rows = cur.fetchall()
         by_source = {}
+        sources_map = {}
         for src, st, cnt in by_source_rows:
+            sources_map[src] = sources_map.get(src, 0) + cnt
             if src not in by_source:
                 by_source[src] = {"source": src, "pending": 0, "resolved": 0, "discarded": 0, "total": 0}
             by_source[src]["total"] += cnt
@@ -267,6 +302,7 @@ def get_dead_letter_stats(conn) -> Dict[str, Any]:
                 by_source[src][st.lower()] += cnt
 
         stats["by_source"] = list(by_source.values())
+        stats["sources"] = sources_map
         return stats
     except Exception as e:
         logger.error("Error retrieving DLQ stats: %s", e)
@@ -277,6 +313,34 @@ def get_dead_letter_stats(conn) -> Dict[str, Any]:
         return {"total": 0, "pending": 0, "resolved": 0, "discarded": 0, "by_source": []}
     finally:
         cur.close()
+
+
+def get_dlq_stats(conn=None) -> Dict[str, Any]:
+    """Returns aggregated DLQ statistics; acquires connection if conn is None."""
+    close_conn = False
+    if conn is None:
+        try:
+            from packages.infrastructure.db_connector import get_connection, release_connection
+            conn = get_connection()
+            close_conn = True
+        except Exception:
+            conn = None
+
+    try:
+        raw_stats = get_dead_letter_stats(conn)
+        return {
+            "total_records": raw_stats.get("total", 0),
+            "pending_count": raw_stats.get("pending", 0),
+            "replayed_count": raw_stats.get("resolved", 0),
+            "discarded_count": raw_stats.get("discarded", 0),
+            "sources": {item["source"]: item["count"] for item in raw_stats.get("by_source", []) if isinstance(item, dict) and "source" in item},
+        }
+    finally:
+        if close_conn and conn:
+            try:
+                release_connection(conn)
+            except Exception:
+                pass
 
 
 def replay_dead_letter(
@@ -300,7 +364,7 @@ def replay_dead_letter(
         cur = conn.cursor()
 
     try:
-        cur.execute("SELECT * FROM dead_letter_queue WHERE id = %s", (dlq_id,))
+        cur.execute("SELECT * FROM staging_dataextraction.dead_letter_queue WHERE id = %s", (dlq_id,))
         record = cur.fetchone()
         if not record:
             return {"success": False, "error": f"DLQ record {dlq_id} not found"}
@@ -331,7 +395,7 @@ def replay_dead_letter(
 
         if success:
             cur_write.execute("""
-                UPDATE dead_letter_queue
+                UPDATE staging_dataextraction.dead_letter_queue
                 SET status = 'RESOLVED',
                     retry_count = %s,
                     last_retried_at = NOW(),
@@ -345,7 +409,7 @@ def replay_dead_letter(
         else:
             new_status = "DISCARDED" if current_retries >= max_retries else "PENDING"
             cur_write.execute("""
-                UPDATE dead_letter_queue
+                UPDATE staging_dataextraction.dead_letter_queue
                 SET status = %s,
                     retry_count = %s,
                     last_retried_at = NOW(),
@@ -376,7 +440,7 @@ def discard_dead_letter(conn, dlq_id: int, reason: str = "Manually discarded") -
     cur = conn.cursor()
     try:
         cur.execute("""
-            UPDATE dead_letter_queue
+            UPDATE staging_dataextraction.dead_letter_queue
             SET status = 'DISCARDED',
                 error_reason = %s,
                 last_retried_at = NOW()

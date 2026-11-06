@@ -15,6 +15,8 @@ volumes:
   temporal_data:
   minio_data:
 
+  ollama_data:
+
 services:
 
   # ── PostgreSQL 15 + PostGIS ──────────────────────────────────────────────────
@@ -35,6 +37,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dataextraction
+
+  # ── PgBouncer Connection Pooler ──────────────────────────────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.21.0
+    container_name: dex-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "6432:6432"
     networks:
       - dataextraction
 
@@ -74,6 +92,54 @@ services:
       done;
       /usr/bin/mc mb --ignore-existing local/$${LAKEHOUSE_BUCKET_NAME:-dataextraction-lakehouse};
       echo 'Lakehouse observation bucket verified.';
+      exit 0;
+      "
+    networks:
+      - dataextraction
+
+  # ── Ollama LLM Inference Engine (Llama 3.1 8B) ──────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dex-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - dataextraction
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Ollama Model Auto-Provisioner (Pulls model on bootstrap) ─────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: dex-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Verifying Ollama model availability...';
+      if ! ollama list | grep -q '${OLLAMA_MODEL:-llama3.1:8b}'; then
+        echo 'Pulling model ${OLLAMA_MODEL:-llama3.1:8b}...';
+        ollama pull ${OLLAMA_MODEL:-llama3.1:8b};
+      fi;
+      echo 'Ollama model readiness confirmed.';
       exit 0;
       "
     networks:
@@ -139,6 +205,8 @@ services:
     environment:
       - TEMPORAL_HOST=temporal:7233
       - POSTGRES_HOST=postgres
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
     volumes:
       - ./packages/api:/app/packages/api
       - ./packages/infrastructure:/app/packages/infrastructure
@@ -212,6 +280,8 @@ services:
       - TEMPORAL_HOST=temporal:7233
       - POSTGRES_HOST=postgres
       - WORKER_TYPE=identity
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
     command: ["python", "-m", "packages.temporal.workers.worker_identity"]
     volumes:
       - ./packages:/app/packages
@@ -234,6 +304,8 @@ services:
       - TEMPORAL_HOST=temporal:7233
       - POSTGRES_HOST=postgres
       - WORKER_TYPE=executive
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
     command: ["python", "-m", "packages.temporal.workers.worker_executive"]
     volumes:
       - ./packages:/app/packages
@@ -279,6 +351,30 @@ services:
       - POSTGRES_HOST=postgres
       - WORKER_TYPE=search
     command: ["python", "-m", "packages.temporal.workers.worker_search"]
+    volumes:
+      - ./packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 7 - Post-Dedup Email Discovery & Verification ──────
+  worker-email-enrichment:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-email-enrichment
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=email_enrichment
+    command: ["python", "-m", "packages.temporal.workers.worker_email_enrichment"]
     volumes:
       - ./packages:/app/packages
     networks:

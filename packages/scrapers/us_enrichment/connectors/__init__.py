@@ -1,7 +1,16 @@
 """
 US B2B Connectors package.
-Provides unified access to all 6 US open-data source clients.
+Provides unified access to all US open-data and enrichment source clients.
 """
+
+import sys
+from pathlib import Path
+
+_PACKAGES_ROOT = Path(__file__).resolve().parents[3]
+_INFRA_PATH = _PACKAGES_ROOT / "infrastructure"
+for _p in [str(_PACKAGES_ROOT), str(_INFRA_PATH)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from .sam_client import SamGovClient, sam_gov_client
 from .edgar_client import EdgarClient, edgar_client
@@ -12,6 +21,7 @@ from .opencorporates_client import OpenCorporatesClient, opencorporates_client
 from .npi_client import NPIClient, npi_client
 from .fcc_uls_client import FCCULSClient, fcc_uls_client
 from .opendirectories_client import OpenDirectoriesClient, opendirectories_client
+from .gleif_client import GleifEnrichmentClient, gleif_client
 
 _CONNECTOR_MAP = {
     "SAM_GOV": sam_gov_client,
@@ -23,6 +33,7 @@ _CONNECTOR_MAP = {
     "CMS_NPI": npi_client,
     "FCC_ULS": fcc_uls_client,
     "OPENDIRECTORIES": opendirectories_client,
+    "GLEIF": gleif_client,
 }
 
 
@@ -41,6 +52,7 @@ __all__ = [
     "NPIClient", "npi_client",
     "FCCULSClient", "fcc_uls_client",
     "OpenDirectoriesClient", "opendirectories_client",
+    "GleifEnrichmentClient", "gleif_client",
     "get_connector",
 ]
 

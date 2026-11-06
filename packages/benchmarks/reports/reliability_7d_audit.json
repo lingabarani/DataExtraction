@@ -1,0 +1,69 @@
+{
+  "simulated_days": 7,
+  "total_traffic_events": 10500,
+  "total_faults_injected": 4,
+  "total_faults_recovered": 4,
+  "fault_recovery_rate_pct": 100.0,
+  "mtbf_sec": 0.23,
+  "mttr_sec": 0.2299,
+  "data_loss_rate_pct": 0.0,
+  "dlq_accuracy_pct": 100.0,
+  "fault_results": [
+    {
+      "fault_type": "DATABASE_TRANSIENT_DISCONNECT",
+      "scenario": "PostgreSQL socket RST mid-transaction with 2 drops and 3rd retry recovery",
+      "injected_at": "2026-11-04T07:32:24.116184+00:00",
+      "recovered": true,
+      "recovery_time_sec": 0.0315,
+      "data_loss_occurred": false,
+      "dlq_routed": false,
+      "details": {
+        "attempts_before_recovery": 3,
+        "backoff_applied": true
+      }
+    },
+    {
+      "fault_type": "OPENSEARCH_429_THROTTLING",
+      "scenario": "OpenSearch bulk item rejection 429. Verification of CDC watermark halt safety",
+      "injected_at": "2026-11-04T07:32:24.119121+00:00",
+      "recovered": true,
+      "recovery_time_sec": 0.0029,
+      "data_loss_occurred": false,
+      "dlq_routed": true,
+      "details": {
+        "halted_watermark": 101,
+        "first_failed_version": 102,
+        "silent_skip_prevented": true
+      }
+    },
+    {
+      "fault_type": "ONEREACH_OUTBOUND_OUTAGE",
+      "scenario": "3x HTTP 500 rejection with exponential backoff and PostgreSQL DLQ capture",
+      "injected_at": "2026-11-04T07:32:25.004430+00:00",
+      "recovered": true,
+      "recovery_time_sec": 0.8846,
+      "data_loss_occurred": false,
+      "dlq_routed": true,
+      "details": {
+        "attempt_count": 3,
+        "http_status": 500,
+        "delivery_status": "FAILED",
+        "dlq_enqueued": true
+      }
+    },
+    {
+      "fault_type": "WORKER_CRASH_RESUME",
+      "scenario": "Process killed mid-batch; resumed worker replays batch with ON CONFLICT idempotency",
+      "injected_at": "2026-11-04T07:32:25.004967+00:00",
+      "recovered": true,
+      "recovery_time_sec": 0.0006,
+      "data_loss_occurred": false,
+      "dlq_routed": false,
+      "details": {
+        "idempotent_replay": true,
+        "duplicate_records_created": 0
+      }
+    }
+  ],
+  "overall_certified": true
+}

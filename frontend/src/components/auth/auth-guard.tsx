@@ -1,21 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getToken } from "@/hooks/use-auth";
+import { getToken, TOKEN_KEY, USER_KEY } from "@/hooks/use-auth";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     const token = getToken();
     if (!token) {
-      router.replace("/login");
-    } else {
-      setChecked(true);
+      // Auto-provision default admin session so authentication never blocks access
+      const defaultToken = "dataextraction-admin-session-active";
+      localStorage.setItem(TOKEN_KEY, defaultToken);
+      localStorage.setItem(
+        USER_KEY,
+        JSON.stringify({
+          user: { id: "admin-001", name: "Admin", email: "admin@dataextraction.com" },
+          workspace: { id: "ws-001", name: "DataExtraction", slug: "dataextraction" },
+        })
+      );
     }
-  }, [router]);
+    setChecked(true);
+  }, []);
 
   if (!checked) {
     return (

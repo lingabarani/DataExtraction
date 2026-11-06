@@ -1,0 +1,63 @@
+{
+  "started_at": "2026-11-03T07:00:44.492489+00:00",
+  "dry_run": false,
+  "databases_migrated": {
+    "data\\gmaps.sqlite": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\api\\data\\progress\\osm_state_progress.db": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\data\\progress\\osm_state_progress.db": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\databases\\US\\Arizona_AZ.sqlite": {
+      "tiles_migrated": 144,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\databases\\US\\California_CA.sqlite": {
+      "tiles_migrated": 150,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\databases\\US\\Maine_ME.sqlite": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\databases\\US\\New_Hampshire_NH.sqlite": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\databases\\US\\Vermont_VT.sqlite": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\databases\\US\\Wyoming_WY.sqlite": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    },
+    "packages\\scrapers\\google_maps\\data\\gmaps.sqlite": {
+      "tiles_migrated": 0,
+      "places_migrated": 0,
+      "osm_chunks_migrated": 0
+    }
+  },
+  "total_tiles_migrated": 294,
+  "total_places_migrated": 0,
+  "total_osm_chunks_migrated": 0,
+  "total_jobs_migrated": 0,
+  "status": "SUCCESS",
+  "duration_seconds": 0.243,
+  "completed_at": "2026-11-03T07:00:44.735737+00:00"
+}

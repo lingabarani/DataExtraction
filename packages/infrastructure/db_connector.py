@@ -27,20 +27,20 @@ import sys
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, Generator, Tuple
+from typing import Optional, Generator, Tuple, Any, Dict, List
 
-_SAFE_IDENTIFIER_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+_SAFE_IDENTIFIER_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$')
 
 def _assert_safe_identifier(identifier: str) -> str:
-    if not isinstance(identifier, str) or not _SAFE_IDENTIFIER_RE.match(identifier):
+    if not isinstance(identifier, str) or not _SAFE_IDENTIFIER_RE.match(identifier.strip()):
         raise ValueError(f"Insecure or malformed SQL identifier: {identifier!r}")
-    return identifier
+    return identifier.strip()
 
 
 from dotenv import load_dotenv
 
 # Set up logger
-logger = logging.getLogger("oneextraction.db")
+logger = logging.getLogger("dataextraction.db")
 if not logger.handlers:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] [DB] %(message)s"))
@@ -82,6 +82,7 @@ def _init_pool():
                 user=DB_USER,
                 password=DB_PASS,
                 connect_timeout=10,
+                options="-c search_path=staging_dataextraction,master_dataextraction,identity_resolution,raw_dataextraction,search_dataextraction,public",
             )
             logger.info("Initialized PostgreSQL connection pool (%d-%d connections) -> %s:%d/%s",
                         DB_POOL_MIN, DB_POOL_MAX, DB_HOST, DB_PORT, DB_NAME)
@@ -100,7 +101,22 @@ def get_connection(row_factory: bool = False):
             _init_pool()
         try:
             conn = _PG_POOL.getconn()
-            conn.autocommit = False
+            if getattr(conn, "closed", 0) != 0:
+                _PG_POOL.putconn(conn, close=True)
+                conn = _PG_POOL.getconn()
+            # Test-on-borrow fast ping to ensure connection is live
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                conn.commit()
+            except Exception:
+                try:
+                    _PG_POOL.putconn(conn, close=True)
+                except Exception:
+                    pass
+                conn = _PG_POOL.getconn()
+            if getattr(conn, "autocommit", None) is not False:
+                conn.autocommit = False
             return conn
         except Exception as e:
             logger.error("Error acquiring connection from pool: %s", e)
@@ -112,17 +128,30 @@ def get_connection(row_factory: bool = False):
                 dbname=DB_NAME,
                 user=DB_USER,
                 password=DB_PASS,
-                connect_timeout=10
+                connect_timeout=10,
+                options="-c search_path=staging_dataextraction,master_dataextraction,identity_resolution,raw_dataextraction,search_dataextraction,public",
             )
     else:
-        # SQLite dev fallback
-        import sqlite3
-        sqlite_path = os.getenv("SQLITE_DATABASE_URL", "sqlite:///output/us/api/oneextraction.db")
-        sqlite_path = sqlite_path.replace("sqlite:///", "")
-        conn = sqlite3.connect(sqlite_path)
-        if row_factory:
-            conn.row_factory = sqlite3.Row
-        return conn
+        raise RuntimeError(
+            f"Unsupported DATABASE_TYPE='{DATABASE_TYPE}'. "
+            "Enterprise architecture strictly enforces PostgreSQL. SQLite fallback is disabled."
+        )
+
+
+get_db_connection = get_connection
+
+
+def execute_query(query: str, params: Optional[Tuple[Any, ...]] = None) -> List[Any]:
+    """
+    Executes a parameterized query safely via the pooled connection cursor.
+    Returns fetched rows if available; commits and returns empty list otherwise.
+    """
+    with get_db_cursor() as (conn, cur):
+        cur.execute(query, params or ())
+        if cur.description:
+            return cur.fetchall()
+        conn.commit()
+        return []
 
 
 def release_connection(conn) -> None:
@@ -132,16 +161,26 @@ def release_connection(conn) -> None:
     if DATABASE_TYPE == "postgresql" and _PG_POOL is not None:
         try:
             if getattr(conn, "closed", 0) != 0:
-                _PG_POOL.putconn(conn, close=True)
+                try:
+                    _PG_POOL.putconn(conn, close=True)
+                except Exception:
+                    pass
                 return
             conn.rollback()
             _PG_POOL.putconn(conn, close=False)
         except Exception as e:
-            logger.warning("Error releasing connection back to pool: %s", e)
-            try:
-                conn.close()
-            except Exception:
-                pass
+            err_msg = str(e).lower()
+            if "unkeyed" in err_msg or "not in pool" in err_msg:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            else:
+                logger.warning("Error releasing connection back to pool: %s", e)
+                try:
+                    conn.close()
+                except Exception:
+                    pass
     else:
         try:
             conn.close()
@@ -160,6 +199,24 @@ def close_pool() -> None:
             logger.warning("Error closing connection pool: %s", e)
         finally:
             _PG_POOL = None
+
+
+def get_db_pool_status() -> Dict[str, Any]:
+    """Returns runtime connection pool status."""
+    global _PG_POOL
+    if _PG_POOL is not None:
+        return {
+            "initialized": True,
+            "minconn": getattr(_PG_POOL, "minconn", 1),
+            "maxconn": getattr(_PG_POOL, "maxconn", 10),
+            "closed": getattr(_PG_POOL, "closed", False),
+        }
+    return {"initialized": False, "status": "uninitialized"}
+
+
+# Standard aliases
+close_connection_pool = close_pool
+_release_connection = release_connection
 
 
 
@@ -216,15 +273,13 @@ def get_cursor(conn, dict_cursor: bool = False):
 
 
 def placeholder() -> str:
-    """Returns SQL parameter placeholder: %s (Postgres) or ? (SQLite)."""
-    return "%s" if DATABASE_TYPE == "postgresql" else "?"
+    """Returns SQL parameter placeholder: %s (Postgres standard)."""
+    return "%s"
 
 
 def db_info() -> str:
     """Returns a human-readable connection description."""
-    if DATABASE_TYPE == "postgresql":
-        return f"PostgreSQL {DB_HOST}:{DB_PORT}/{DB_NAME}"
-    return f"SQLite fallback"
+    return f"PostgreSQL {DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 
 # ── Upsert helpers ────────────────────────────────────────────────────────────

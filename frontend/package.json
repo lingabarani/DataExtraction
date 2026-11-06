@@ -1,11 +1,11 @@
 {
-  "name": "@oneextraction/web",
+  "name": "@dataextraction/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 3000",
     "dev:turbo": "next dev --turbopack --port 3000",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
     "lint": "next lint"
@@ -38,7 +38,6 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",

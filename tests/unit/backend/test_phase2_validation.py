@@ -55,6 +55,10 @@ from contact_validator import (
     extract_registered_domain,
     normalise_linkedin,
 )
+from packages.pipeline.normalizer import (
+    clean_legal_suffixes,
+    normalize_company,
+)
 
 
 class TestTaxValidator(unittest.TestCase):
@@ -400,6 +404,71 @@ class TestContactValidator(unittest.TestCase):
         }
         score_risky = lead_score_from_contact(contact_risky, seniority_level="MANAGER")
         self.assertEqual(score_risky, 20)
+
+
+class TestLegalSuffixNormalizer(unittest.TestCase):
+    """Tests clean_legal_suffixes and organization name normalization."""
+
+    def test_us_and_commonwealth_suffixes(self):
+        cases = [
+            ("Apple Inc.", "APPLE"),
+            ("Microsoft Corporation", "MICROSOFT"),
+            ("Google LLC", "GOOGLE"),
+            ("Tesla, Inc.", "TESLA"),
+            ("Acme Ltd.", "ACME"),
+            ("Infosys Pvt Ltd", "INFOSYS"),
+            ("Berkshire Hathaway Energy Co.", "BERKSHIRE HATHAWAY ENERGY"),
+            ("Acme Limited Liability Company", "ACME"),
+            ("Alliance Corp", "ALLIANCE"),
+            ("Goldman Sachs & Co. LLC", "GOLDMAN SACHS"),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_legal_suffixes(raw), expected)
+
+    def test_mexican_and_european_suffixes(self):
+        cases = [
+            ("Fomento Economico Mexicano S.A.B. de C.V.", "FOMENTO ECONOMICO MEXICANO"),
+            ("Grupo Bimbo S.A. de C.V.", "GRUPO BIMBO"),
+            ("Distribuidora del Norte S. de R.L. de C.V.", "DISTRIBUIDORA DEL NORTE"),
+            ("Servicios Integrales S.A.S.", "SERVICIOS INTEGRALES"),
+            ("Siemens AG", "SIEMENS"),
+            ("Robert Bosch GmbH", "ROBERT BOSCH"),
+            ("BioNTech SE", "BIONTECH"),
+            ("MercadoLibre S.R.L.", "MERCADOLIBRE"),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_legal_suffixes(raw), expected)
+
+    def test_non_terminal_preservation(self):
+        """Legal words occurring mid-string or as brand names must NOT be stripped."""
+        cases = [
+            ("Incorporate Global Inc.", "INCORPORATE GLOBAL"),
+            ("The Limited Company", "THE LIMITED COMPANY"),
+            ("Company Global Ltd", "COMPANY GLOBAL"),
+            ("Corporation for Public Broadcasting", "CORPORATION FOR PUBLIC BROADCASTING"),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_legal_suffixes(raw), expected)
+
+    def test_none_and_empty(self):
+        self.assertIsNone(clean_legal_suffixes(None))
+        self.assertIsNone(clean_legal_suffixes(""))
+        self.assertIsNone(clean_legal_suffixes("   "))
+
+    def test_normalize_company_integration(self):
+        """Verifies clean_legal_suffixes is wired into normalize_company and preserves original name."""
+        raw = {
+            "Company Name": "Acme Industrial Technologies, LLC",
+            "Website": "https://acme-industrial.com",
+            "Primary Industry": "Industrial Automation",
+        }
+        res = normalize_company(raw, "ZOOMINFO")
+        self.assertEqual(res["normalized_name"], "ACME INDUSTRIAL TECHNOLOGIES")
+        self.assertEqual(res["name"], "Acme Industrial Technologies, LLC")
+        self.assertEqual(res["legal_name"], "Acme Industrial Technologies, LLC")
 
 
 if __name__ == "__main__":

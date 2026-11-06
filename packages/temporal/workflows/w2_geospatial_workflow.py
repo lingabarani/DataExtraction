@@ -30,17 +30,9 @@ with workflow.unsafe.imports_passed_through():
     from packages.temporal.activities.pipeline_activities import (
         validate_geo_activity,
     )
-    from packages.infrastructure.config_manager import config_manager
+    from packages.temporal.config import QUEUE_GEOSPATIAL, GEOSPATIAL_RETRY_POLICY
 
-TASK_QUEUE = config_manager.QUEUE_GEOSPATIAL
-
-GEOSPATIAL_RETRY_POLICY = RetryPolicy(
-    initial_interval=timedelta(seconds=10),
-    backoff_coefficient=2.0,
-    maximum_interval=timedelta(minutes=10),
-    maximum_attempts=4,
-    non_retryable_error_types=["PermissionError"],
-)
+TASK_QUEUE = QUEUE_GEOSPATIAL
 
 
 @workflow.defn(name="Agent2GeospatialWorkflow")

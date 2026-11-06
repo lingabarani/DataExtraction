@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { ScraperPanel } from "@/components/scraper/scraper-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata: Metadata = { title: "Scraper Control | OneExtraction Project" };
+export const metadata: Metadata = { title: "Scraper Control | DataExtraction Project" };
 
 function ScraperFallback() {
   return (

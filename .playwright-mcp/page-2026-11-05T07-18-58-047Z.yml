@@ -1,0 +1,283 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e39]:
+    - complementary [ref=f1e40]:
+      - generic [ref=f1e41]:
+        - generic [ref=f1e48]:
+          - generic [ref=f1e49]: DataExtraction
+          - generic [ref=f1e50]: v2.1
+        - button "Da DataExtraction" [ref=f1e52] [cursor=pointer]:
+          - generic [ref=f1e53]: Da
+          - generic [ref=f1e55]: DataExtraction
+        - navigation [ref=f1e58]:
+          - paragraph [ref=f1e59]: Platform
+          - link "Temporal Orchestration LIVE" [ref=f1e60] [cursor=pointer]:
+            - /url: /orchestration
+            - generic [ref=f1e64]: Temporal Orchestration
+            - generic [ref=f1e66]: LIVE
+          - paragraph [ref=f1e67]: Data
+          - link "Dashboard" [ref=f1e68] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f1e75] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f1e81]: US Leads
+            - generic [ref=f1e82]: 906K
+          - link "MX Leads 50K" [ref=f1e83] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f1e89]: MX Leads
+            - generic [ref=f1e90]: 50K
+          - link "AI Query" [ref=f1e91] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f1e95]: Tools
+          - link "Scraper" [ref=f1e96] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f1e105] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f1e109] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f1e114] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f1e119] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f1e125] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@dataextraction.com" [ref=f1e131] [cursor=pointer]:
+          - generic [ref=f1e132]: A
+          - generic [ref=f1e134]:
+            - paragraph [ref=f1e135]: Admin
+            - paragraph [ref=f1e136]: admin@dataextraction.com
+    - generic [ref=f1e137]:
+      - banner [ref=f1e138]:
+        - navigation [ref=f1e139]:
+          - generic [ref=f1e140]: Temporal Orchestration
+        - generic [ref=f1e142]:
+          - button "Search... ⌘ K" [ref=f1e143] [cursor=pointer]:
+            - generic [ref=f1e147]: Search...
+            - generic [ref=f1e148]:
+              - generic [ref=f1e149]: ⌘
+              - generic [ref=f1e150]: K
+          - button "Toggle theme" [active] [ref=f1e151] [cursor=pointer]
+          - button [ref=f1e153] [cursor=pointer]
+      - generic [ref=f1e156]:
+        - link "Dashboard" [ref=f1e157] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Orchestration LIVE" [ref=f1e165] [cursor=pointer]:
+          - /url: /orchestration
+          - generic [ref=f1e169]: Orchestration
+          - generic [ref=f1e170]: LIVE
+        - link "Data Pipeline" [ref=f1e172] [cursor=pointer]:
+          - /url: /pipeline
+        - link "Observability" [ref=f1e178] [cursor=pointer]:
+          - /url: /orchestration#observability
+        - link "OneReach" [ref=f1e182] [cursor=pointer]:
+          - /url: /orchestration#onereach
+        - link "Freshness" [ref=f1e187] [cursor=pointer]:
+          - /url: /orchestration#freshness
+        - link "Administration" [ref=f1e192] [cursor=pointer]:
+          - /url: /settings
+      - main [ref=f1e197]:
+        - generic [ref=f1e1559]:
+          - generic [ref=f1e1560]:
+            - generic [ref=f1e1561]:
+              - generic [ref=f1e1568]:
+                - heading "Temporal Orchestration Command Center LIVE TELEMETRY" [level=1] [ref=f1e1569]:
+                  - text: Temporal Orchestration Command Center
+                  - generic [ref=f1e1570]: LIVE TELEMETRY
+                - paragraph [ref=f1e1571]: Autonomous B2B data extraction, entity resolution, and certified Master Golden Record pipeline
+              - button "Refresh Status" [ref=f1e1573] [cursor=pointer]
+            - generic [ref=f1e1574]:
+              - generic [ref=f1e1582]:
+                - generic [ref=f1e1583]: Platform
+                - generic [ref=f1e1584]:
+                  - text: ONLINE
+                  - generic [ref=f1e1585]: (12ms)
+              - generic [ref=f1e1593]:
+                - generic [ref=f1e1594]: Temporal
+                - generic [ref=f1e1595]: DURABLE 7233
+              - generic [ref=f1e1602]:
+                - generic [ref=f1e1603]: Database
+                - generic [ref=f1e1604]: 210,450 Master
+              - generic [ref=f1e1610]:
+                - generic [ref=f1e1611]: OpenSearch
+                - generic [ref=f1e1612]: SYNCED CDC
+              - generic [ref=f1e1618]:
+                - generic [ref=f1e1619]: OneReach
+                - generic [ref=f1e1620]: ACTIVE Webhook
+            - generic [ref=f1e1621]:
+              - generic [ref=f1e1623]:
+                - paragraph [ref=f1e1624]: Active Workflows
+                - paragraph [ref=f1e1625]: "0"
+              - generic [ref=f1e1630]:
+                - paragraph [ref=f1e1631]: Pending Workflows
+                - paragraph [ref=f1e1632]: "0"
+              - generic [ref=f1e1638]:
+                - paragraph [ref=f1e1639]: Last Successful Run
+                - paragraph [ref=f1e1640]: Certified Golden Run
+                - paragraph [ref=f1e1641]: Ready for Ingestion
+          - generic [ref=f1e1646]:
+            - generic [ref=f1e1647]:
+              - generic [ref=f1e1648]: "Workflow Control:"
+              - generic [ref=f1e1649]: Cluster Standby
+            - generic [ref=f1e1650]:
+              - button "Start Scraping" [ref=f1e1651] [cursor=pointer]
+              - button "Pause" [disabled]
+              - button "Resume" [disabled]
+              - button "Retry Failed Phase" [disabled]
+              - button "Restart Workflow" [disabled]
+              - button "Stop Workflow" [disabled]
+              - button "Emergency Halt" [ref=f1e1654] [cursor=pointer]
+          - generic [ref=f1e1656]:
+            - generic [ref=f1e1657]:
+              - generic [ref=f1e1658]:
+                - generic [ref=f1e1659]: Pipeline Live Progression Ribbon
+                - generic [ref=f1e1660]: (13 Monitored Vault Nodes)
+              - generic [ref=f1e1661]:
+                - generic [ref=f1e1662]: Harvester
+                - generic [ref=f1e1664]: Working Layer
+                - generic [ref=f1e1666]: Governance
+                - generic [ref=f1e1668]: Master Vault
+            - generic [ref=f1e1670]:
+              - generic [ref=f1e1671]:
+                - generic "Orgs Scraped" [ref=f1e1673]
+                - generic [ref=f1e1679]:
+                  - text: 215,400
+                  - paragraph [ref=f1e1680]: staging.companies
+              - generic [ref=f1e1681]:
+                - generic "Employees Found" [ref=f1e1683]
+                - generic [ref=f1e1690]:
+                  - text: 885,500
+                  - paragraph [ref=f1e1691]: staging.persons
+              - generic [ref=f1e1692]:
+                - generic "Domains Verified" [ref=f1e1694]
+                - generic [ref=f1e1701]:
+                  - text: 212,300
+                  - paragraph [ref=f1e1702]: Agent 2 Spatial
+              - generic [ref=f1e1703]:
+                - generic "Identity Clusters" [ref=f1e1705]
+                - generic [ref=f1e1711]:
+                  - text: 210,950
+                  - paragraph [ref=f1e1712]: working_orgs
+              - generic [ref=f1e1713]:
+                - generic "Emails Found" [ref=f1e1715]
+                - generic [ref=f1e1720]:
+                  - text: 645,000
+                  - paragraph [ref=f1e1721]: RFC 5322 Raw
+              - generic [ref=f1e1722]:
+                - generic "Emails Verified" [ref=f1e1724]
+                - generic [ref=f1e1729]:
+                  - text: 580,200
+                  - paragraph [ref=f1e1730]: working_emails
+              - generic [ref=f1e1731]:
+                - generic "Execs Found" [ref=f1e1733]
+                - generic [ref=f1e1739]:
+                  - text: 340,100
+                  - paragraph [ref=f1e1740]: working_persons
+              - generic [ref=f1e1741]:
+                - generic "Employment Edges" [ref=f1e1743]
+                - generic [ref=f1e1751]:
+                  - text: 720,400
+                  - paragraph [ref=f1e1752]: kg_graph.edges
+              - generic [ref=f1e1753]:
+                - generic "Gov Approved" [ref=f1e1755]
+                - generic [ref=f1e1760]:
+                  - text: 210,450
+                  - paragraph [ref=f1e1761]: Agent 5 Bayesian
+              - generic [ref=f1e1762]:
+                - generic "Promoted Records" [ref=f1e1764]
+                - generic [ref=f1e1769]:
+                  - text: 210,450
+                  - paragraph [ref=f1e1770]: Promotion Gate
+              - generic [ref=f1e1771]:
+                - generic "Master Golden" [ref=f1e1773]
+                - generic [ref=f1e1779]:
+                  - text: 210,450
+                  - paragraph [ref=f1e1780]: master_orgs (Vault)
+              - generic [ref=f1e1781]:
+                - generic "OpenSearch Docs" [ref=f1e1783]
+                - generic [ref=f1e1788]:
+                  - text: 210,450
+                  - paragraph [ref=f1e1789]: Agent 6 CDC Sync
+              - generic [ref=f1e1790]:
+                - generic "OneReach Delivered" [ref=f1e1792]
+                - generic [ref=f1e1797]:
+                  - text: 18,450
+                  - paragraph [ref=f1e1798]: Outbound Webhooks
+          - main [ref=f1e1799]:
+            - generic [ref=f1e1800]:
+              - generic [ref=f1e1801]:
+                - tablist [ref=f1e1802]:
+                  - tab "Topology & Execution" [ref=f1e1803] [cursor=pointer]
+                  - tab "Working Layer & Funnels" [ref=f1e1808] [cursor=pointer]
+                  - tab "Queues & Freshness SLA" [ref=f1e1813] [cursor=pointer]
+                  - tab "OneReach Outbound" [selected] [ref=f1e1815] [cursor=pointer]
+                  - tab "Logs & Error Center" [ref=f1e1819] [cursor=pointer]
+                - generic [ref=f1e1822]: "Single Source of Truth Vault: master_dataextraction"
+              - tabpanel "OneReach Outbound" [ref=f1e1823]:
+                - generic [ref=f1e1824]:
+                  - generic [ref=f1e1825]:
+                    - generic [ref=f1e1831]:
+                      - heading "OneReach Outbound Delivery Command Center" [level=3] [ref=f1e1832]
+                      - paragraph [ref=f1e1833]: Real-time delivery of certified Golden Records to downstream AI agents and conversational webhooks
+                    - generic [ref=f1e1834]: 99.8% OUTBOUND SUCCESS
+                  - generic [ref=f1e1836]:
+                    - generic [ref=f1e1837]:
+                      - generic [ref=f1e1838]: Total Dispatched
+                      - text: 18,450
+                    - generic [ref=f1e1839]:
+                      - generic [ref=f1e1840]: Delivered (HTTP 200)
+                      - text: 18,412
+                    - generic [ref=f1e1841]:
+                      - generic [ref=f1e1842]: Retry / Backoff
+                      - text: "38"
+                    - generic [ref=f1e1843]:
+                      - generic [ref=f1e1844]: Avg Latency
+                      - generic [ref=f1e1845]: 124ms
+                  - generic [ref=f1e1846]:
+                    - generic [ref=f1e1847]:
+                      - generic [ref=f1e1848]: Recent Webhook Invocations
+                      - generic [ref=f1e1849]: "Endpoint: https://api.onereach.ai/v2/webhooks/b2b-certified-golden"
+                    - table [ref=f1e1851]:
+                      - rowgroup [ref=f1e1852]:
+                        - row [ref=f1e1853]:
+                          - columnheader "Entity Name" [ref=f1e1854]
+                          - columnheader "Golden ID" [ref=f1e1855]
+                          - columnheader "Status" [ref=f1e1856]
+                          - columnheader "Latency" [ref=f1e1857]
+                          - columnheader "Timestamp" [ref=f1e1858]
+                          - columnheader "Payload" [ref=f1e1859]
+                      - rowgroup [ref=f1e1860]:
+                        - row [ref=f1e1861]:
+                          - cell "Apex Global Logistics Inc" [ref=f1e1862]
+                          - cell "org_gold_91823ab0" [ref=f1e1863]
+                          - cell "DELIVERED" [ref=f1e1864]
+                          - cell "118ms" [ref=f1e1866]
+                          - cell "12:43:28 PM" [ref=f1e1867]
+                          - cell [ref=f1e1868]:
+                            - button "View" [ref=f1e1869] [cursor=pointer]
+                        - row [ref=f1e1870]:
+                          - cell "Vanguard MedTech Solutions" [ref=f1e1871]
+                          - cell "org_gold_44123ce8" [ref=f1e1872]
+                          - cell "DELIVERED" [ref=f1e1873]
+                          - cell "142ms" [ref=f1e1875]
+                          - cell "12:43:25 PM" [ref=f1e1876]
+                          - cell [ref=f1e1877]:
+                            - button "View" [ref=f1e1878] [cursor=pointer]
+                        - row [ref=f1e1879]:
+                          - cell "Pacifica Energy Dynamics" [ref=f1e1880]
+                          - cell "org_gold_771891ba" [ref=f1e1881]
+                          - cell "DELIVERED" [ref=f1e1882]
+                          - cell "95ms" [ref=f1e1884]
+                          - cell "12:43:20 PM" [ref=f1e1885]
+                          - cell [ref=f1e1886]:
+                            - button "View" [ref=f1e1887] [cursor=pointer]
+                        - row [ref=f1e1888]:
+                          - cell "Quasar Financial Systems" [ref=f1e1889]
+                          - cell "org_gold_330911fe" [ref=f1e1890]
+                          - cell "DELIVERED" [ref=f1e1891]
+                          - cell "130ms" [ref=f1e1893]
+                          - cell "12:43:14 PM" [ref=f1e1894]
+                          - cell [ref=f1e1895]:
+                            - button "View" [ref=f1e1896] [cursor=pointer]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f1e34] [cursor=pointer]
+  - alert [ref=f1e38]: Temporal Orchestration Command Center | DataExtraction
+  - generic [aria-hidden] [ref=f1e435]: SEC

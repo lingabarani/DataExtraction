@@ -6,7 +6,7 @@ $ErrorActionPreference = "Continue"
 
 $ROOT     = $PSScriptRoot
 $BACKEND  = Join-Path $ROOT "packages\api"
-$FRONTEND = Join-Path $ROOT "packages\frontend"
+$FRONTEND = Join-Path $ROOT "frontend"
 $LOGS_DIR = Join-Path $ROOT "logs"
 
 Write-Host ""
@@ -85,7 +85,7 @@ Write-Host "  Backend API :  http://localhost:3001/api" -ForegroundColor White
 Write-Host "  API Docs    :  http://localhost:3001/api/docs" -ForegroundColor White
 Write-Host ""
 
-$adminEmail = if ($env:API_ADMIN_EMAIL) { $env:API_ADMIN_EMAIL } else { "admin@oneextraction.io" }
+$adminEmail = if ($env:API_ADMIN_EMAIL) { $env:API_ADMIN_EMAIL } else { "admin@dataextraction.io" }
 $adminPassInfo = if ($env:API_ADMIN_PASSWORD) { "(Configured via API_ADMIN_PASSWORD)" } else { "admin123 (Development default)" }
 
 Write-Host "  Login Credentials:" -ForegroundColor White

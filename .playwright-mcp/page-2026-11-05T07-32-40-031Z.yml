@@ -1,0 +1,369 @@
+- generic [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - complementary [ref=f5e3]:
+      - generic [ref=f5e4]:
+        - generic [ref=f5e11]:
+          - generic [ref=f5e12]: DataExtraction
+          - generic [ref=f5e13]: v2.1
+        - button "Da DataExtraction" [ref=f5e15] [cursor=pointer]:
+          - generic [ref=f5e16]: Da
+          - generic [ref=f5e18]: DataExtraction
+        - navigation [ref=f5e21]:
+          - paragraph [ref=f5e22]: Platform
+          - link "Temporal Orchestration LIVE" [ref=f5e23] [cursor=pointer]:
+            - /url: /orchestration
+            - generic [ref=f5e27]: Temporal Orchestration
+            - generic [ref=f5e29]: LIVE
+          - paragraph [ref=f5e30]: Data
+          - link "Dashboard" [ref=f5e31] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f5e38] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f5e44]: US Leads
+            - generic [ref=f5e45]: 906K
+          - link "MX Leads 50K" [ref=f5e46] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f5e52]: MX Leads
+            - generic [ref=f5e53]: 50K
+          - link "AI Query" [ref=f5e54] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f5e58]: Tools
+          - link "Scraper" [ref=f5e59] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f5e68] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f5e72] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f5e77] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f5e82] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f5e88] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@dataextraction.com" [ref=f5e94] [cursor=pointer]:
+          - generic [ref=f5e95]: A
+          - generic [ref=f5e97]:
+            - paragraph [ref=f5e98]: Admin
+            - paragraph [ref=f5e99]: admin@dataextraction.com
+    - generic [ref=f5e100]:
+      - banner [ref=f5e101]:
+        - navigation [ref=f5e102]:
+          - generic [ref=f5e103]: Temporal Orchestration
+        - generic [ref=f5e105]:
+          - button "Search... ⌘ K" [ref=f5e106] [cursor=pointer]:
+            - generic [ref=f5e110]: Search...
+            - generic [ref=f5e111]:
+              - generic [ref=f5e112]: ⌘
+              - generic [ref=f5e113]: K
+          - button "Toggle theme" [ref=f5e114] [cursor=pointer]
+          - button [ref=f5e116] [cursor=pointer]
+      - generic [ref=f5e119]:
+        - link "Dashboard" [ref=f5e120] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Orchestration LIVE" [ref=f5e127] [cursor=pointer]:
+          - /url: /orchestration
+          - generic [ref=f5e131]: Orchestration
+          - generic [ref=f5e132]: LIVE
+        - link "Data Pipeline" [ref=f5e134] [cursor=pointer]:
+          - /url: /pipeline
+        - link "Observability" [ref=f5e140] [cursor=pointer]:
+          - /url: /orchestration#observability
+        - link "OneReach" [ref=f5e144] [cursor=pointer]:
+          - /url: /orchestration#onereach
+        - link "Freshness" [active] [ref=f5e149] [cursor=pointer]:
+          - /url: /orchestration#freshness
+        - link "Administration" [ref=f5e155] [cursor=pointer]:
+          - /url: /settings
+      - main [ref=f5e160]:
+        - generic [ref=f5e161]:
+          - generic [ref=f5e162]:
+            - generic [ref=f5e163]:
+              - generic [ref=f5e170]:
+                - heading "Temporal Orchestration Command Center LIVE TELEMETRY" [level=1] [ref=f5e171]:
+                  - text: Temporal Orchestration Command Center
+                  - generic [ref=f5e172]: LIVE TELEMETRY
+                - paragraph [ref=f5e173]: Autonomous B2B data extraction, entity resolution, and certified Master Golden Record pipeline
+              - generic [ref=f5e174]:
+                - button "Syncing..." [disabled]
+            - generic [ref=f5e175]:
+              - generic [ref=f5e183]:
+                - generic [ref=f5e184]: Platform
+                - generic [ref=f5e185]:
+                  - text: ONLINE
+                  - generic [ref=f5e186]: (12ms)
+              - generic [ref=f5e194]:
+                - generic [ref=f5e195]: Temporal
+                - generic [ref=f5e196]: DURABLE 7233
+              - generic [ref=f5e203]:
+                - generic [ref=f5e204]: Database
+                - generic [ref=f5e205]: 210,450 Master
+              - generic [ref=f5e211]:
+                - generic [ref=f5e212]: OpenSearch
+                - generic [ref=f5e213]: SYNCED CDC
+              - generic [ref=f5e219]:
+                - generic [ref=f5e220]: OneReach
+                - generic [ref=f5e221]: ACTIVE Webhook
+            - generic [ref=f5e222]:
+              - generic [ref=f5e224]:
+                - paragraph [ref=f5e225]: Active Workflows
+                - paragraph [ref=f5e226]: "0"
+              - generic [ref=f5e231]:
+                - paragraph [ref=f5e232]: Pending Workflows
+                - paragraph [ref=f5e233]: "0"
+              - generic [ref=f5e239]:
+                - paragraph [ref=f5e240]: Last Successful Run
+                - paragraph [ref=f5e241]: Certified Golden Run
+                - paragraph [ref=f5e242]: Ready for Ingestion
+          - generic [ref=f5e247]:
+            - generic [ref=f5e248]:
+              - generic [ref=f5e249]: "Workflow Control:"
+              - generic [ref=f5e250]: Cluster Standby
+            - generic [ref=f5e251]:
+              - button "Start Scraping" [ref=f5e252] [cursor=pointer]
+              - button "Pause" [disabled]
+              - button "Resume" [disabled]
+              - button "Retry Failed Phase" [disabled]
+              - button "Restart Workflow" [disabled]
+              - button "Stop Workflow" [disabled]
+              - button "Emergency Halt" [ref=f5e255] [cursor=pointer]
+          - generic [ref=f5e257]:
+            - generic [ref=f5e258]:
+              - generic [ref=f5e259]:
+                - generic [ref=f5e260]: Pipeline Live Progression Ribbon
+                - generic [ref=f5e261]: (13 Monitored Vault Nodes)
+              - generic [ref=f5e262]:
+                - generic [ref=f5e263]: Harvester
+                - generic [ref=f5e265]: Working Layer
+                - generic [ref=f5e267]: Governance
+                - generic [ref=f5e269]: Master Vault
+            - generic [ref=f5e271]:
+              - generic [ref=f5e272]:
+                - generic "Orgs Scraped" [ref=f5e274]
+                - generic [ref=f5e280]:
+                  - text: 215,400
+                  - paragraph [ref=f5e281]: staging.companies
+              - generic [ref=f5e282]:
+                - generic "Employees Found" [ref=f5e284]
+                - generic [ref=f5e291]:
+                  - text: 885,500
+                  - paragraph [ref=f5e292]: staging.persons
+              - generic [ref=f5e293]:
+                - generic "Domains Verified" [ref=f5e295]
+                - generic [ref=f5e302]:
+                  - text: 212,300
+                  - paragraph [ref=f5e303]: Agent 2 Spatial
+              - generic [ref=f5e304]:
+                - generic "Identity Clusters" [ref=f5e306]
+                - generic [ref=f5e312]:
+                  - text: 210,950
+                  - paragraph [ref=f5e313]: working_orgs
+              - generic [ref=f5e314]:
+                - generic "Emails Found" [ref=f5e316]
+                - generic [ref=f5e321]:
+                  - text: 645,000
+                  - paragraph [ref=f5e322]: RFC 5322 Raw
+              - generic [ref=f5e323]:
+                - generic "Emails Verified" [ref=f5e325]
+                - generic [ref=f5e330]:
+                  - text: 580,200
+                  - paragraph [ref=f5e331]: working_emails
+              - generic [ref=f5e332]:
+                - generic "Execs Found" [ref=f5e334]
+                - generic [ref=f5e340]:
+                  - text: 340,100
+                  - paragraph [ref=f5e341]: working_persons
+              - generic [ref=f5e342]:
+                - generic "Employment Edges" [ref=f5e344]
+                - generic [ref=f5e352]:
+                  - text: 720,400
+                  - paragraph [ref=f5e353]: kg_graph.edges
+              - generic [ref=f5e354]:
+                - generic "Gov Approved" [ref=f5e356]
+                - generic [ref=f5e361]:
+                  - text: 210,450
+                  - paragraph [ref=f5e362]: Agent 5 Bayesian
+              - generic [ref=f5e363]:
+                - generic "Promoted Records" [ref=f5e365]
+                - generic [ref=f5e370]:
+                  - text: 210,450
+                  - paragraph [ref=f5e371]: Promotion Gate
+              - generic [ref=f5e372]:
+                - generic "Master Golden" [ref=f5e374]
+                - generic [ref=f5e380]:
+                  - text: 210,450
+                  - paragraph [ref=f5e381]: master_orgs (Vault)
+              - generic [ref=f5e382]:
+                - generic "OpenSearch Docs" [ref=f5e384]
+                - generic [ref=f5e389]:
+                  - text: 210,450
+                  - paragraph [ref=f5e390]: Agent 6 CDC Sync
+              - generic [ref=f5e391]:
+                - generic "OneReach Delivered" [ref=f5e393]
+                - generic [ref=f5e398]:
+                  - text: 18,450
+                  - paragraph [ref=f5e399]: Outbound Webhooks
+          - main [ref=f5e400]:
+            - generic [ref=f5e401]:
+              - generic [ref=f5e402]:
+                - tablist [ref=f5e403]:
+                  - tab "Topology & Execution" [ref=f5e404] [cursor=pointer]
+                  - tab "Working Layer & Funnels" [ref=f5e409] [cursor=pointer]
+                  - tab "Queues & Freshness SLA" [selected] [ref=f5e414] [cursor=pointer]
+                  - tab "OneReach Outbound" [ref=f5e416] [cursor=pointer]
+                  - tab "Logs & Error Center" [ref=f5e420] [cursor=pointer]
+                - generic [ref=f5e423]: "Single Source of Truth Vault: master_dataextraction"
+              - tabpanel "Queues & Freshness SLA" [ref=f5e424]:
+                - generic [ref=f5e425]:
+                  - generic [ref=f5e426]:
+                    - generic [ref=f5e430]:
+                      - heading "Temporal Distributed Task Queue Monitor" [level=3] [ref=f5e431]
+                      - paragraph [ref=f5e432]: Real-time worker concurrency, backlog queue depth, and activity dispatch latencies
+                    - generic [ref=f5e433]: 7 ISOLATED TASK QUEUES
+                  - table [ref=f5e435]:
+                    - rowgroup [ref=f5e436]:
+                      - row [ref=f5e437]:
+                        - columnheader "Queue & Target Agent" [ref=f5e438]
+                        - columnheader "Workers" [ref=f5e439]
+                        - columnheader "Backlog Pending" [ref=f5e440]
+                        - columnheader "Running" [ref=f5e441]
+                        - columnheader "Completed" [ref=f5e442]
+                        - columnheader "Avg Wait" [ref=f5e443]
+                        - columnheader "Status" [ref=f5e444]
+                    - rowgroup [ref=f5e445]:
+                      - row [ref=f5e446]:
+                        - 'cell "Agent 1: Registry Harvester registry-ingestion-queue" [ref=f5e447]':
+                          - generic [ref=f5e448]: "Agent 1: Registry Harvester"
+                          - generic [ref=f5e449]: registry-ingestion-queue
+                        - cell "8" [ref=f5e450]
+                        - cell "0" [ref=f5e455]
+                        - cell "0" [ref=f5e456]
+                        - cell "200,147" [ref=f5e457]
+                        - cell "12ms" [ref=f5e458]
+                        - cell "NOMINAL" [ref=f5e459]
+                      - row [ref=f5e462]:
+                        - 'cell "Agent 2: Spatial & Domain Harvester geospatial-domain-queue" [ref=f5e463]':
+                          - generic [ref=f5e464]: "Agent 2: Spatial & Domain Harvester"
+                          - generic [ref=f5e465]: geospatial-domain-queue
+                        - cell "6" [ref=f5e466]
+                        - cell "0" [ref=f5e471]
+                        - cell "0" [ref=f5e472]
+                        - cell "10,691" [ref=f5e473]
+                        - cell "18ms" [ref=f5e474]
+                        - cell "NOMINAL" [ref=f5e475]
+                      - row [ref=f5e478]:
+                        - 'cell "Agent 3: Identity & Splink 5.0 identity-clustering-queue" [ref=f5e479]':
+                          - generic [ref=f5e480]: "Agent 3: Identity & Splink 5.0"
+                          - generic [ref=f5e481]: identity-clustering-queue
+                        - cell "4" [ref=f5e482]
+                        - cell "0" [ref=f5e487]
+                        - cell "0" [ref=f5e488]
+                        - cell "52,661" [ref=f5e489]
+                        - cell "45ms" [ref=f5e490]
+                        - cell "NOMINAL" [ref=f5e491]
+                      - row [ref=f5e494]:
+                        - 'cell "Agent 7: Email Discovery & Validation email-enrichment-queue" [ref=f5e495]':
+                          - generic [ref=f5e496]: "Agent 7: Email Discovery & Validation"
+                          - generic [ref=f5e497]: email-enrichment-queue
+                        - cell "12" [ref=f5e498]
+                        - cell "24" [ref=f5e503]
+                        - cell "12" [ref=f5e504]
+                        - cell "57,160" [ref=f5e505]
+                        - cell "85ms" [ref=f5e506]
+                        - cell "ACTIVE" [ref=f5e507]
+                      - row [ref=f5e510]:
+                        - 'cell "Agent 4: Executive Discovery executive-contact-queue" [ref=f5e511]':
+                          - generic [ref=f5e512]: "Agent 4: Executive Discovery"
+                          - generic [ref=f5e513]: executive-contact-queue
+                        - cell "8" [ref=f5e514]
+                        - cell "0" [ref=f5e519]
+                        - cell "0" [ref=f5e520]
+                        - cell "64,759" [ref=f5e521]
+                        - cell "15ms" [ref=f5e522]
+                        - cell "IDLE" [ref=f5e523]
+                      - row [ref=f5e526]:
+                        - 'cell "Agent 5: Governance & Certification governance-quality-queue" [ref=f5e527]':
+                          - generic [ref=f5e528]: "Agent 5: Governance & Certification"
+                          - generic [ref=f5e529]: governance-quality-queue
+                        - cell "6" [ref=f5e530]
+                        - cell "0" [ref=f5e535]
+                        - cell "0" [ref=f5e536]
+                        - cell "210,838" [ref=f5e537]
+                        - cell "14ms" [ref=f5e538]
+                        - cell "IDLE" [ref=f5e539]
+                      - row [ref=f5e542]:
+                        - 'cell "Agent 6: Search, CDC & OneReach search-persistence-queue" [ref=f5e543]':
+                          - generic [ref=f5e544]: "Agent 6: Search, CDC & OneReach"
+                          - generic [ref=f5e545]: search-persistence-queue
+                        - cell "4" [ref=f5e546]
+                        - cell "0" [ref=f5e551]
+                        - cell "0" [ref=f5e552]
+                        - cell "210,838" [ref=f5e553]
+                        - cell "22ms" [ref=f5e554]
+                        - cell "IDLE" [ref=f5e555]
+                - generic [ref=f5e558]:
+                  - generic [ref=f5e559]:
+                    - generic [ref=f5e565]:
+                      - heading "Autonomous Freshness & SLA Revalidation Engine" [level=3] [ref=f5e566]
+                      - paragraph [ref=f5e567]: "Lifecycle decay monitoring: 30d Website | 90d Email | 90d Executive | 48d Registry"
+                    - generic [ref=f5e568]: 95.8% OVERALL COMPLIANCE
+                  - generic [ref=f5e570]:
+                    - generic [ref=f5e571]:
+                      - generic [ref=f5e572]:
+                        - generic [ref=f5e573]:
+                          - generic [ref=f5e574]: Website & Domain (30 Days)
+                          - generic [ref=f5e581]: 94.0%
+                        - progressbar [ref=f5e583]
+                      - generic [ref=f5e585]:
+                        - generic [ref=f5e586]:
+                          - generic [ref=f5e587]: Compliant
+                          - text: 198,200
+                        - generic [ref=f5e588]:
+                          - generic [ref=f5e589]: Stale / Due
+                          - text: 12,638
+                    - generic [ref=f5e590]:
+                      - generic [ref=f5e591]:
+                        - generic [ref=f5e592]:
+                          - generic [ref=f5e593]: Email Deliverability (90 Days)
+                          - generic [ref=f5e598]: 96.9%
+                        - progressbar [ref=f5e600]
+                      - generic [ref=f5e602]:
+                        - generic [ref=f5e603]:
+                          - generic [ref=f5e604]: Compliant
+                          - text: 562,400
+                        - generic [ref=f5e605]:
+                          - generic [ref=f5e606]: Stale / Due
+                          - text: 17,800
+                    - generic [ref=f5e607]:
+                      - generic [ref=f5e608]:
+                        - generic [ref=f5e609]:
+                          - generic [ref=f5e610]: Executive Employment (90 Days)
+                          - generic [ref=f5e617]: 95.0%
+                        - progressbar [ref=f5e619]
+                      - generic [ref=f5e621]:
+                        - generic [ref=f5e622]:
+                          - generic [ref=f5e623]: Compliant
+                          - text: 324,100
+                        - generic [ref=f5e624]:
+                          - generic [ref=f5e625]: Stale / Due
+                          - text: 17,100
+                    - generic [ref=f5e626]:
+                      - generic [ref=f5e627]:
+                        - generic [ref=f5e628]:
+                          - generic [ref=f5e629]: Government & Reg Registry (48 Days)
+                          - generic [ref=f5e634]: 97.6%
+                        - progressbar [ref=f5e636]
+                      - generic [ref=f5e638]:
+                        - generic [ref=f5e639]:
+                          - generic [ref=f5e640]: Compliant
+                          - text: 195,400
+                        - generic [ref=f5e641]:
+                          - generic [ref=f5e642]: Stale / Due
+                          - text: 4,747
+                  - generic [ref=f5e643]:
+                    - generic [ref=f5e644]:
+                      - generic [ref=f5e647]: "Next Scheduled Revalidation Wave:"
+                      - generic [ref=f5e648]: 11/6/2026, 5:30:00 AM
+                    - generic [ref=f5e649]: Temporal Revalidation Cron Daemon ACTIVE
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f5e657] [cursor=pointer]
+  - alert [ref=f5e661]: Temporal Orchestration Command Center | DataExtraction

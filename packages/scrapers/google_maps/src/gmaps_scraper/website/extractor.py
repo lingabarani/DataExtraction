@@ -595,3 +595,27 @@ class WebsiteExtractor:
 
         logger.debug("Unexpected address format type: %s", type(addr).__name__)
         return []
+
+
+class ContactExtractor:
+    """Extracts contact details and corporate leadership from raw HTML."""
+
+    @classmethod
+    def extract_from_html(cls, html_content: str, base_url: str = "") -> Dict[str, Any]:
+        from .crawler import PageResponse
+        pages = {base_url: PageResponse(url=base_url, status_code=200, html=html_content)}
+        extracted = WebsiteExtractor.extract(business={"name": "", "website": base_url}, crawled_pages=pages)
+        emails = [
+            c.get("value")
+            for c in extracted.get("contacts", [])
+            if c.get("type") == "email" and c.get("value")
+        ]
+        people = []
+        for l in extracted.get("leadership", []):
+            people.append({
+                "full_name": l.get("full_name"),
+                "title": l.get("role_raw") or l.get("role_standardized"),
+                "role": l.get("role_standardized"),
+                "confidence": l.get("confidence"),
+            })
+        return {"emails": emails, "people": people, "raw": extracted}

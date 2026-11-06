@@ -404,6 +404,66 @@ class TestEntityResolutionAndDeduplicator(unittest.TestCase):
         self.assertIn("ein:77-0493581", self.dedup._company_cache)
         self.assertEqual(self.dedup._company_cache["ein:77-0493581"], "co_2")
 
+    def test_three_tier_resolution_auto_merge_at_95(self):
+        """Confidence >= 0.95 triggers automatic merge."""
+        existing_company = {
+            "id": "co_tesla_corp",
+            "name": "Tesla Inc",
+            "normalized_name": "TESLA",
+            "state_code": "TX",
+            "_similarity": 0.98,
+        }
+        self.dedup._find_company_fuzzy = MagicMock(return_value=existing_company)
+        self.dedup._fetch_company = MagicMock(return_value=existing_company)
+
+        incoming = {
+            "name": "Tesla, Inc.",
+            "state_code": "TX",
+            "website": "https://tesla.com",
+        }
+        res = self.dedup.check_company(incoming)
+        self.assertEqual(res.action, "update")
+        self.assertEqual(res.id, "co_tesla_corp")
+        self.assertGreaterEqual(res.confidence, 0.95)
+
+    def test_three_tier_resolution_quarantine_at_75(self):
+        """Confidence between 0.70 and 0.9499 enters isolation review queue (quarantined)."""
+        existing_company = {
+            "id": "co_american_airlines_corp",
+            "name": "American Airlines Group",
+            "normalized_name": "AMERICAN AIRLINES GROUP",
+            "state_code": "TX",
+            "_similarity": 0.82,
+        }
+        self.dedup._find_company_fuzzy = MagicMock(return_value=existing_company)
+
+        incoming = {
+            "id": "incoming_air_1",
+            "name": "American Air Cargo",
+            "state_code": "TX",
+            "api_source": "TEST_SCRAPER",
+        }
+        res = self.dedup.check_company(incoming)
+        self.assertEqual(res.action, "isolate")
+        self.assertEqual(res.id, "co_american_airlines_corp")
+        self.assertGreaterEqual(res.confidence, 0.70)
+        self.assertLess(res.confidence, 0.95)
+        self.assertIsNotNone(res.review_id)
+
+    def test_three_tier_resolution_distinct_insert_below_70(self):
+        """Confidence below 0.70 does not match and inserts new distinct entity."""
+        self.dedup._find_company_fuzzy = MagicMock(return_value=None)
+
+        incoming = {
+            "name": "Completely Unrelated Brand X",
+            "state_code": "CA",
+            "website": "https://brand-x.com",
+        }
+        res = self.dedup.check_company(incoming)
+        self.assertEqual(res.action, "insert")
+        self.assertTrue(res.id.startswith("co_"))
+        self.assertEqual(res.confidence, 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

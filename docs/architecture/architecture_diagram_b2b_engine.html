@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataExtraction Enterprise - High-Level Architecture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f1f5f9;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .canvas-container {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      max-width: 1560px;
+      width: 100%;
+    }
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+
+<div class="canvas-container">
+  <svg viewBox="0 0 1520 1020" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Arrow markers -->
+      <marker id="arr-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0284c7" />
+      </marker>
+      <marker id="arr-gray" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569" />
+      </marker>
+      <marker id="arr-magenta" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#db2777" />
+      </marker>
+      <filter id="subtle-shadow" x="-5%" y="-5%" width="110%" height="110%">
+        <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0f172a" flood-opacity="0.05"/>
+      </filter>
+    </defs>
+
+    <!-- ============================================================== -->
+    <!-- TOP HEADER BANNER                                              -->
+    <!-- ============================================================== -->
+    <rect x="20" y="16" width="1480" height="74" rx="12" fill="#0b2545" />
+    <text x="600" y="44" font-size="22" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="0.02em">
+      B2B Sales Intelligence &amp; Entity Resolution Engine
+    </text>
+    <text x="600" y="65" font-size="13" font-weight="600" fill="#93c5fd" text-anchor="middle">
+      High-Level Architecture: Collect &rarr; Ingest &rarr; Normalize &rarr; Deduplicate &rarr; Validate &amp; Enrich &rarr; Golden Profiles &rarr; Deliver Intelligence
+    </text>
+
+    <!-- Cloud-Agnostic Badge (Replacing AWS) -->
+    <rect x="1240" y="27" width="240" height="52" rx="6" fill="#133e6f" stroke="#1d4ed8" stroke-width="1" />
+    <text x="1360" y="46" font-size="12" font-weight="700" fill="#38bdf8" text-anchor="middle">SOVEREIGN PLATFORM</text>
+    <text x="1360" y="66" font-size="10.5" font-weight="500" fill="#cbd5e1" text-anchor="middle">100% Self-Hosted &bull; Zero AWS Lock-in</text>
+
+    <!-- ============================================================== -->
+    <!-- 1. DATA SOURCES (LEFT COLUMN)                                  -->
+    <!-- ============================================================== -->
+    <g transform="translate(20, 105)">
+      <rect width="235" height="525" rx="8" fill="#f0f9ff" stroke="#38bdf8" stroke-width="1.5" />
+      <rect x="0" y="0" width="235" height="34" rx="8" fill="#e0f2fe" />
+      <circle cx="22" cy="17" r="10" fill="#0284c7" />
+      <text x="22" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">1</text>
+      <text x="42" y="22" font-size="13" font-weight="700" fill="#0369a1">Data Sources</text>
+
+      <!-- Source 1: Government -->
+      <g transform="translate(14, 46)">
+        <text x="0" y="14" font-size="11.5" font-weight="700" fill="#0f172a">&#127963; Government &amp; Public Registries</text>
+        <text x="16" y="30" font-size="10" fill="#475569">&bull; SEC EDGAR (CIK, Form 10-K)</text>
+        <text x="16" y="45" font-size="10" fill="#475569">&bull; CMS NPI Healthcare Registry</text>
+        <text x="16" y="60" font-size="10" fill="#475569">&bull; SAM.gov &amp; Federal Contractors</text>
+        <text x="16" y="75" font-size="10" fill="#475569">&bull; FDIC &amp; State Banking Registries</text>
+      </g>
+
+      <!-- Source 2: State & Local -->
+      <g transform="translate(14, 140)">
+        <text x="0" y="14" font-size="11.5" font-weight="700" fill="#0f172a">&#128205; State &amp; Corporate Registries</text>
+        <text x="16" y="30" font-size="10" fill="#475569">&bull; Florida Sunbiz, New York OpenData</text>
+        <text x="16" y="45" font-size="10" fill="#475569">&bull; Delaware, Texas, California SOS</text>
+        <text x="16" y="60" font-size="10" fill="#475569">&bull; OpenCorporates Open Datasets</text>
+      </g>
+
+      <!-- Source 3: Web & Directories -->
+      <g transform="translate(14, 225)">
+        <text x="0" y="14" font-size="11.5" font-weight="700" fill="#0f172a">&#127760; Web &amp; Directory Sources</text>
+        <text x="16" y="30" font-size="10" fill="#475569">&bull; Live Corporate Web Domains</text>
+        <text x="16" y="45" font-size="10" fill="#475569">&bull; Executive &amp; Team Pages (/about)</text>
+        <text x="16" y="60" font-size="10" fill="#475569">&bull; YellowPages &amp; Business Directories</text>
+      </g>
+
+      <!-- Source 4: Maps & Location -->
+      <g transform="translate(14, 310)">
+        <text x="0" y="14" font-size="11.5" font-weight="700" fill="#0f172a">&#128506; Maps &amp; Spatial Footprint</text>
+        <text x="16" y="30" font-size="10" fill="#475569">&bull; Google Maps Places API</text>
+        <text x="16" y="45" font-size="10" fill="#475569">&bull; OpenStreetMap Overpass API</text>
+        <text x="16" y="60" font-size="10" fill="#475569">&bull; Quadtree Spatial Tile Decomposition</text>
+      </g>
+
+      <!-- Source 5: Bulk Feeds -->
+      <g transform="translate(14, 400)">
+        <text x="0" y="14" font-size="11.5" font-weight="700" fill="#0f172a">&#128196; Bulk File &amp; Batch Feeds</text>
+        <text x="16" y="30" font-size="10" fill="#475569">&bull; Monthly Statutory CSV / XML Dumps</text>
+        <text x="16" y="45" font-size="10" fill="#475569">&bull; Compressed Parquet Lakehouse Feeds</text>
+        <text x="16" y="60" font-size="10" fill="#475569">&bull; Partner Data Drops &amp; Sync Files</text>
+      </g>
+    </g>
+
+    <!-- Arrow 1 to 2 -->
+    <line x1="255" y1="360" x2="275" y2="360" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 2. INGESTION & RAW STAGING (DOCKER / TEMPORAL)                 -->
+    <!-- ============================================================== -->
+    <g transform="translate(280, 105)">
+      <rect width="255" height="525" rx="8" fill="#f0fdf4" stroke="#4ade80" stroke-width="1.5" />
+      <rect x="0" y="0" width="255" height="34" rx="8" fill="#dcfce7" />
+      <circle cx="22" cy="17" r="10" fill="#16a34a" />
+      <text x="22" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">2</text>
+      <text x="42" y="22" font-size="13" font-weight="700" fill="#15803d">Ingestion &amp; Raw Staging</text>
+
+      <!-- Sub-box: Containerized Worker Fleet -->
+      <g transform="translate(12, 46)">
+        <rect width="231" height="305" rx="6" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.2" />
+        <text x="12" y="22" font-size="12" font-weight="700" fill="#166534">&#128640; Temporal Worker Fleet</text>
+        <text x="12" y="36" font-size="9.5" fill="#64748b">(Docker Compose / Task Queues)</text>
+
+        <!-- API Ingestion -->
+        <g transform="translate(10, 48)">
+          <rect width="211" height="70" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <text x="8" y="16" font-size="10.5" font-weight="700" fill="#0f172a">&#128279; API Ingestion Workers</text>
+          <text x="16" y="32" font-size="9.5" fill="#475569">&bull; Auth &amp; Session Management</text>
+          <text x="16" y="46" font-size="9.5" fill="#475569">&bull; Token Bucket Rate Limiting</text>
+          <text x="16" y="60" font-size="9.5" fill="#475569">&bull; Pagination &amp; Exponential Retry</text>
+        </g>
+
+        <!-- Web Scraping -->
+        <g transform="translate(10, 126)">
+          <rect width="211" height="75" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <text x="8" y="16" font-size="10.5" font-weight="700" fill="#0f172a">&#128376; Web Scraping Engine</text>
+          <text x="16" y="32" font-size="9.5" fill="#475569">&bull; Async Domain Exploration</text>
+          <text x="16" y="46" font-size="9.5" fill="#475569">&bull; Cloudflare XOR Email Decoder</text>
+          <text x="16" y="60" font-size="9.5" fill="#475569">&bull; Robots.txt &amp; Domain Throttling</text>
+        </g>
+
+        <!-- Bulk File -->
+        <g transform="translate(10, 210)">
+          <rect width="211" height="82" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+          <text x="8" y="16" font-size="10.5" font-weight="700" fill="#0f172a">&#128193; Bulk Ingestion Workers</text>
+          <text x="16" y="32" font-size="9.5" fill="#475569">&bull; Streaming XML &amp; CSV Parsers</text>
+          <text x="16" y="46" font-size="9.5" fill="#475569">&bull; Schema Validation &amp; Checksums</text>
+          <text x="16" y="60" font-size="9.5" fill="#475569">&bull; Fast Chunk Chunking Pipeline</text>
+          <text x="16" y="74" font-size="9.5" fill="#475569">&bull; Zero AWS ECS Dependency</text>
+        </g>
+      </g>
+
+      <!-- Sub-box: MinIO S3 Staging (Replacing AWS S3) -->
+      <g transform="translate(12, 362)">
+        <rect width="231" height="148" rx="6" fill="#ffffff" stroke="#86efac" stroke-width="1.2" />
+        <rect x="0" y="0" width="6" height="148" rx="2" fill="#16a34a" />
+        <text x="16" y="24" font-size="12" font-weight="700" fill="#15803d">&#128190; MinIO S3 Staging Layer</text>
+        <text x="16" y="40" font-size="9.5" fill="#64748b">(Self-Hosted S3 Object Storage)</text>
+        <text x="16" y="62" font-size="10" fill="#475569">&bull; Immutable Raw Payload Snapshots</text>
+        <text x="16" y="78" font-size="10" fill="#475569">&bull; Full Provenance &amp; Source Metadata</text>
+        <text x="16" y="94" font-size="10" fill="#475569">&bull; Ingestion State Checkpointing</text>
+        <text x="16" y="110" font-size="10" fill="#475569">&bull; Date &amp; Source Partitions</text>
+        <text x="16" y="130" font-size="9.5" font-weight="600" fill="#166534">Port 9000 &bull; S3 Compatible API</text>
+      </g>
+    </g>
+
+    <!-- Arrow 2 to 3 -->
+    <line x1="535" y1="360" x2="550" y2="360" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 3. DATA PROCESSING & NORMALIZATION                             -->
+    <!-- ============================================================== -->
+    <g transform="translate(555, 105)">
+      <rect width="180" height="525" rx="8" fill="#faf5ff" stroke="#c084fc" stroke-width="1.5" />
+      <rect x="0" y="0" width="180" height="34" rx="8" fill="#f3e8ff" />
+      <circle cx="20" cy="17" r="10" fill="#9333ea" />
+      <text x="20" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">3</text>
+      <text x="38" y="22" font-size="12" font-weight="700" fill="#7e22ce">Data Normalization</text>
+
+      <g transform="translate(12, 55)">
+        <rect width="156" height="50" rx="4" fill="#ffffff" stroke="#e9d5ff" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#129529; Data Cleaning</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">Whitespace &amp; Null Scrubbing</text>
+      </g>
+
+      <g transform="translate(12, 120)">
+        <rect width="156" height="65" rx="4" fill="#ffffff" stroke="#e9d5ff" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#9878; Legal Standardization</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">Corp Suffixes (Inc, LLC)</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">EIN / Tax ID Format</text>
+      </g>
+
+      <g transform="translate(12, 200)">
+        <rect width="156" height="65" rx="4" fill="#ffffff" stroke="#e9d5ff" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#127960; Address Engine</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">Street Parsing &amp; US States</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">ZIP+4 &amp; Geocoding</text>
+      </g>
+
+      <g transform="translate(12, 280)">
+        <rect width="156" height="65" rx="4" fill="#ffffff" stroke="#e9d5ff" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#128202; Industry Taxonomy</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">NAICS Code Matching</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">SIC Industry Crosswalk</text>
+      </g>
+
+      <g transform="translate(12, 360)">
+        <rect width="156" height="65" rx="4" fill="#ffffff" stroke="#e9d5ff" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#128279; Domain Resolution</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">Root Domain Extraction</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">Protocol &amp; www Strip</text>
+      </g>
+
+      <g transform="translate(12, 440)">
+        <rect width="156" height="65" rx="4" fill="#ffffff" stroke="#e9d5ff" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#128394; Schema Mapping</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">Unified Lead Entity Model</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">DuckDB Transformation</text>
+      </g>
+    </g>
+
+    <!-- Arrow 3 to 4 -->
+    <line x1="735" y1="360" x2="750" y2="360" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 4. DEDUPLICATION & ENTITY RESOLUTION (SPLINK EM)               -->
+    <!-- ============================================================== -->
+    <g transform="translate(755, 105)">
+      <rect width="190" height="525" rx="8" fill="#eef2ff" stroke="#818cf8" stroke-width="1.5" />
+      <rect x="0" y="0" width="190" height="34" rx="8" fill="#e0e7ff" />
+      <circle cx="20" cy="17" r="10" fill="#4f46e5" />
+      <text x="20" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">4</text>
+      <text x="38" y="22" font-size="12" font-weight="700" fill="#3730a3">Dedup &amp; Splink EM</text>
+
+      <g transform="translate(12, 50)">
+        <rect width="166" height="75" rx="4" fill="#ffffff" stroke="#c7d2fe" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#127919; Exact Deterministic Match</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">&bull; Tax ID / EIN Match</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">&bull; SEC CIK Number Match</text>
+        <text x="10" y="66" font-size="9.5" fill="#475569">&bull; Exact Domain Equality</text>
+      </g>
+
+      <g transform="translate(12, 140)">
+        <rect width="166" height="85" rx="4" fill="#ffffff" stroke="#c7d2fe" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#128201; Probabilistic Splink EM</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">&bull; Fellegi-Sunter Model</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">&bull; Jaro-Winkler Name (&ge;0.92)</text>
+        <text x="10" y="66" font-size="9.5" fill="#475569">&bull; Levenshtein Address Match</text>
+        <text x="10" y="78" font-size="9" font-weight="600" fill="#4f46e5">Expectation-Maximization</text>
+      </g>
+
+      <g transform="translate(12, 240)">
+        <rect width="166" height="75" rx="4" fill="#ffffff" stroke="#c7d2fe" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#127760; Cross-Source Linking</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">&bull; SEC &harr; Google Maps</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">&bull; CMS NPI &harr; State SOS</text>
+        <text x="10" y="66" font-size="9.5" fill="#475569">&bull; Disparate Fragment Fusion</text>
+      </g>
+
+      <g transform="translate(12, 330)">
+        <rect width="166" height="85" rx="4" fill="#ffffff" stroke="#c7d2fe" stroke-width="1" />
+        <text x="10" y="20" font-size="11" font-weight="700" fill="#0f172a">&#128397; Connected Components</text>
+        <text x="10" y="38" font-size="9.5" fill="#475569">&bull; Graph Adjacency Cluster</text>
+        <text x="10" y="52" font-size="9.5" fill="#475569">&bull; Duplicate Cluster ID</text>
+        <text x="10" y="68" font-size="9.5" font-weight="700" fill="#059669">&bull; is_canonical = TRUE</text>
+        <text x="10" y="80" font-size="8.5" fill="#64748b">Primary Golden Entity Set</text>
+      </g>
+
+      <g transform="translate(12, 430)">
+        <rect width="166" height="75" rx="4" fill="#f8fafc" stroke="#a5b4fc" stroke-width="1.2" />
+        <text x="10" y="20" font-size="10.5" font-weight="700" fill="#1e1b4b">&#9888; Business Constraint:</text>
+        <text x="10" y="36" font-size="9" fill="#312e81">Enrichment starts ONLY</text>
+        <text x="10" y="50" font-size="9" fill="#312e81">after deduplication &amp;</text>
+        <text x="10" y="64" font-size="9" font-weight="700" fill="#047857">merge are completed.</text>
+      </g>
+    </g>
+
+    <!-- Arrow 4 to 5 -->
+    <line x1="945" y1="360" x2="960" y2="360" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 5. VALIDATION LAYER (POST-DEDUP EMAIL ENRICHMENT)              -->
+    <!-- ============================================================== -->
+    <g transform="translate(965, 105)">
+      <rect width="210" height="525" rx="8" fill="#f0fdfa" stroke="#2dd4bf" stroke-width="1.5" />
+      <rect x="0" y="0" width="210" height="34" rx="8" fill="#ccfbf1" />
+      <circle cx="20" cy="17" r="10" fill="#0d9488" />
+      <text x="20" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">5</text>
+      <text x="38" y="22" font-size="12" font-weight="700" fill="#0f766e">Validation &amp; Enrichment</text>
+
+      <!-- Company Validation -->
+      <g transform="translate(10, 46)">
+        <rect width="190" height="55" rx="4" fill="#ffffff" stroke="#99f6e4" stroke-width="1" />
+        <text x="10" y="18" font-size="11" font-weight="700" fill="#0f172a">&#127970; Company Validation</text>
+        <text x="10" y="34" font-size="9.5" fill="#475569">&bull; Active Corporate Standing</text>
+        <text x="10" y="48" font-size="9.5" fill="#475569">&bull; SEC Filing Recency &amp; SIC</text>
+      </g>
+
+      <!-- Contact Validation -->
+      <g transform="translate(10, 110)">
+        <rect width="190" height="60" rx="4" fill="#ffffff" stroke="#99f6e4" stroke-width="1" />
+        <text x="10" y="18" font-size="11" font-weight="700" fill="#0f172a">&#128100; Contact Validation</text>
+        <text x="10" y="34" font-size="9.5" fill="#475569">&bull; Name &amp; Title Verification</text>
+        <text x="10" y="48" font-size="9.5" fill="#475569">&bull; Corporate Phone / Address</text>
+      </g>
+
+      <!-- 5-Tier Email Validation Engine -->
+      <g transform="translate(10, 180)">
+        <rect width="190" height="330" rx="6" fill="#ffffff" stroke="#14b8a6" stroke-width="1.5" />
+        <rect x="0" y="0" width="190" height="26" rx="6" fill="#0f766e" />
+        <text x="14" y="18" font-size="11" font-weight="700" fill="#ffffff">&#9993; Email Validation (5-Tier)</text>
+
+        <!-- Tier 1 -->
+        <g transform="translate(10, 36)">
+          <circle cx="10" cy="10" r="9" fill="#0284c7" />
+          <text x="10" y="14" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+          <text x="26" y="13" font-size="10.5" font-weight="700" fill="#0f172a">Syntax Check (20%)</text>
+          <text x="26" y="27" font-size="8.5" fill="#64748b">RFC-5322 specs &amp; regex</text>
+        </g>
+
+        <!-- Tier 2 -->
+        <g transform="translate(10, 72)">
+          <circle cx="10" cy="10" r="9" fill="#16a34a" />
+          <text x="10" y="14" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+          <text x="26" y="13" font-size="10.5" font-weight="700" fill="#0f172a">MX Record Check (20%)</text>
+          <text x="26" y="27" font-size="8.5" fill="#64748b">Async DNS query &amp; TTL cache</text>
+        </g>
+
+        <!-- Tier 3 -->
+        <g transform="translate(10, 108)">
+          <circle cx="10" cy="10" r="9" fill="#eab308" />
+          <text x="10" y="14" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+          <text x="26" y="13" font-size="10.5" font-weight="700" fill="#0f172a">SMTP Handshake (30%)</text>
+          <text x="26" y="27" font-size="8.5" fill="#64748b">RFC-5321 HELO/RCPT TO probe</text>
+        </g>
+
+        <!-- Tier 4 -->
+        <g transform="translate(10, 144)">
+          <circle cx="10" cy="10" r="9" fill="#f97316" />
+          <text x="10" y="14" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+          <text x="26" y="13" font-size="10.5" font-weight="700" fill="#0f172a">Catch-All Analysis (20%)</text>
+          <text x="26" y="27" font-size="8.5" fill="#64748b">Randomized honeypot mailbox</text>
+        </g>
+
+        <!-- Tier 5 -->
+        <g transform="translate(10, 180)">
+          <circle cx="10" cy="10" r="9" fill="#ec4899" />
+          <text x="10" y="14" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+          <text x="26" y="13" font-size="10.5" font-weight="700" fill="#0f172a">Domain Reputation (10%)</text>
+          <text x="26" y="27" font-size="8.5" fill="#64748b">Disposable &amp; MX provider check</text>
+        </g>
+
+        <!-- Outcome badge -->
+        <rect x="10" y="222" width="170" height="50" rx="4" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2" />
+        <text x="95" y="242" font-size="10" font-weight="700" fill="#047857" text-anchor="middle">&#10004; DELIVERABILITY SCORE</text>
+        <text x="95" y="258" font-size="11" font-weight="800" fill="#065f46" text-anchor="middle">Score &ge; 0.80 &rarr; VERIFIED</text>
+        <text x="95" y="286" font-size="9" fill="#64748b" text-anchor="middle">Target bounce rate &lt; 1.5%</text>
+      </g>
+    </g>
+
+    <!-- Arrow 5 to 6 -->
+    <line x1="1175" y1="360" x2="1190" y2="360" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 6. GOLDEN PROFILE ENGINE                                       -->
+    <!-- ============================================================== -->
+    <g transform="translate(1195, 105)">
+      <rect width="145" height="525" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5" />
+      <rect x="0" y="0" width="145" height="34" rx="8" fill="#fef3c7" />
+      <circle cx="18" cy="17" r="10" fill="#d97706" />
+      <text x="18" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">6</text>
+      <text x="34" y="22" font-size="11" font-weight="700" fill="#b45309">Golden Profile</text>
+
+      <g transform="translate(10, 50)">
+        <text x="0" y="14" font-size="20" text-anchor="middle" fill="#d97706">&#11088;</text>
+        <text x="0" y="40" font-size="10.5" font-weight="700" fill="#0f172a">&bull; Select Best Source</text>
+        <text x="0" y="55" font-size="9.5" fill="#475569">Statutory authority tier</text>
+      </g>
+
+      <g transform="translate(10, 130)">
+        <text x="0" y="14" font-size="10.5" font-weight="700" fill="#0f172a">&bull; Merge Validated</text>
+        <text x="0" y="28" font-size="9.5" fill="#475569">Field-level survivorship</text>
+        <text x="0" y="42" font-size="9.5" fill="#475569">Address + Map reconcil</text>
+      </g>
+
+      <g transform="translate(10, 205)">
+        <text x="0" y="14" font-size="10.5" font-weight="700" fill="#0f172a">&bull; Executive Mapping</text>
+        <text x="0" y="28" font-size="9.5" fill="#475569">Item 10 C-Suite linking</text>
+        <text x="0" y="42" font-size="9.5" fill="#475569">Corporate Org Graph</text>
+      </g>
+
+      <g transform="translate(10, 280)">
+        <text x="0" y="14" font-size="10.5" font-weight="700" fill="#0f172a">&bull; Maintain Lineage</text>
+        <text x="0" y="28" font-size="9.5" fill="#475569">Full source provenance</text>
+        <text x="0" y="42" font-size="9.5" fill="#475569">Audit trail JSONB</text>
+      </g>
+
+      <g transform="translate(10, 360)">
+        <text x="0" y="14" font-size="10.5" font-weight="700" fill="#0f172a">&bull; Quality Score</text>
+        <text x="0" y="28" font-size="9.5" fill="#475569">Completeness + Fresh</text>
+        <text x="0" y="42" font-size="9.5" font-weight="700" fill="#b45309">Scale: 0 &ndash; 100</text>
+      </g>
+
+      <g transform="translate(10, 440)">
+        <rect width="125" height="50" rx="4" fill="#ffffff" stroke="#fcd34d" stroke-width="1" />
+        <text x="62" y="22" font-size="10" font-weight="700" fill="#92400e" text-anchor="middle">SOVEREIGN IP</text>
+        <text x="62" y="38" font-size="9" fill="#b45309" text-anchor="middle">100% Owned Data</text>
+      </g>
+    </g>
+
+    <!-- Arrow 6 to 7 -->
+    <line x1="1340" y1="360" x2="1355" y2="360" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 7. CENTRAL B2B DATABASE & SEARCH (RIGHT COLUMN)               -->
+    <!-- ============================================================== -->
+    <g transform="translate(1360, 105)">
+      <rect width="140" height="525" rx="8" fill="#ecfdf5" stroke="#34d399" stroke-width="1.5" />
+      <rect x="0" y="0" width="140" height="34" rx="8" fill="#d1fae5" />
+      <circle cx="18" cy="17" r="10" fill="#059669" />
+      <text x="18" y="21" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">7</text>
+      <text x="34" y="22" font-size="11" font-weight="700" fill="#047857">Central Storage</text>
+
+      <!-- PostgreSQL 16 3NF -->
+      <g transform="translate(10, 48)">
+        <rect width="120" height="135" rx="4" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" />
+        <text x="8" y="18" font-size="10.5" font-weight="700" fill="#0f172a">&#128452; PostgreSQL 16</text>
+        <text x="8" y="32" font-size="8.5" fill="#64748b">(OLTP Relational 3NF)</text>
+        <text x="8" y="52" font-size="9" fill="#475569">&bull; 50+ Entity Fields</text>
+        <text x="8" y="68" font-size="9" fill="#475569">&bull; Canonical Profiles</text>
+        <text x="8" y="84" font-size="9" fill="#475569">&bull; Exec Directory</text>
+        <text x="8" y="100" font-size="9" fill="#475569">&bull; Validation Audit</text>
+        <text x="8" y="116" font-size="9" fill="#475569">&bull; Quality (0-100)</text>
+      </g>
+
+      <!-- MinIO S3 Lakehouse -->
+      <g transform="translate(10, 195)">
+        <rect width="120" height="135" rx="4" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" />
+        <text x="8" y="18" font-size="10.5" font-weight="700" fill="#0f172a">&#128190; MinIO S3 Tier</text>
+        <text x="8" y="32" font-size="8.5" fill="#64748b">(Parquet Lakehouse)</text>
+        <text x="8" y="52" font-size="9" fill="#475569">&bull; Compressed Files</text>
+        <text x="8" y="68" font-size="9" fill="#475569">&bull; Year/Month/SIC</text>
+        <text x="8" y="84" font-size="9" fill="#475569">&bull; Snappy/Zstd</text>
+        <text x="8" y="100" font-size="9" fill="#475569">&bull; Billions of rows</text>
+        <text x="8" y="116" font-size="9" fill="#475569">&bull; Zero AWS S3</text>
+      </g>
+
+      <!-- OpenSearch 2.x Cluster -->
+      <g transform="translate(10, 345)">
+        <rect width="120" height="150" rx="4" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" />
+        <text x="8" y="18" font-size="10.5" font-weight="700" fill="#0f172a">&#128269; OpenSearch 2.x</text>
+        <text x="8" y="32" font-size="8.5" fill="#64748b">(Search &amp; Analytics)</text>
+        <text x="8" y="52" font-size="9" fill="#475569">&bull; Sub-50ms Facets</text>
+        <text x="8" y="68" font-size="9" fill="#475569">&bull; Full-Text Match</text>
+        <text x="8" y="84" font-size="9" fill="#475569">&bull; Geo Proximity</text>
+        <text x="8" y="100" font-size="9" fill="#475569">&bull; NAICS Inverted</text>
+        <text x="8" y="116" font-size="9" fill="#475569">&bull; Near Real-Time</text>
+        <text x="8" y="132" font-size="8.5" font-weight="600" fill="#059669">Port 9200 REST</text>
+      </g>
+    </g>
+
+    <!-- Bi-directional arrow from Central Storage (7) down to Access Layer (8) -->
+    <path d="M 1430 630 L 1430 680 L 1320 680" fill="none" stroke="#0284c7" stroke-width="2" marker-end="url(#arr-blue)" />
+
+    <!-- ============================================================== -->
+    <!-- 8. ACCESS & DELIVERY LAYER (FASTAPI REST GATEWAY)              -->
+    <!-- ============================================================== -->
+    <g transform="translate(20, 645)">
+      <rect width="1285" height="120" rx="8" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.5" />
+      <rect x="0" y="0" width="1285" height="30" rx="8" fill="#e0f2fe" />
+      <circle cx="18" cy="15" r="9" fill="#0284c7" />
+      <text x="18" y="19" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">8</text>
+      <text x="34" y="20" font-size="12" font-weight="700" fill="#0369a1">Access &amp; Delivery Layer (FastAPI REST API Gateway)</text>
+
+      <!-- RESTful Endpoints Column -->
+      <g transform="translate(20, 40)">
+        <text x="0" y="16" font-size="12" font-weight="700" fill="#0f172a">&#128640; RESTful Enterprise Endpoints</text>
+        <text x="10" y="34" font-size="10.5" fill="#475569">&bull; Search &amp; Multi-Faceted Filter API</text>
+        <text x="10" y="50" font-size="10.5" fill="#475569">&bull; Real-time Verified Contact Extraction</text>
+        <text x="10" y="66" font-size="10.5" fill="#475569">&bull; Asynchronous Job Status &amp; DLQ Re-drive</text>
+      </g>
+
+      <!-- External Consumers Column -->
+      <g transform="translate(420, 40)">
+        <text x="0" y="16" font-size="12" font-weight="700" fill="#0f172a">&#128101; External Consumers &amp; Applications</text>
+        <text x="10" y="34" font-size="10.5" fill="#475569">&bull; Sales &amp; Outbound Growth Teams</text>
+        <text x="10" y="50" font-size="10.5" fill="#475569">&bull; Downstream CRM Webhooks (HubSpot, Salesforce)</text>
+        <text x="10" y="66" font-size="10.5" fill="#475569">&bull; Enterprise BI Tools &amp; Strategic Executive Dashboards</text>
+      </g>
+
+      <!-- Direct API Routes Table -->
+      <g transform="translate(820, 36)">
+        <rect width="440" height="74" rx="4" fill="#ffffff" stroke="#bae6fd" stroke-width="1" />
+        <text x="16" y="18" font-size="10" font-weight="700" fill="#0369a1">GET /api/v1/companies/search</text>
+        <text x="260" y="18" font-size="9.5" fill="#64748b">(Faceted OpenSearch Query)</text>
+
+        <text x="16" y="34" font-size="10" font-weight="700" fill="#0369a1">POST /api/v1/enrichment/jobs</text>
+        <text x="260" y="34" font-size="9.5" fill="#64748b">(Trigger Post-Dedup Verification)</text>
+
+        <text x="16" y="50" font-size="10" font-weight="700" fill="#0369a1">GET /api/v1/enrichment/jobs/{id}</text>
+        <text x="260" y="50" font-size="9.5" fill="#64748b">(Poll Job Progress &amp; Bayesian Score)</text>
+
+        <text x="16" y="66" font-size="10" font-weight="700" fill="#0369a1">GET /api/v1/health &amp; /api/v1/dlq</text>
+        <text x="260" y="66" font-size="9.5" fill="#64748b">(Cluster Status &amp; Re-drive Management)</text>
+      </g>
+    </g>
+
+    <!-- ============================================================== -->
+    <!-- 9. AUTOMATED SCHEDULED REFRESH (TEMPORAL CRON - ZERO AWS)      -->
+    <!-- ============================================================== -->
+    <g transform="translate(20, 780)">
+      <rect width="1480" height="135" rx="8" fill="#fdf2f8" stroke="#f472b6" stroke-width="1.5" />
+      <rect x="0" y="0" width="1480" height="30" rx="8" fill="#fce7f3" />
+      <circle cx="18" cy="15" r="9" fill="#db2777" />
+      <text x="18" y="19" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">9</text>
+      <text x="34" y="20" font-size="12" font-weight="700" fill="#be185d">
+        Automated Scheduled Refresh &amp; Continuous Intelligence (Temporal.io Cron + APScheduler &mdash; Zero AWS EventBridge)
+      </text>
+
+      <g transform="translate(30, 44)">
+        <!-- Step 1: Temporal Cron -->
+        <g transform="translate(0, 0)">
+          <rect width="165" height="70" rx="6" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.2" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#9d174d">&#128338; Temporal Cron</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">Daily &amp; Weekly Schedules</text>
+          <text x="12" y="54" font-size="9" fill="#64748b">Native In-Memory Engine</text>
+        </g>
+        <line x1="170" y1="35" x2="195" y2="35" stroke="#db2777" stroke-width="2" marker-end="url(#arr-magenta)" />
+
+        <!-- Step 2: Docker Worker -->
+        <g transform="translate(205, 0)">
+          <rect width="165" height="70" rx="6" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.2" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#9d174d">&#9881; Docker Worker</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">Scheduled Job Dispatch</text>
+          <text x="12" y="54" font-size="9" fill="#64748b">Zero AWS ECS Dependency</text>
+        </g>
+        <line x1="375" y1="35" x2="400" y2="35" stroke="#db2777" stroke-width="2" marker-end="url(#arr-magenta)" />
+
+        <!-- Step 3: Re-Collect -->
+        <g transform="translate(410, 0)">
+          <rect width="165" height="70" rx="6" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.2" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#9d174d">&#128450; Re-Collect</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">New Filings &amp; Places</text>
+          <text x="12" y="54" font-size="9" fill="#64748b">Delta Statutory Ingestion</text>
+        </g>
+        <line x1="580" y1="35" x2="605" y2="35" stroke="#db2777" stroke-width="2" marker-end="url(#arr-magenta)" />
+
+        <!-- Step 4: Re-Validate -->
+        <g transform="translate(615, 0)">
+          <rect width="165" height="70" rx="6" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.2" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#9d174d">&#10004; Re-Validate</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">Freshness Decay (&gt;90d)</text>
+          <text x="12" y="54" font-size="9" fill="#64748b">Re-check SMTP Status</text>
+        </g>
+        <line x1="785" y1="35" x2="810" y2="35" stroke="#db2777" stroke-width="2" marker-end="url(#arr-magenta)" />
+
+        <!-- Step 5: Re-Run Dedup -->
+        <g transform="translate(820, 0)">
+          <rect width="165" height="70" rx="6" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.2" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#9d174d">&#128397; Re-Run Dedup</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">Splink EM Cluster Sync</text>
+          <text x="12" y="54" font-size="9" fill="#64748b">Absorb New Subsidiaries</text>
+        </g>
+        <line x1="990" y1="35" x2="1015" y2="35" stroke="#db2777" stroke-width="2" marker-end="url(#arr-magenta)" />
+
+        <!-- Step 6: Update Golden -->
+        <g transform="translate(1025, 0)">
+          <rect width="165" height="70" rx="6" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.2" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#9d174d">&#11088; Update Golden</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">Field Survivorship Refresh</text>
+          <text x="12" y="54" font-size="9" fill="#64748b">Quality Score Adjustment</text>
+        </g>
+        <line x1="1195" y1="35" x2="1220" y2="35" stroke="#db2777" stroke-width="2" marker-end="url(#arr-magenta)" />
+
+        <!-- Step 7: Continuous DB -->
+        <g transform="translate(1230, 0)">
+          <rect width="180" height="70" rx="6" fill="#ffffff" stroke="#db2777" stroke-width="1.5" />
+          <text x="12" y="22" font-size="11" font-weight="700" fill="#be185d">&#128452; Continuous DB</text>
+          <text x="12" y="38" font-size="9.5" fill="#475569">Always-Fresh Profiles</text>
+          <text x="12" y="54" font-size="9" font-weight="700" fill="#047857">Deliverability Kept &gt;98%</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Bi-directional sync line from Continuous DB up to Central Storage (7) -->
+    <path d="M 1430 780 L 1430 635" fill="none" stroke="#db2777" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-magenta)" />
+
+    <!-- ============================================================== -->
+    <!-- 10. KEY BENEFITS FOOTER BAR                                    -->
+    <!-- ============================================================== -->
+    <g transform="translate(20, 930)">
+      <rect width="1480" height="68" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" />
+
+      <!-- Tag -->
+      <g transform="translate(24, 24)">
+        <text x="0" y="16" font-size="12" font-weight="800" fill="#0f172a">&#127919; Key Benefits:</text>
+      </g>
+
+      <!-- Benefit 1 -->
+      <g transform="translate(145, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#128338; Real-Time &amp; Batch</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">Continuous statutory updates</text>
+      </g>
+
+      <!-- Benefit 2 -->
+      <g transform="translate(345, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#128452; Scalable Processing</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">Temporal distributed sagas</text>
+      </g>
+
+      <!-- Benefit 3 -->
+      <g transform="translate(545, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#11088; High Data Quality</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">0&ndash;100 Bayesian confidence</text>
+      </g>
+
+      <!-- Benefit 4 -->
+      <g transform="translate(745, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#128397; Splink Deduplication</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">Zero duplicate profile leaks</text>
+      </g>
+
+      <!-- Benefit 5 -->
+      <g transform="translate(945, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#128274; Sovereign IP (Zero AWS)</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">100% first-party data asset</text>
+      </g>
+
+      <!-- Benefit 6 -->
+      <g transform="translate(1160, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#128197; Automated Refresh</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">Native Cron &amp; 90d decay</text>
+      </g>
+
+      <!-- Benefit 7 -->
+      <g transform="translate(1335, 14)">
+        <text x="0" y="16" font-size="11" font-weight="700" fill="#0369a1">&#9993; &lt;1.5% Bounce Rate</text>
+        <text x="0" y="32" font-size="9.5" fill="#64748b">Active RFC-5321 verified</text>
+      </g>
+    </g>
+
+  </svg>
+</div>
+
+</body>
+</html>
+

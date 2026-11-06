@@ -28,15 +28,38 @@ _ENGINE_DIR = _REPO_ROOT / "Open Map Extraction Engine"
 if str(_BOTASAURUS_DIR) not in sys.path:
     sys.path.insert(0, str(_BOTASAURUS_DIR))
 
-from normalizer import normalize_company
-from deduplicator import Deduplicator
-from db_connector import (
-    get_connection,
-    release_connection,
-    upsert_company,
-    update_company_fields,
-    log_data_source,
-)
+try:
+    from packages.pipeline.normalizer import normalize_company
+except ImportError:
+    try:
+        from normalizer import normalize_company
+    except ImportError:
+        def normalize_company(c): return c
+
+try:
+    from packages.pipeline.deduplicator import Deduplicator
+except ImportError:
+    try:
+        from deduplicator import Deduplicator
+    except ImportError:
+        class Deduplicator: pass
+
+try:
+    from packages.infrastructure.db_connector import (
+        get_connection,
+        release_connection,
+        upsert_company,
+        update_company_fields,
+        log_data_source,
+    )
+except ImportError:
+    from db_connector import (
+        get_connection,
+        release_connection,
+        upsert_company,
+        update_company_fields,
+        log_data_source,
+    )
 
 from .config import OverpassConfig, default_config
 from .circuit_breaker import EndpointCircuitBreaker

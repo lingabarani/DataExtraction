@@ -28,6 +28,15 @@ agents:
     full_refresh_staleness_days: 30      # Run full refresh if > 30 days
     require_human_approval: true         # Full refresh is high-impact
 
+  email_enrichment:
+    enabled: true
+    cycle_interval_seconds: 3600
+    batch_size: 500
+    max_records: 5000
+    probe_smtp: true
+    verify_dedup_completed: true
+    require_human_approval: false
+
   alert:
     enabled: true
     channels:

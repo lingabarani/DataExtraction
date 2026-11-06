@@ -29,7 +29,10 @@ for p in [
         sys.path.insert(0, str(p))
 
 from deduplicator import Deduplicator
-from tax_validator import validate_ein, validate_rfc
+try:
+    from packages.domain.tax_validator import validate_ein, validate_rfc
+except ImportError:
+    from tax_validator import validate_ein, validate_rfc
 from packages.scrapers.mexico.utils.rfc_utils import is_valid_rfc, get_rfc_type
 from db_test_cleaner import EphemeralDatabaseHarness
 from wiremock_controller import load_fixture

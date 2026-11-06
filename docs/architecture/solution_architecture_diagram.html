@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Solution Architecture - DataExtraction Platform</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      padding: 30px;
+    }
+    .header-panel {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .header-panel h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .header-panel .meta {
+      font-size: 13px;
+      color: #64748b;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .meta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-approved { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .badge-tier { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    
+    .diagram-container {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow-x: auto;
+    }
+    
+    svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .legend-panel {
+      margin-top: 24px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px 28px;
+      display: flex;
+      gap: 32px;
+      font-size: 12px;
+      color: #475569;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .legend-color-box {
+      width: 20px;
+      height: 12px;
+      border-radius: 2px;
+      border: 1px solid #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-panel">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+      <h1>ENTERPRISE SOLUTION ARCHITECTURE (ESA-301)</h1>
+      <div>
+        <span class="meta-badge badge-approved">Baseline Approved</span>
+        <span class="meta-badge badge-tier">Production Ready</span>
+      </div>
+    </div>
+    <div class="meta">
+      <span><strong>System:</strong> B2B Lead Intelligence & Entity Resolution Engine</span>
+      <span><strong>Architecture Style:</strong> Azure / AWS Well-Architected Clean Enterprise</span>
+      <span><strong>Security Standard:</strong> NIST SP 800-207 Zero Trust | CIS L2</span>
+      <span><strong>Date:</strong> October 2026</span>
+    </div>
+  </div>
+
+  <div class="diagram-container">
+    <svg width="1380" height="980" viewBox="0 0 1380 980" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Marker for Data Flow Arrows -->
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb" />
+        </marker>
+        <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b" />
+        </marker>
+        <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#16a34a" />
+        </marker>
+        <filter id="card-shadow" x="-5%" y="-5%" width="110%" height="110%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.06"/>
+        </filter>
+      </defs>
+
+      <!-- ============================================================== -->
+      <!-- ZONE 1: PUBLIC INTERNET & EXTERNAL NETWORKS                    -->
+      <!-- ============================================================== -->
+      <rect x="30" y="30" width="1320" height="110" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6 3" />
+      <text x="50" y="52" font-size="12" font-weight="700" fill="#475569" letter-spacing="0.05em">ZONE 1: PUBLIC INTERNET / UNTRUSTED BOUNDARY</text>
+
+      <!-- Users -->
+      <g transform="translate(60, 65)">
+        <rect width="180" height="56" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="56" rx="2" fill="#0284c7" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">Enterprise Users</text>
+        <text x="18" y="42" font-size="10" fill="#64748b">Internal Corporate Web / SSO</text>
+      </g>
+
+      <g transform="translate(260, 65)">
+        <rect width="170" height="56" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="56" rx="2" fill="#0284c7" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">Operations / SecOps</text>
+        <text x="18" y="42" font-size="10" fill="#64748b">Admin Console & Observability</text>
+      </g>
+
+      <!-- External Third-Party Registries -->
+      <g transform="translate(560, 65)">
+        <rect width="180" height="56" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="56" rx="2" fill="#64748b" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">SEC EDGAR / Registries</text>
+        <text x="18" y="42" font-size="10" fill="#64748b">HTTPS Statutory APIs</text>
+      </g>
+
+      <g transform="translate(760, 65)">
+        <rect width="180" height="56" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="56" rx="2" fill="#64748b" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">Google Maps / OSM</text>
+        <text x="18" y="42" font-size="10" fill="#64748b">Geospatial Bounding Data</text>
+      </g>
+
+      <g transform="translate(960, 65)">
+        <rect width="180" height="56" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="56" rx="2" fill="#64748b" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">Target Mail Exchangers</text>
+        <text x="18" y="42" font-size="10" fill="#64748b">RFC-5321 Port 25 SMTP MX</text>
+      </g>
+
+      <g transform="translate(1160, 65)">
+        <rect width="160" height="56" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="56" rx="2" fill="#64748b" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">Enterprise Downstream</text>
+        <text x="18" y="42" font-size="10" fill="#64748b">CRM / Webhook Consumers</text>
+      </g>
+
+      <!-- Connection from Internet to Zone 2 -->
+      <line x1="240" y1="121" x2="240" y2="175" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+      <text x="250" y="152" font-size="10" font-weight="600" fill="#1d4ed8">HTTPS (TLS 1.3 / Port 443)</text>
+
+
+      <!-- ============================================================== -->
+      <!-- ZONE 2: PERIMETER NETWORK (DMZ / INGRESS SUBNETS)              -->
+      <!-- ============================================================== -->
+      <rect x="30" y="175" width="1320" height="135" rx="8" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" stroke-dasharray="6 3" />
+      <text x="50" y="196" font-size="12" font-weight="700" fill="#0369a1" letter-spacing="0.05em">ZONE 2: PERIMETER NETWORK (DMZ / PUBLIC INGRESS SUBNET: 10.100.1.0/24)</text>
+
+      <!-- WAF & Load Balancer -->
+      <g transform="translate(60, 215)">
+        <rect width="250" height="75" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="75" rx="2" fill="#0284c7" />
+        <text x="18" y="26" font-size="13" font-weight="700" fill="#0f172a">Edge WAF & DDoS Shield</text>
+        <text x="18" y="44" font-size="10.5" fill="#475569">AWS WAF / Azure Front Door</text>
+        <text x="18" y="60" font-size="9.5" fill="#64748b">TLS Termination • OWASP Top 10 • Rate Limits</text>
+      </g>
+
+      <!-- Web Application Console -->
+      <g transform="translate(370, 215)">
+        <rect width="260" height="75" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="75" rx="2" fill="#2563eb" />
+        <text x="18" y="26" font-size="13" font-weight="700" fill="#0f172a">Web Application Portal</text>
+        <text x="18" y="44" font-size="10.5" fill="#475569">React / Next.js Admin UI</text>
+        <text x="18" y="60" font-size="9.5" fill="#64748b">Operator Dashboards • Search & Control Panel</text>
+      </g>
+
+      <!-- API Gateway -->
+      <g transform="translate(690, 215)">
+        <rect width="280" height="75" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="75" rx="2" fill="#2563eb" />
+        <text x="18" y="26" font-size="13" font-weight="700" fill="#0f172a">Enterprise API Gateway</text>
+        <text x="18" y="44" font-size="10.5" fill="#475569">FastAPI / Reverse Proxy Engine</text>
+        <text x="18" y="60" font-size="9.5" fill="#64748b">Token Introspection • Route Dispatch • Throttling</text>
+      </g>
+
+      <!-- IAM Service -->
+      <g transform="translate(1030, 215)">
+        <rect width="290" height="75" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="75" rx="2" fill="#dc2626" />
+        <text x="18" y="26" font-size="13" font-weight="700" fill="#991b1b">Identity & Access Management</text>
+        <text x="18" y="44" font-size="10.5" fill="#b91c1c">Keycloak / Microsoft Entra ID</text>
+        <text x="18" y="60" font-size="9.5" fill="#7f1d1d">OAuth 2.0 / OIDC • RS256 JWT • RBAC Rules</text>
+      </g>
+
+      <!-- Intra-DMZ Flows -->
+      <line x1="310" y1="252" x2="370" y2="252" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+      <line x1="630" y1="252" x2="690" y2="252" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+      <line x1="970" y1="242" x2="1030" y2="242" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#arrow-gray)" />
+      <text x="975" y="235" font-size="9" font-weight="600" fill="#991b1b">Verify JWT</text>
+
+
+      <!-- Connection from DMZ to Private Zone -->
+      <line x1="830" y1="290" x2="830" y2="350" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+      <text x="840" y="325" font-size="10" font-weight="600" fill="#1d4ed8">mTLS / gRPC (Port 7233) to Private Workload VNet</text>
+
+
+      <!-- ============================================================== -->
+      <!-- ZONE 3: PRIVATE APPLICATION NETWORK (INTERNAL SUBNET)          -->
+      <!-- ============================================================== -->
+      <rect x="30" y="350" width="1320" height="340" rx="8" fill="#f8fafc" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6 3" />
+      <text x="50" y="372" font-size="12" font-weight="700" fill="#1e40af" letter-spacing="0.05em">ZONE 3: PRIVATE APPLICATION NETWORK (ZERO TRUST VNET: 10.100.10.0/22 | NO PUBLIC INGRESS)</text>
+
+      <!-- Workflow Orchestration Subsystem (Temporal.io) -->
+      <g transform="translate(60, 390)">
+        <rect width="1260" height="75" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5" />
+        <rect x="0" y="0" width="6" height="75" rx="2" fill="#1d4ed8" />
+        <text x="24" y="25" font-size="13" font-weight="700" fill="#1e3a8a">WORKFLOW ORCHESTRATION CLUSTER (TEMPORAL.IO ENTERPRISE)</text>
+        <text x="24" y="44" font-size="10.5" fill="#1d4ed8">Temporal Frontend Service (gRPC 7233) • Matching Service • History Engine • Native Cron Scheduler</text>
+        <text x="24" y="60" font-size="9.5" fill="#475569">Stateful Distributed Sagas • Guaranteed Exactly-Once Execution • Automatic Compensations & Exponential Backoff Retries</text>
+      </g>
+
+      <!-- Microservices Workload Layer -->
+      <g transform="translate(60, 485)">
+        <!-- MS 1: Statutory Ingestion -->
+        <g transform="translate(0, 0)">
+          <rect width="160" height="85" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#2563eb" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Statutory Ingestion</text>
+          <text x="12" y="36" font-size="9.5" fill="#475569">SEC EDGAR / CMS</text>
+          <text x="12" y="52" font-size="8.5" fill="#64748b">Queue: federal-ingestion</text>
+          <text x="12" y="70" font-size="8" font-weight="600" fill="#0284c7">Egress: HTTPS/443</text>
+        </g>
+
+        <!-- MS 2: Geospatial Ingestion -->
+        <g transform="translate(175, 0)">
+          <rect width="160" height="85" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#2563eb" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Geospatial Harvester</text>
+          <text x="12" y="36" font-size="9.5" fill="#475569">Google Maps & OSM</text>
+          <text x="12" y="52" font-size="8.5" fill="#64748b">Quadtree Bounding</text>
+          <text x="12" y="70" font-size="8" font-weight="600" fill="#0284c7">Egress: Overpass QL</text>
+        </g>
+
+        <!-- MS 3: Deduplication (Splink) -->
+        <g transform="translate(350, 0)">
+          <rect width="175" height="85" rx="4" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#0284c7" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Entity Resolution</text>
+          <text x="12" y="36" font-size="9.5" fill="#0369a1">Splink Fellegi-Sunter</text>
+          <text x="12" y="52" font-size="8.5" fill="#475569">EM Match Probability</text>
+          <text x="12" y="70" font-size="8" font-weight="700" fill="#047857">is_canonical = TRUE</text>
+        </g>
+
+        <!-- MS 4: Email Discovery & SMTP Probing -->
+        <g transform="translate(540, 0)">
+          <rect width="190" height="85" rx="4" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#0284c7" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Email Discovery & SMTP</text>
+          <text x="12" y="36" font-size="9.5" fill="#0369a1">Async Crawl + RFC-5321</text>
+          <text x="12" y="52" font-size="8.5" fill="#475569">Cloudflare XOR / Catch-All</text>
+          <text x="12" y="70" font-size="8" font-weight="700" fill="#16a34a">Score >= 0.80 Deliverable</text>
+        </g>
+
+        <!-- MS 5: Executive Contact Mapping -->
+        <g transform="translate(745, 0)">
+          <rect width="160" height="85" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#2563eb" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Executive Mapping</text>
+          <text x="12" y="36" font-size="9.5" fill="#475569">Item 10 Leadership</text>
+          <text x="12" y="52" font-size="8.5" fill="#64748b">Corporate Org Graph</text>
+          <text x="12" y="70" font-size="8" fill="#475569">FK Relationship Links</text>
+        </g>
+
+        <!-- MS 6: Governance & Quality -->
+        <g transform="translate(920, 0)">
+          <rect width="160" height="85" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#2563eb" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Data Governance</text>
+          <text x="12" y="36" font-size="9.5" fill="#475569">Freshness Decay</text>
+          <text x="12" y="52" font-size="8.5" fill="#64748b">Completeness & Validity</text>
+          <text x="12" y="70" font-size="8" fill="#475569">Half-Life Audit Sweep</text>
+        </g>
+
+        <!-- MS 7: Storage & CDC Dispatcher -->
+        <g transform="translate(1095, 0)">
+          <rect width="165" height="85" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="4" height="85" rx="2" fill="#2563eb" />
+          <text x="12" y="20" font-size="11" font-weight="700" fill="#0f172a">Persistence & CDC</text>
+          <text x="12" y="36" font-size="9.5" fill="#475569">Triple-Store Dispatch</text>
+          <text x="12" y="52" font-size="8.5" fill="#64748b">Relational + Parquet + OS</text>
+          <text x="12" y="70" font-size="8" font-weight="600" fill="#0284c7">ACID Write Dispatcher</text>
+        </g>
+      </g>
+
+      <!-- Event Streaming & Cache Tier -->
+      <g transform="translate(60, 595)">
+        <g transform="translate(0, 0)">
+          <rect width="610" height="75" rx="4" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="6" height="75" rx="2" fill="#1d4ed8" />
+          <text x="20" y="26" font-size="12" font-weight="700" fill="#1e3a8a">Distributed Message Broker & Event Bus (Kafka / RabbitMQ)</text>
+          <text x="20" y="44" font-size="10.5" fill="#475569">Topics: dataextraction.dedup.events | dataextraction.enrichment.events | dataextraction.cdc</text>
+          <text x="20" y="60" font-size="9.5" fill="#64748b">High-Throughput Asynchronous Decoupling • Pub/Sub Backpressure Buffering</text>
+        </g>
+
+        <g transform="translate(650, 0)">
+          <rect width="610" height="75" rx="4" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.2" filter="url(#card-shadow)" />
+          <rect x="0" y="0" width="6" height="75" rx="2" fill="#1d4ed8" />
+          <text x="20" y="26" font-size="12" font-weight="700" fill="#1e3a8a">Distributed In-Memory Cache (Redis Cluster / Valkey)</text>
+          <text x="20" y="44" font-size="10.5" fill="#475569">DNS MX Records (TTL 24h) • Leaky-Bucket Per-Domain Rate Limit Counters</text>
+          <text x="20" y="60" font-size="9.5" fill="#64748b">Sub-Millisecond Read Latency • Cluster Replication & Sentinel Failover</text>
+        </g>
+      </g>
+
+      <!-- Connections from Private Zone to Data Tier -->
+      <line x1="1175" y1="570" x2="1175" y2="720" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+      <text x="1010" y="705" font-size="10" font-weight="600" fill="#1d4ed8">Encrypted JDBC / S3 API / HTTPS</text>
+
+
+      <!-- ============================================================== -->
+      <!-- ZONE 4: ISOLATED SECURE DATA & STORAGE SUBNET                  -->
+      <!-- ============================================================== -->
+      <rect x="30" y="720" width="880" height="135" rx="8" fill="#f8fafc" stroke="#475569" stroke-width="1.8" stroke-dasharray="6 3" />
+      <text x="50" y="742" font-size="12" font-weight="700" fill="#334155" letter-spacing="0.05em">ZONE 4: SECURE DATA & PERSISTENCE TIER (ISOLATED NON-ROUTABLE SUBNET: 10.100.20.0/24)</text>
+
+      <!-- DB 1: PostgreSQL 16 Enterprise -->
+      <g transform="translate(60, 755)">
+        <rect width="250" height="80" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="80" rx="2" fill="#334155" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">PostgreSQL 16 Cluster</text>
+        <text x="18" y="40" font-size="10" fill="#475569">OLTP 3NF Relational Store</text>
+        <text x="18" y="56" font-size="9" fill="#64748b">Port 5432 • PgBouncer Pool</text>
+        <text x="18" y="70" font-size="8.5" font-weight="600" fill="#0369a1">Entities, Canonical Jobs & Audit</text>
+      </g>
+
+      <!-- DB 2: MinIO S3 Object Storage -->
+      <g transform="translate(340, 755)">
+        <rect width="250" height="80" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="80" rx="2" fill="#334155" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">Object Storage Lakehouse</text>
+        <text x="18" y="40" font-size="10" fill="#475569">MinIO S3 / ADLS Gen2</text>
+        <text x="18" y="56" font-size="9" fill="#64748b">Port 9000 • S3 Protocol</text>
+        <text x="18" y="70" font-size="8.5" font-weight="600" fill="#0369a1">Snappy Parquet Columnar Partitions</text>
+      </g>
+
+      <!-- DB 3: OpenSearch Cluster -->
+      <g transform="translate(620, 755)">
+        <rect width="260" height="80" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="80" rx="2" fill="#334155" />
+        <text x="18" y="24" font-size="12" font-weight="700" fill="#0f172a">OpenSearch 2.x Cluster</text>
+        <text x="18" y="40" font-size="10" fill="#475569">Search & Real-Time Analytics</text>
+        <text x="18" y="56" font-size="9" fill="#64748b">Port 9200 • HTTPS REST</text>
+        <text x="18" y="70" font-size="8.5" font-weight="600" fill="#0369a1">Faceted Queries & Sub-50ms Index</text>
+      </g>
+
+
+      <!-- ============================================================== -->
+      <!-- ZONE 5: MANAGEMENT, OBSERVABILITY & GOVERNANCE                 -->
+      <!-- ============================================================== -->
+      <rect x="940" y="720" width="410" height="135" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6 3" />
+      <text x="960" y="742" font-size="12" font-weight="700" fill="#15803d" letter-spacing="0.05em">MANAGEMENT & OBSERVABILITY TIER</text>
+
+      <g transform="translate(960, 755)">
+        <rect width="180" height="80" rx="4" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="80" rx="2" fill="#16a34a" />
+        <text x="16" y="24" font-size="11.5" font-weight="700" fill="#0f172a">Metrics & Telemetry</text>
+        <text x="16" y="40" font-size="9.5" fill="#475569">Prometheus & OTel</text>
+        <text x="16" y="56" font-size="9" fill="#64748b">Grafana Dashboards</text>
+        <text x="16" y="70" font-size="8" font-weight="600" fill="#16a34a">SLO/SLA Performance</text>
+      </g>
+
+      <g transform="translate(1155, 755)">
+        <rect width="170" height="80" rx="4" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.2" filter="url(#card-shadow)" />
+        <rect x="0" y="0" width="6" height="80" rx="2" fill="#16a34a" />
+        <text x="16" y="24" font-size="11.5" font-weight="700" fill="#0f172a">Resilience & DLQ</text>
+        <text x="16" y="40" font-size="9.5" fill="#475569">Dead-Letter Queue</text>
+        <text x="16" y="56" font-size="9" fill="#64748b">Auto/Manual Re-Drive</text>
+        <text x="16" y="70" font-size="8" font-weight="600" fill="#16a34a">Zero Data Loss Policy</text>
+      </g>
+
+      <!-- Observability Data Flow -->
+      <line x1="940" y1="670" x2="1050" y2="755" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#arrow-green)" />
+      <text x="960" y="700" font-size="9" font-weight="600" fill="#15803d">Telemetry OTLP Push</text>
+
+      <!-- ============================================================== -->
+      <!-- FOOTER BANNER / SPECIFICATION STAMP                            -->
+      <!-- ============================================================== -->
+      <rect x="30" y="875" width="1320" height="75" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+      <text x="50" y="902" font-size="11" font-weight="700" fill="#0f172a">ARCHITECTURAL DESIGN SIGN-OFF STANDARDS:</text>
+      <text x="50" y="922" font-size="10" fill="#475569">1. Zero Vendor Tax (100% First-Party Data Ownership) • 2. Post-Dedup Isolation (Enrichment restricted to is_canonical = TRUE) • 3. Zero AWS Cloud Scheduler Dependency</text>
+      <text x="50" y="938" font-size="10" fill="#475569">4. NIST SP 800-207 Zero Trust Network Architecture • 5. Distributed Sagas with Guaranteed Exactly-Once Execution • 6. Verified by 315/315 Unit & E2E Automated Tests</text>
+    </svg>
+  </div>
+
+  <div class="legend-panel">
+    <div class="legend-item">
+      <div class="legend-color-box" style="background:#ffffff; border:1.5px dashed #0284c7;"></div>
+      <span><strong>DMZ Perimeter:</strong> Ingress traffic inspection, WAF, OAuth 2.0 / OIDC Token Introspection</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background:#f8fafc; border:1.5px dashed #2563eb;"></div>
+      <span><strong>Private VNet:</strong> Isolated application microservices, Temporal sagas, Zero public ingress</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background:#f8fafc; border:1.8px dashed #475569;"></div>
+      <span><strong>Data Tier:</strong> Non-routable subnet, PostgreSQL 3NF, MinIO S3 Lakehouse, OpenSearch cluster</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background:#f0fdf4; border:1.5px dashed #16a34a;"></div>
+      <span><strong>Observability:</strong> Prometheus OTLP metrics, centralized logging, Grafana dashboards, DLQ re-drive</span>
+    </div>
+  </div>
+
+</body>
+</html>
+

@@ -53,6 +53,7 @@ class TestConfigManagerSecurity(unittest.TestCase):
         """In development mode, safe default JWT secrets and admin passwords should be allowed."""
         os.environ["ENVIRONMENT"] = "development"
         os.environ.pop("JWT_SECRET", None)
+        os.environ.pop("API_ADMIN_EMAIL", None)
         cfg = ConfigManager()
 
         self.assertFalse(cfg.is_production)

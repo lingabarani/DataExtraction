@@ -21,12 +21,14 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
         sys.path.insert(0, p)
 
 from packages.temporal.client import get_temporal_client
-from packages.infrastructure.config_manager import config_manager
+from packages.temporal.config import QUEUE_EXECUTIVE, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.pipeline_activities import (
     validate_contacts_activity,
     build_leads_activity,
 )
 from packages.temporal.activities.storage_activities import (
+    ingest_working_person_activity,
+    complete_executive_enrichment_activity,
     ingest_kg_person_activity,
     ingest_kg_employment_activity,
     ingest_kg_hierarchy_activity,
@@ -42,8 +44,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dataextraction.worker.executive")
 
-TASK_QUEUE = config_manager.QUEUE_EXECUTIVE
-MAX_ACTIVITIES = int(os.getenv("EXECUTIVE_WORKER_MAX_CONCURRENT_ACTIVITIES", "10"))
+TASK_QUEUE = QUEUE_EXECUTIVE
+MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_EXECUTIVE, 8)
 
 
 async def run_worker():
@@ -53,6 +55,8 @@ async def run_worker():
     activities = [
         validate_contacts_activity,
         build_leads_activity,
+        ingest_working_person_activity,
+        complete_executive_enrichment_activity,
         ingest_kg_person_activity,
         ingest_kg_employment_activity,
         ingest_kg_hierarchy_activity,

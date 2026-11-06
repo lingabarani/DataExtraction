@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models-pvc
+  namespace: oneextraction
+  labels:
+    app.kubernetes.io/name: ollama
+    app.kubernetes.io/part-of: oneextraction-platform
+    app.kubernetes.io/component: inference-engine
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: oneextraction
+  labels:
+    app.kubernetes.io/name: ollama
+    app.kubernetes.io/part-of: oneextraction-platform
+    app.kubernetes.io/component: inference-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: ollama
+  ports:
+    - name: http-ollama
+      port: 11434
+      targetPort: 11434
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: oneextraction
+  labels:
+    app: ollama
+    app.kubernetes.io/name: ollama
+    app.kubernetes.io/part-of: oneextraction-platform
+    app.kubernetes.io/component: inference-engine
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+        app.kubernetes.io/name: ollama
+        app.kubernetes.io/part-of: oneextraction-platform
+    spec:
+      initContainers:
+        - name: init-model-puller
+          image: ollama/ollama:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting ephemeral Ollama server for bootstrap model caching..."
+              ollama serve &
+              SERVER_PID=$!
+              until ollama list > /dev/null 2>&1; do
+                echo "Waiting for local daemon to initialize..."
+                sleep 2
+              done
+              if ! ollama list | grep -q "${OLLAMA_MODEL:-llama3.1:8b}"; then
+                echo "Pulling model ${OLLAMA_MODEL:-llama3.1:8b} into persistent cache volume..."
+                ollama pull "${OLLAMA_MODEL:-llama3.1:8b}"
+              fi
+              echo "Model bootstrap verified. Terminating ephemeral daemon..."
+              kill $SERVER_PID
+              wait $SERVER_PID 2>/dev/null || true
+              echo "Init container complete."
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          volumeMounts:
+            - name: ollama-storage
+              mountPath: /root/.ollama
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          command:
+            - /bin/sh
+            - -c
+            - "ollama serve"
+          ports:
+            - name: http
+              containerPort: 11434
+          envFrom:
+            - configMapRef:
+                name: oneextraction-config
+          env:
+            - name: OLLAMA_KEEP_ALIVE
+              value: "30m"
+            - name: OLLAMA_NUM_PARALLEL
+              value: "4"
+          resources:
+            requests:
+              cpu: "2000m"
+              memory: "8Gi"
+            limits:
+              cpu: "4000m"
+              memory: "16Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 2
+          volumeMounts:
+            - name: ollama-storage
+              mountPath: /root/.ollama
+      volumes:
+        - name: ollama-storage
+          persistentVolumeClaim:
+            claimName: ollama-models-pvc
+

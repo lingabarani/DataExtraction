@@ -10,6 +10,7 @@ from packages.temporal.workers.worker_identity import run_worker as run_identity
 from packages.temporal.workers.worker_executive import run_worker as run_executive_worker
 from packages.temporal.workers.worker_governance import run_worker as run_governance_worker
 from packages.temporal.workers.worker_search import run_worker as run_search_worker
+from packages.temporal.workers.worker_email_enrichment import run_worker as run_email_enrichment_worker
 
 __all__ = [
     "run_registry_worker",
@@ -18,4 +19,5 @@ __all__ = [
     "run_executive_worker",
     "run_governance_worker",
     "run_search_worker",
+    "run_email_enrichment_worker",
 ]

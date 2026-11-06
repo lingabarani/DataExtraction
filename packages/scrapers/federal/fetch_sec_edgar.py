@@ -28,10 +28,16 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config_manager import config_manager
-from db_connector import get_connection, db_info
-from contact_validator import validate_contact, lead_score_from_contact
-from http_client import http_client
+try:
+    from packages.infrastructure.config_manager import config_manager
+    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.domain.contact_validator import validate_contact, lead_score_from_contact
+    from packages.infrastructure.http_client import http_client
+except ImportError:
+    from config_manager import config_manager
+    from db_connector import get_connection, db_info
+    from contact_validator import validate_contact, lead_score_from_contact
+    from http_client import http_client
 
 SEC_HEADERS = {
     "User-Agent": config_manager.get_sec_user_agent(),
@@ -68,15 +74,8 @@ SIC_INDUSTRIES = {
 
 
 def _upsert(cur, record: dict):
-    data = {k: v for k, v in record.items() if v is not None and v != ""}
-    cols = list(data.keys())
-    ph   = ", ".join(["%s"] * len(cols))
-    sets = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c not in ("id","created_at"))
-    cur.execute(
-        f"INSERT INTO us_leads ({', '.join(cols)}) VALUES ({ph}) "
-        f"ON CONFLICT (id) DO UPDATE SET {sets}, updated_at = NOW()",
-        [data[c] for c in cols]
-    )
+    from packages.infrastructure.staging_writer import upsert_staging_record
+    upsert_staging_record(cur, record, source="SEC_EDGAR")
 
 
 def _sic_to_industry(sic: str) -> str:

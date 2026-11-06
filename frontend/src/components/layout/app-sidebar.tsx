@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Globe2, BarChart3, Settings,
   Download, Copy, Radio, Database, ChevronDown,
-  LogOut, Circle, MapPin, Activity,
-  Workflow, Bot, CalendarClock,
+  LogOut, Circle, MapPin, Activity, Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -20,17 +19,15 @@ import { useAuth } from "@/hooks/use-auth";
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
-const PRIMARY_NAV = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "US Leads", href: "/leads", icon: Globe2, count: "906K" },
-  { label: "MX Leads", href: "/leads/mexico", icon: Globe2, count: "50K" },
-  { label: "AI Query", href: "/analytics", icon: BarChart3 },
+const PLATFORM_NAV = [
+  { label: "Temporal Orchestration", href: "/orchestration", icon: Cpu, dot: "green" as const, count: "LIVE" },
 ];
 
-const ORCHESTRATION_NAV = [
-  { label: "Pipelines", href: "/pipelines", icon: Workflow },
-  { label: "Agents", href: "/agents", icon: Bot, count: "4" },
-  { label: "Schedules", href: "/schedules", icon: CalendarClock },
+const PRIMARY_NAV = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "US Leads", href: "/leads", icon: Globe2, count: "213K" },
+  { label: "MX Leads", href: "/leads/mexico", icon: Globe2, count: "50K" },
+  { label: "AI Query", href: "/analytics", icon: BarChart3 },
 ];
 
 const TOOLS_NAV = [
@@ -76,12 +73,13 @@ function NavItem({
   return (
     <Link
       href={href}
+      prefetch={true}
       className={cn(
-        "group flex items-center gap-2.5 px-2.5 py-[7px] rounded text-[13px] transition-colors duration-100",
+        "group flex items-center gap-2.5 px-2.5 py-[7px] rounded text-[13px] transition-all duration-100 active:scale-[0.98]",
         depth === 1 && "pl-8",
         isActive
-          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
+          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/70"
       )}
     >
       <Icon className={cn(
@@ -130,7 +128,7 @@ export function SidebarContent() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-[13px] font-semibold text-sidebar-foreground tracking-tight">
-            OneExtraction
+            DataExtraction
           </span>
           <span className="text-[10px] text-sidebar-foreground/30 font-mono">v2.1</span>
         </div>      
@@ -154,13 +152,13 @@ export function SidebarContent() {
       {/* ── Main nav ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-2 space-y-0.5 scrollbar-enterprise">
 
-        <SectionLabel>Data</SectionLabel>
-        {PRIMARY_NAV.map(item => (
+        <SectionLabel>Platform</SectionLabel>
+        {PLATFORM_NAV.map(item => (
           <NavItem key={item.href} {...item} />
         ))}
 
-        <SectionLabel>Orchestration</SectionLabel>
-        {ORCHESTRATION_NAV.map(item => (
+        <SectionLabel>Data</SectionLabel>
+        {PRIMARY_NAV.map(item => (
           <NavItem key={item.href} {...item} />
         ))}
 
@@ -194,7 +192,7 @@ export function SidebarContent() {
                   {user?.name ?? "Admin"}
                 </p>
                 <p className="text-[10px] text-sidebar-foreground/35 truncate font-mono">
-                  {user?.email ?? "admin@oneextraction.com"}
+                  {user?.email ?? "admin@dataextraction.com"}
                 </p>
               </div>
             </button>

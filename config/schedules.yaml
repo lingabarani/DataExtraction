@@ -46,3 +46,26 @@ schedules:
       limit: 1000
       mode: "auto"
     paused: false
+
+  nightly_email_enrichment:
+    id: "nightly-canonical-email-enrichment"
+    workflow: "EmailEnrichmentWorkflow"
+    task_queue: "email-enrichment-queue"
+    cron: "0 3 * * *"          # 3:00 AM UTC (strictly after deduplication)
+    input:
+      batch_size: 500
+      max_records: 5000
+      probe_smtp: true
+      verify_dedup_completed: true
+    paused: false
+
+  daily_freshness_revalidation:
+    id: "daily-freshness-revalidation-sweep"
+    workflow: "RevalidationSweepWorkflow"
+    task_queue: "governance-quality-queue"
+    cron: "0 2 * * *"          # 2:00 AM UTC daily
+    input:
+      batch_size: 5000
+      freshness_threshold: 0.70
+      auto_reharvest: true
+    paused: false

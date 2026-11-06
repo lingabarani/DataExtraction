@@ -59,6 +59,47 @@ CREATE INDEX IF NOT EXISTS idx_places_review_count ON places(review_count);
 CREATE INDEX IF NOT EXISTS idx_places_category ON places(category);
 CREATE INDEX IF NOT EXISTS idx_places_lat_lng ON places(latitude, longitude);
 
+CREATE TABLE IF NOT EXISTS raw_places (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_id TEXT UNIQUE,
+    cid TEXT NOT NULL,
+    ftid TEXT,
+    place_id TEXT,
+    name TEXT NOT NULL,
+    address TEXT,
+    street_address TEXT,
+    latitude REAL,
+    longitude REAL,
+    website TEXT,
+    phone TEXT,
+    phone_e164 TEXT,
+    category TEXT,
+    vertical TEXT,
+    vertical_raw TEXT,
+    country TEXT,
+    country_code TEXT,
+    region TEXT,
+    city TEXT,
+    postal_code TEXT,
+    rating REAL,
+    review_count INTEGER DEFAULT 0,
+    search_task_id TEXT,
+    tile_id TEXT,
+    run_id TEXT,
+    source_data TEXT,
+    collected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_raw_places_raw_id ON raw_places(raw_id);
+CREATE INDEX IF NOT EXISTS idx_raw_places_cid ON raw_places(cid);
+CREATE INDEX IF NOT EXISTS idx_raw_places_place_id ON raw_places(place_id);
+CREATE INDEX IF NOT EXISTS idx_raw_places_task_id ON raw_places(search_task_id);
+CREATE INDEX IF NOT EXISTS idx_raw_places_tile_id ON raw_places(tile_id);
+CREATE INDEX IF NOT EXISTS idx_raw_places_run_id ON raw_places(run_id);
+CREATE INDEX IF NOT EXISTS idx_raw_places_country_region ON raw_places(country_code, region);
+CREATE INDEX IF NOT EXISTS idx_raw_places_category ON raw_places(category);
+CREATE INDEX IF NOT EXISTS idx_raw_places_collected_at ON raw_places(collected_at);
+
 CREATE TABLE IF NOT EXISTS verticals (
     key TEXT PRIMARY KEY,
     label TEXT
@@ -426,12 +467,14 @@ class Database:
     def __init__(self, db_path: Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._last_commit_time: Optional[datetime] = None
 
     @contextlib.contextmanager
     def get_connection(self):
-        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn = sqlite3.connect(str(self.db_path), timeout=60.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("PRAGMA busy_timeout = 60000;")
         try:
             yield conn
         finally:
@@ -520,6 +563,7 @@ class Database:
                 )
 
             conn.commit()
+            self._last_commit_time = datetime.now()
 
     def reclassify_all(self) -> Dict[str, int]:
         """Re-derives vertical and location dimensions for all existing rows idempotently."""
@@ -554,6 +598,7 @@ class Database:
                     "postal_code": p["postal_code"]
                 })
             conn.commit()
+            self._last_commit_time = datetime.now()
             return {"total": len(rows), "changed": changed}
 
     def upsert_place_stub(self, place: Dict[str, Any]) -> bool:
@@ -639,7 +684,356 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, merged)
             conn.commit()
+            self._last_commit_time = datetime.now()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
+
+    def insert_raw_place(self, record: Dict[str, Any]) -> bool:
+        """
+        Inserts a raw business discovery record into raw_places.
+        Preserves original fields, category, region, search_task_id, tile_id, run_id, and collection timestamp.
+        Idempotent on raw_id = '{search_task_id}:{tile_id}:{cid}' so task replay does not duplicate records.
+        """
+        from .taxonomy import enrich_place_dimensions
+
+        rec = dict(record)
+        explicit_cc = rec.get("country_code") or rec.get("country")
+        explicit_reg = rec.get("region") or rec.get("region_code")
+        if "region" not in rec and "region_code" in rec:
+            rec["region"] = rec["region_code"]
+        if "country_code" not in rec and "country" in rec:
+            rec["country_code"] = rec["country"]
+        enrich_place_dimensions(rec)
+        if explicit_cc:
+            rec["country_code"] = explicit_cc
+        if explicit_reg:
+            rec["region"] = explicit_reg
+
+        cid = str(rec.get("cid") or "")
+        task_id = str(rec.get("search_task_id") or rec.get("task_id") or "none")
+        tile_id = str(rec.get("tile_id") or "none")
+        raw_id = rec.get("raw_id") or f"{task_id}:{tile_id}:{cid}"
+
+        source_data = rec.get("source_data")
+        if source_data is not None and not isinstance(source_data, str):
+            try:
+                source_data = json.dumps(source_data)
+            except Exception:
+                source_data = str(source_data)
+
+        defaults = {
+            "raw_id": raw_id,
+            "cid": cid,
+            "ftid": rec.get("ftid"),
+            "place_id": rec.get("place_id"),
+            "name": rec.get("name") or "",
+            "address": rec.get("address"),
+            "street_address": rec.get("street_address"),
+            "latitude": rec.get("latitude"),
+            "longitude": rec.get("longitude"),
+            "website": rec.get("website"),
+            "phone": rec.get("phone"),
+            "phone_e164": rec.get("phone_e164"),
+            "category": rec.get("category"),
+            "vertical": rec.get("vertical"),
+            "vertical_raw": rec.get("vertical_raw"),
+            "country": rec.get("country"),
+            "country_code": rec.get("country_code"),
+            "region": rec.get("region"),
+            "city": rec.get("city"),
+            "postal_code": rec.get("postal_code"),
+            "rating": rec.get("rating"),
+            "review_count": rec.get("review_count") or 0,
+            "search_task_id": rec.get("search_task_id") or rec.get("task_id"),
+            "tile_id": rec.get("tile_id"),
+            "run_id": rec.get("run_id"),
+            "source_data": source_data,
+            "collected_at": rec.get("collected_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        sql = """
+        INSERT INTO raw_places (
+            raw_id, cid, ftid, place_id, name, address, street_address,
+            latitude, longitude, website, phone, phone_e164,
+            category, vertical, vertical_raw, country, country_code,
+            region, city, postal_code, rating, review_count,
+            search_task_id, tile_id, run_id, source_data, collected_at
+        ) VALUES (
+            :raw_id, :cid, :ftid, :place_id, :name, :address, :street_address,
+            :latitude, :longitude, :website, :phone, :phone_e164,
+            :category, :vertical, :vertical_raw, :country, :country_code,
+            :region, :city, :postal_code, :rating, :review_count,
+            :search_task_id, :tile_id, :run_id, :source_data, :collected_at
+        )
+        ON CONFLICT(raw_id) DO UPDATE SET
+            ftid = COALESCE(excluded.ftid, raw_places.ftid),
+            place_id = COALESCE(excluded.place_id, raw_places.place_id),
+            name = COALESCE(excluded.name, raw_places.name),
+            address = COALESCE(excluded.address, raw_places.address),
+            street_address = COALESCE(excluded.street_address, raw_places.street_address),
+            latitude = COALESCE(excluded.latitude, raw_places.latitude),
+            longitude = COALESCE(excluded.longitude, raw_places.longitude),
+            website = COALESCE(excluded.website, raw_places.website),
+            phone = COALESCE(excluded.phone, raw_places.phone),
+            phone_e164 = COALESCE(excluded.phone_e164, raw_places.phone_e164),
+            category = COALESCE(excluded.category, raw_places.category),
+            vertical = COALESCE(excluded.vertical, raw_places.vertical),
+            vertical_raw = COALESCE(excluded.vertical_raw, raw_places.vertical_raw),
+            country = COALESCE(excluded.country, raw_places.country),
+            country_code = COALESCE(excluded.country_code, raw_places.country_code),
+            region = COALESCE(excluded.region, raw_places.region),
+            city = COALESCE(excluded.city, raw_places.city),
+            postal_code = COALESCE(excluded.postal_code, raw_places.postal_code),
+            rating = COALESCE(excluded.rating, raw_places.rating),
+            review_count = MAX(raw_places.review_count, excluded.review_count),
+            source_data = COALESCE(excluded.source_data, raw_places.source_data);
+        """
+        with self.get_connection() as conn:
+            exists = conn.execute("SELECT 1 FROM raw_places WHERE raw_id = ?", (raw_id,)).fetchone() is not None
+            cur = conn.execute(sql, defaults)
+            conn.commit()
+            self._last_commit_time = datetime.now()
+            self._last_commit_time = datetime.now()
+            return not exists
+
+    def insert_raw_places_batch(self, records: List[Dict[str, Any]]) -> int:
+        """Batch inserts raw place records into raw_places. Returns count inserted."""
+        if not records:
+            return 0
+        from .taxonomy import enrich_place_dimensions
+        inserted = 0
+        sql = """
+        INSERT INTO raw_places (
+            raw_id, cid, ftid, place_id, name, address, street_address,
+            latitude, longitude, website, phone, phone_e164,
+            category, vertical, vertical_raw, country, country_code,
+            region, city, postal_code, rating, review_count,
+            search_task_id, tile_id, run_id, source_data, collected_at
+        ) VALUES (
+            :raw_id, :cid, :ftid, :place_id, :name, :address, :street_address,
+            :latitude, :longitude, :website, :phone, :phone_e164,
+            :category, :vertical, :vertical_raw, :country, :country_code,
+            :region, :city, :postal_code, :rating, :review_count,
+            :search_task_id, :tile_id, :run_id, :source_data, :collected_at
+        )
+        ON CONFLICT(raw_id) DO UPDATE SET
+            ftid = COALESCE(excluded.ftid, raw_places.ftid),
+            place_id = COALESCE(excluded.place_id, raw_places.place_id),
+            name = COALESCE(excluded.name, raw_places.name),
+            address = COALESCE(excluded.address, raw_places.address),
+            street_address = COALESCE(excluded.street_address, raw_places.street_address),
+            latitude = COALESCE(excluded.latitude, raw_places.latitude),
+            longitude = COALESCE(excluded.longitude, raw_places.longitude),
+            website = COALESCE(excluded.website, raw_places.website),
+            phone = COALESCE(excluded.phone, raw_places.phone),
+            phone_e164 = COALESCE(excluded.phone_e164, raw_places.phone_e164),
+            category = COALESCE(excluded.category, raw_places.category),
+            vertical = COALESCE(excluded.vertical, raw_places.vertical),
+            vertical_raw = COALESCE(excluded.vertical_raw, raw_places.vertical_raw),
+            country = COALESCE(excluded.country, raw_places.country),
+            country_code = COALESCE(excluded.country_code, raw_places.country_code),
+            region = COALESCE(excluded.region, raw_places.region),
+            city = COALESCE(excluded.city, raw_places.city),
+            postal_code = COALESCE(excluded.postal_code, raw_places.postal_code),
+            rating = COALESCE(excluded.rating, raw_places.rating),
+            review_count = MAX(raw_places.review_count, excluded.review_count),
+            source_data = COALESCE(excluded.source_data, raw_places.source_data);
+        """
+        with self.get_connection() as conn:
+            for record in records:
+                rec = dict(record)
+                explicit_cc = rec.get("country_code") or rec.get("country")
+                explicit_reg = rec.get("region") or rec.get("region_code")
+                if "region" not in rec and "region_code" in rec:
+                    rec["region"] = rec["region_code"]
+                if "country_code" not in rec and "country" in rec:
+                    rec["country_code"] = rec["country"]
+                enrich_place_dimensions(rec)
+                if explicit_cc:
+                    rec["country_code"] = explicit_cc
+                if explicit_reg:
+                    rec["region"] = explicit_reg
+
+                cid = str(rec.get("cid") or "")
+                task_id = str(rec.get("search_task_id") or rec.get("task_id") or "none")
+                tile_id = str(rec.get("tile_id") or "none")
+                raw_id = rec.get("raw_id") or f"{task_id}:{tile_id}:{cid}"
+
+                source_data = rec.get("source_data")
+                if source_data is not None and not isinstance(source_data, str):
+                    try:
+                        source_data = json.dumps(source_data)
+                    except Exception:
+                        source_data = str(source_data)
+
+                defaults = {
+                    "raw_id": raw_id,
+                    "cid": cid,
+                    "ftid": rec.get("ftid"),
+                    "place_id": rec.get("place_id"),
+                    "name": rec.get("name") or "",
+                    "address": rec.get("address"),
+                    "street_address": rec.get("street_address"),
+                    "latitude": rec.get("latitude"),
+                    "longitude": rec.get("longitude"),
+                    "website": rec.get("website"),
+                    "phone": rec.get("phone"),
+                    "phone_e164": rec.get("phone_e164"),
+                    "category": rec.get("category"),
+                    "vertical": rec.get("vertical"),
+                    "vertical_raw": rec.get("vertical_raw"),
+                    "country": rec.get("country"),
+                    "country_code": rec.get("country_code"),
+                    "region": rec.get("region"),
+                    "city": rec.get("city"),
+                    "postal_code": rec.get("postal_code"),
+                    "rating": rec.get("rating"),
+                    "review_count": rec.get("review_count") or 0,
+                    "search_task_id": rec.get("search_task_id") or rec.get("task_id"),
+                    "tile_id": rec.get("tile_id"),
+                    "run_id": rec.get("run_id"),
+                    "source_data": source_data,
+                    "collected_at": rec.get("collected_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                cur = conn.execute(sql, defaults)
+                if cur.rowcount > 0:
+                    inserted += 1
+            conn.commit()
+            self._last_commit_time = datetime.now()
+        return inserted
+
+    def get_raw_places(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+        category: Optional[str] = None,
+        run_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Fetches raw discovery records from raw_places."""
+        with self.get_connection() as conn:
+            table_check = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='raw_places'").fetchone()
+            if not table_check:
+                return []
+            query = "SELECT * FROM raw_places WHERE 1=1"
+            params: List[Any] = []
+            if country_code:
+                query += " AND UPPER(country_code) = ?"
+                params.append(country_code.upper())
+            if region_code:
+                query += " AND UPPER(region) = ?"
+                params.append(region_code.upper())
+            if category:
+                query += " AND LOWER(category) = ?"
+                params.append(category.lower())
+            if run_id:
+                query += " AND run_id = ?"
+                params.append(run_id)
+            query += " ORDER BY id ASC"
+            if limit is not None:
+                query += " LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
+            rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_raw_places_count(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+        category: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> int:
+        """Returns total count of raw discovery records."""
+        with self.get_connection() as conn:
+            table_check = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='raw_places'").fetchone()
+            if not table_check:
+                return 0
+            query = "SELECT COUNT(*) FROM raw_places WHERE 1=1"
+            params: List[Any] = []
+            if country_code:
+                query += " AND UPPER(country_code) = ?"
+                params.append(country_code.upper())
+            if region_code:
+                query += " AND UPPER(region) = ?"
+                params.append(region_code.upper())
+            if category:
+                query += " AND LOWER(category) = ?"
+                params.append(category.lower())
+            if run_id:
+                query += " AND run_id = ?"
+                params.append(run_id)
+            row = conn.execute(query, params).fetchone()
+            return row[0] if row else 0
+
+    def get_places_count(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> int:
+        """Returns total count of canonical places in places table."""
+        with self.get_connection() as conn:
+            query = "SELECT COUNT(*) FROM places WHERE 1=1"
+            params: List[Any] = []
+            if country_code:
+                query += " AND UPPER(country_code) = ?"
+                params.append(country_code.upper())
+            if region_code:
+                query += " AND UPPER(region) = ?"
+                params.append(region_code.upper())
+            if category:
+                query += " AND LOWER(category) = ?"
+                params.append(category.lower())
+            row = conn.execute(query, params).fetchone()
+            return row[0] if row else 0
+
+    def get_collection_counts(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Provides side-by-side counts of raw records vs canonical places."""
+        with self.get_connection() as conn:
+            raw_cnt = self.get_raw_places_count(country_code=country_code, region_code=region_code)
+            canonical_cnt = self.get_places_count(country_code=country_code, region_code=region_code)
+
+            # Country breakdowns
+            raw_by_c: Dict[str, int] = {}
+            canonical_by_c: Dict[str, int] = {}
+
+            table_check = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='raw_places'").fetchone()
+            if table_check:
+                for r in conn.execute("SELECT COALESCE(country_code, country, 'Unknown') as c, COUNT(*) FROM raw_places GROUP BY c"):
+                    raw_by_c[r[0]] = r[1]
+
+            for r in conn.execute("SELECT COALESCE(country_code, country, 'Unknown') as c, COUNT(*) FROM places GROUP BY c"):
+                canonical_by_c[r[0]] = r[1]
+
+            # Region breakdowns
+            raw_by_r: Dict[str, int] = {}
+            canonical_by_r: Dict[str, int] = {}
+            if table_check:
+                for r in conn.execute("SELECT COALESCE(region, 'Unknown') as reg, COUNT(*) FROM raw_places GROUP BY reg"):
+                    raw_by_r[r[0]] = r[1]
+
+            for r in conn.execute("SELECT COALESCE(region, 'Unknown') as reg, COUNT(*) FROM places GROUP BY reg"):
+                canonical_by_r[r[0]] = r[1]
+
+            # Deduplication ratio
+            dedup_diff = max(0, raw_cnt - canonical_cnt)
+            dedup_pct = round((dedup_diff / raw_cnt * 100.0), 2) if raw_cnt > 0 else 0.0
+
+            return {
+                "raw_total": raw_cnt,
+                "canonical_total": canonical_cnt,
+                "duplicates_collapsed": dedup_diff,
+                "dedup_ratio_pct": dedup_pct,
+                "raw_by_country": raw_by_c,
+                "canonical_by_country": canonical_by_c,
+                "raw_by_region": raw_by_r,
+                "canonical_by_region": canonical_by_r,
+            }
 
     def update_place_details(self, cid: str, details: Dict[str, Any], status: str = "details_done"):
         with self.get_connection() as conn:
@@ -696,6 +1090,7 @@ class Database:
                     """, (cid, pt.get("day_idx"), pt.get("hour_idx"), pt.get("popularity_pct")))
 
             conn.commit()
+            self._last_commit_time = datetime.now()
 
         # Insert child photos if provided
         if "photos" in details and details["photos"]:
@@ -718,6 +1113,7 @@ class Database:
                 WHERE cid = :cid
             """, {"cid": cid, "error": error})
             conn.commit()
+            self._last_commit_time = datetime.now()
 
     def insert_review(self, review: Dict[str, Any]):
         defaults = {
@@ -753,6 +1149,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, merged)
             conn.commit()
+            self._last_commit_time = datetime.now()
 
     def insert_photo(self, photo: Dict[str, Any]):
         defaults = {
@@ -769,6 +1166,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, merged)
             conn.commit()
+            self._last_commit_time = datetime.now()
 
     def get_place(self, cid: str) -> Optional[Dict[str, Any]]:
         with self.get_connection() as conn:
@@ -809,6 +1207,9 @@ class Database:
             reviews_count = conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0]
             photos_count = conn.execute("SELECT COUNT(*) FROM photos").fetchone()[0]
             last_run = conn.execute("SELECT * FROM run_state ORDER BY start_time DESC LIMIT 1").fetchone()
+
+            raw_check = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='raw_places'").fetchone()
+            raw_places_count = conn.execute("SELECT COUNT(*) FROM raw_places").fetchone()[0] if raw_check else 0
 
             # Pipeline 2 Metrics
             with_website = conn.execute("SELECT COUNT(*) FROM places WHERE website IS NOT NULL AND website != ''").fetchone()[0]
@@ -872,6 +1273,7 @@ class Database:
 
             return {
                 "total_places": total,
+                "raw_places_count": raw_places_count,
                 "enriched_places": enriched,
                 "pending_places": pending,
                 "failed_places": failed,
@@ -1407,6 +1809,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute("UPDATE places SET status = 'pending', error = NULL WHERE status = 'failed'")
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount
 
     # ------------------------------------------------------------------
@@ -1459,6 +1862,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
 
     # ------------------------------------------------------------------
     # Live Jobs & Events Methods
@@ -1492,6 +1896,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
         return job_data["id"]
 
     def update_job(self, job_id: str, updates: Dict[str, Any]):
@@ -1511,6 +1916,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
 
     def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         with self.get_connection() as conn:
@@ -1571,6 +1977,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.lastrowid
 
     def get_job_events(self, job_id: str, limit: int = 200, after_id: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -1606,6 +2013,7 @@ class Database:
                 WHERE status NOT IN ('done', 'cancelled', 'failed', 'interrupted')
             """)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount
 
     # -------------------------------------------------------------------------
@@ -1636,9 +2044,9 @@ class Database:
             "task_id": task["task_id"],
             "country_code": task["country_code"].upper(),
             "region_code": task["region_code"].upper(),
-            "region_name": task["region_name"],
+            "region_name": task.get("region_name") or task["region_code"].upper(),
             "category": task["category"],
-            "tile_id": str(task["tile_id"]),
+            "tile_id": str(task.get("tile_id", "")),
             "status": task.get("status", "pending"),
             "attempt_count": int(task.get("attempt_count", 0)),
             "last_error": task.get("last_error"),
@@ -1648,6 +2056,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
 
     def get_collection_tasks(
@@ -1784,6 +2193,7 @@ class Database:
                     WHERE task_id = ?
                 """, (status, error, task_id))
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
 
     def reset_failed_collection_tasks(
@@ -1808,6 +2218,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(query, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount
 
     # -------------------------------------------------------------------------
@@ -1897,6 +2308,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
 
     def get_website_discovery_stats(
@@ -2022,6 +2434,7 @@ class Database:
                 WHERE cid = :cid
             """, {"status": data.get("extraction_status", "completed"), "cid": cid})
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
 
     def save_company_leaders(self, cid: str, leaders: List[Dict[str, Any]]) -> int:
@@ -2071,6 +2484,7 @@ class Database:
                 if cur.rowcount > 0:
                     count += 1
             conn.commit()
+            self._last_commit_time = datetime.now()
             return count
 
     def save_company_contacts(self, cid: str, contacts: List[Dict[str, Any]]) -> int:
@@ -2105,6 +2519,7 @@ class Database:
                 if cur.rowcount > 0:
                     count += 1
             conn.commit()
+            self._last_commit_time = datetime.now()
             return count
 
     def get_company_enrichment(self, cid: str) -> Dict[str, Any]:
@@ -2192,6 +2607,7 @@ class Database:
                     updated_at = CURRENT_TIMESTAMP
             """, (config_id, cfg_str))
             conn.commit()
+            self._last_commit_time = datetime.now()
             return True
 
     def get_pipeline_config(self, config_id: str = "default") -> Optional[Dict[str, Any]]:
@@ -2240,6 +2656,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return True
 
     def update_pipeline_run(self, run_id: str, updates: Dict[str, Any]) -> bool:
@@ -2271,6 +2688,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
 
     def get_pipeline_run(self, run_id: str) -> Optional[Dict[str, Any]]:
@@ -2409,8 +2827,8 @@ class Database:
         params = {
             "tile_id": tile_data["tile_id"],
             "parent_tile_id": tile_data.get("parent_tile_id"),
-            "task_id": tile_data["task_id"],
-            "run_id": tile_data["run_id"],
+            "task_id": tile_data.get("task_id", ""),
+            "run_id": tile_data.get("run_id") or "run_default",
             "country_code": tile_data["country_code"].upper(),
             "region_code": tile_data["region_code"].upper(),
             "category": tile_data["category"],
@@ -2439,6 +2857,7 @@ class Database:
         with self.get_connection() as conn:
             conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return True
 
     def update_geographic_tile(self, tile_id: str, updates: Dict[str, Any]) -> bool:
@@ -2464,6 +2883,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount > 0
 
     def get_geographic_tile(self, tile_id: str) -> Optional[Dict[str, Any]]:
@@ -2554,6 +2974,52 @@ class Database:
                 "limit_reached": counts.get("limit_reached", 0),
             }
 
+    def reset_stale_running_tiles(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+    ) -> int:
+        """Resets tiles stuck in 'running' state (from a crashed/killed session) back to 'pending'."""
+        conditions = ["status = 'running'"]
+        params: List[Any] = []
+        if country_code:
+            conditions.append("country_code = ?")
+            params.append(country_code.upper())
+        if region_code:
+            conditions.append("region_code = ?")
+            params.append(region_code.upper())
+        sql = f"""
+            UPDATE geographic_tiles
+            SET status = 'pending', updated_at = CURRENT_TIMESTAMP
+            WHERE {' AND '.join(conditions)}
+        """
+        with self.get_connection() as conn:
+            cur = conn.execute(sql, params)
+            conn.commit()
+            self._last_commit_time = datetime.now()
+            return cur.rowcount
+
+    def reset_stale_inprogress_tasks(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+    ) -> int:
+        """Resets collection tasks stuck in 'in_progress' (from a crashed session) back to 'pending'."""
+        conditions = ["status = 'in_progress'"]
+        params: List[Any] = []
+        if country_code:
+            conditions.append("country_code = ?")
+            params.append(country_code.upper())
+        if region_code:
+            conditions.append("region_code = ?")
+            params.append(region_code.upper())
+        sql = f"UPDATE collection_tasks SET status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE {' AND '.join(conditions)}"
+        with self.get_connection() as conn:
+            cur = conn.execute(sql, params)
+            conn.commit()
+            self._last_commit_time = datetime.now()
+            return cur.rowcount
+
     def reset_failed_tiles(
         self,
         country_code: Optional[str] = None,
@@ -2581,6 +3047,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.rowcount
 
     # -------------------------------------------------------------------------
@@ -2642,6 +3109,7 @@ class Database:
 
             conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
 
             row = conn.execute(
                 "SELECT id FROM additional_intelligence WHERE cid = ? AND entity_type = ? AND field_name = ? AND normalized_value = ?",
@@ -2682,6 +3150,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.execute(sql, params)
             conn.commit()
+            self._last_commit_time = datetime.now()
             return cur.lastrowid
 
     def get_additional_intelligence(
@@ -2873,6 +3342,258 @@ class Database:
                 "sources_no_data": source_status_counts.get("no_data", 0),
                 "sources_failed": source_status_counts.get("failed", 0) + source_status_counts.get("blocked", 0),
             }
+
+    def get_last_commit_timestamp(self) -> Optional[str]:
+        """Returns the local time string (HH:MM:SS) of the most recent database commit."""
+        if self._last_commit_time is not None:
+            return self._last_commit_time.strftime("%H:%M:%S")
+        with self.get_connection() as conn:
+            row = conn.execute("""
+                SELECT MAX(t) as max_t FROM (
+                    SELECT datetime(MAX(collected_at), 'localtime') as t FROM raw_places
+                    UNION ALL
+                    SELECT datetime(MAX(updated_at), 'localtime') as t FROM geographic_tiles
+                )
+            """).fetchone()
+            if row and row["max_t"]:
+                parts = str(row["max_t"]).split()
+                if len(parts) > 1:
+                    return parts[1]
+                return str(row["max_t"])
+        return None
+
+    def get_collection_progress_stats(
+        self,
+        country_code: Optional[str] = None,
+        region_code: Optional[str] = None,
+        configured_categories: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculates live collection progress statistics:
+        - raw_saved_today (based on raw_places.collected_at in local time)
+        - total_raw (count in raw_places)
+        - total_canonical (count in places)
+        - Tile breakdown:
+            - planned_root (root tiles)
+            - subdivided_parents (status = 'subdivided')
+            - child_tiles_awaiting (child tiles awaiting processing)
+            - completed, limit_reached, pending, running, retry_pending, failed
+            - finished_tiles (completed + limit_reached)
+            - active_total (finished_tiles + pending + running + retry_pending + failed)
+            - remaining_tiles (pending + running + retry_pending + failed)
+            - in_flight_tiles (pending + running + retry_pending)
+            - can_grow (in_flight_tiles > 0)
+        - Tasks breakdown:
+            - total_categories
+            - completed_categories
+            - in_progress_categories
+            - failed_categories
+            - pending_categories
+        - Category-by-category tile breakdown, raw records, and status
+        - last_db_write (HH:MM:SS)
+        - active db_path and today_date
+        """
+        with self.get_connection() as conn:
+            today_row = conn.execute(
+                "SELECT COUNT(*) FROM raw_places WHERE date(collected_at, 'localtime') = date('now', 'localtime')"
+            ).fetchone()
+            raw_today = today_row[0] if today_row else 0
+
+            raw_total_row = conn.execute("SELECT COUNT(*) FROM raw_places").fetchone()
+            raw_total = raw_total_row[0] if raw_total_row else 0
+
+            can_total_row = conn.execute("SELECT COUNT(*) FROM places").fetchone()
+            canonical_total = can_total_row[0] if can_total_row else 0
+
+            tile_rows = conn.execute("""
+                SELECT
+                    status,
+                    COUNT(*) as cnt,
+                    SUM(CASE WHEN parent_tile_id IS NOT NULL AND parent_tile_id != '' THEN 1 ELSE 0 END) as child_cnt,
+                    SUM(CASE WHEN parent_tile_id IS NULL OR parent_tile_id = '' THEN 1 ELSE 0 END) as root_cnt
+                FROM geographic_tiles
+                WHERE (? IS NULL OR UPPER(region_code) = UPPER(?))
+                  AND (? IS NULL OR UPPER(country_code) = UPPER(?))
+                GROUP BY status
+            """, (region_code, region_code, country_code, country_code)).fetchall()
+            by_status = {r["status"]: dict(r) for r in tile_rows}
+
+            cat_tile_rows = conn.execute("""
+                SELECT
+                    category,
+                    status,
+                    COUNT(*) as cnt,
+                    SUM(CASE WHEN parent_tile_id IS NOT NULL AND parent_tile_id != '' THEN 1 ELSE 0 END) as child_cnt,
+                    SUM(CASE WHEN parent_tile_id IS NULL OR parent_tile_id = '' THEN 1 ELSE 0 END) as root_cnt,
+                    SUM(new_records) as new_recs,
+                    SUM(duplicate_cids) as dup_cids
+                FROM geographic_tiles
+                WHERE (? IS NULL OR UPPER(region_code) = UPPER(?))
+                  AND (? IS NULL OR UPPER(country_code) = UPPER(?))
+                GROUP BY category, status
+            """, (region_code, region_code, country_code, country_code)).fetchall()
+
+            task_row = conn.execute("""
+                SELECT
+                    COUNT(*) as total_categories,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_categories,
+                    SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_categories,
+                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_categories,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_categories
+                FROM collection_tasks
+                WHERE (? IS NULL OR UPPER(region_code) = UPPER(?))
+                  AND (? IS NULL OR UPPER(country_code) = UPPER(?))
+            """, (region_code, region_code, country_code, country_code)).fetchone()
+
+            cat_task_rows = conn.execute("""
+                SELECT category, status, records_collected, last_error
+                FROM collection_tasks
+                WHERE (? IS NULL OR UPPER(region_code) = UPPER(?))
+                  AND (? IS NULL OR UPPER(country_code) = UPPER(?))
+            """, (region_code, region_code, country_code, country_code)).fetchall()
+
+            cat_raw_place_rows = conn.execute("""
+                SELECT
+                    COALESCE(NULLIF(vertical, 'other'), NULLIF(vertical_raw, ''), category) as cat,
+                    COUNT(*) as cnt
+                FROM raw_places
+                WHERE (? IS NULL OR UPPER(region) = UPPER(?))
+                  AND (? IS NULL OR UPPER(country_code) = UPPER(?))
+                GROUP BY cat
+            """, (region_code, region_code, country_code, country_code)).fetchall()
+            raw_places_by_cat = {r["cat"]: r["cnt"] for r in cat_raw_place_rows if r["cat"]}
+
+        completed = by_status.get("completed", {}).get("cnt", 0)
+        limit_reached = by_status.get("limit_reached", {}).get("cnt", 0)
+        pending = by_status.get("pending", {}).get("cnt", 0)
+        running = by_status.get("running", {}).get("cnt", 0)
+        retry_pending = by_status.get("retry_pending", {}).get("cnt", 0)
+        failed = by_status.get("failed", {}).get("cnt", 0)
+        subdivided = by_status.get("subdivided", {}).get("cnt", 0)
+
+        planned_root = sum(v.get("root_cnt", 0) for v in by_status.values())
+        child_tiles_awaiting = sum(
+            by_status.get(s, {}).get("child_cnt", 0)
+            for s in ("pending", "running", "retry_pending")
+        )
+
+        finished_tiles = completed + limit_reached
+        active_total = finished_tiles + pending + running + retry_pending + failed
+        remaining_tiles = pending + running + retry_pending + failed
+        in_flight_tiles = pending + running + retry_pending
+        can_grow = in_flight_tiles > 0
+
+        last_db_write = self.get_last_commit_timestamp() or "N/A"
+
+        # Assemble category-by-category metrics
+        default_cats = [
+            "healthcare", "hospitality", "food", "retail", "fitness",
+            "beauty", "automotive", "finance", "education", "real_estate"
+        ]
+        target_cats = list(configured_categories or default_cats)
+        for r in cat_tile_rows:
+            c = r["category"]
+            if c and c not in target_cats:
+                target_cats.append(c)
+
+        tiles_by_cat_status: Dict[str, Dict[str, Any]] = {}
+        for r in cat_tile_rows:
+            c = r["category"]
+            st = r["status"]
+            tiles_by_cat_status.setdefault(c, {})[st] = dict(r)
+
+        tasks_by_cat: Dict[str, Dict[str, Any]] = {}
+        for r in cat_task_rows:
+            tasks_by_cat[r["category"]] = dict(r)
+
+        cat_by_name: Dict[str, Dict[str, Any]] = {}
+        for cat in target_cats:
+            st_map = tiles_by_cat_status.get(cat, {})
+            c_compl = st_map.get("completed", {}).get("cnt", 0)
+            c_limit = st_map.get("limit_reached", {}).get("cnt", 0)
+            c_pend = st_map.get("pending", {}).get("cnt", 0)
+            c_run = st_map.get("running", {}).get("cnt", 0)
+            c_retry = st_map.get("retry_pending", {}).get("cnt", 0)
+            c_fail = st_map.get("failed", {}).get("cnt", 0)
+            c_sub = st_map.get("subdivided", {}).get("cnt", 0)
+            c_children = sum(st_map.get(s, {}).get("child_cnt", 0) for s in ("pending", "running", "retry_pending"))
+            c_raw = sum(v.get("new_recs", 0) or 0 for v in st_map.values())
+            c_dups = sum(v.get("dup_cids", 0) or 0 for v in st_map.values())
+
+            c_fin = c_compl + c_limit
+            c_active = c_fin + c_pend + c_run + c_retry + c_fail
+            c_rem = c_pend + c_run + c_retry + c_fail
+            c_growing = (c_pend + c_run + c_retry) > 0
+
+            t_info = tasks_by_cat.get(cat, {})
+            t_status = t_info.get("status")
+            t_saved = t_info.get("records_collected", 0) or 0
+            rp_count = raw_places_by_cat.get(cat, 0)
+            effective_raw = max(c_raw, t_saved, rp_count)
+
+            if t_status == "completed" or (c_active > 0 and c_rem == 0 and c_fail == 0):
+                disp_status = "COMPLETED"
+            elif c_fail > 0 and c_rem == c_fail:
+                disp_status = "FAILED"
+            elif c_run > 0 or t_status == "in_progress":
+                disp_status = "RUNNING"
+            elif c_active > 0:
+                disp_status = "RUNNING"
+            else:
+                disp_status = "PENDING"
+
+            cat_by_name[cat] = {
+                "category": cat,
+                "status": disp_status,
+                "completed": c_compl,
+                "limit_reached": c_limit,
+                "pending": c_pend,
+                "running": c_run,
+                "retry_pending": c_retry,
+                "failed": c_fail,
+                "subdivided": c_sub,
+                "child_tiles_awaiting": c_children,
+                "finished_tiles": c_fin,
+                "active_total": c_active,
+                "remaining_tiles": c_rem,
+                "can_grow": c_growing,
+                "raw_saved": effective_raw,
+                "records_collected": effective_raw,
+                "duplicate_cids": c_dups,
+                "active_tile_id": "",
+                "run_new": 0,
+                "run_dups": 0,
+                "results_returned": 0,
+                "recent_names": [],
+            }
+
+        return {
+            "today_date": datetime.now().strftime("%Y-%m-%d"),
+            "db_path": str(self.db_path),
+            "raw_saved_today": raw_today,
+            "total_raw": raw_total,
+            "total_canonical": canonical_total,
+            "planned_root": planned_root,
+            "subdivided_parents": subdivided,
+            "child_tiles_awaiting": child_tiles_awaiting,
+            "completed": completed,
+            "limit_reached": limit_reached,
+            "pending": pending,
+            "running": running,
+            "retry_pending": retry_pending,
+            "failed": failed,
+            "finished_tiles": finished_tiles,
+            "active_total": active_total,
+            "remaining_tiles": remaining_tiles,
+            "in_flight_tiles": in_flight_tiles,
+            "can_grow": can_grow,
+            "total_categories": (task_row["total_categories"] or 0) if task_row else 0,
+            "completed_categories": (task_row["completed_categories"] or 0) if task_row else 0,
+            "in_progress_categories": (task_row["in_progress_categories"] or 0) if task_row else 0,
+            "failed_categories": (task_row["failed_categories"] or 0) if task_row else 0,
+            "last_db_write": last_db_write,
+            "categories": cat_by_name,
+        }
 
 
 

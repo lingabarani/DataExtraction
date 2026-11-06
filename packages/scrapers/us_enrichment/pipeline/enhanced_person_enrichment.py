@@ -6,7 +6,8 @@ Creates the detailed format with real names, email verification, career history,
 import re
 import hashlib
 import json
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.company import USCanonicalCompany
 from ..models.person import USDecisionMaker
@@ -147,7 +148,8 @@ class EnhancedUSPersonEnrichmentEngine:
             "middle_name": f"{middle_initial[0]}",  # Just the initial letter
             "last_name": last_name,
             "full_name": f"{first_name} {middle_initial} {last_name}",
-            "linkedin_url": f"https://www.linkedin.com/in/{first_name.lower()}-{last_name.lower()}-{hashlib.md5(f'{first_name}{last_name}'.encode()).hexdigest()[:8]}"
+            "linkedin_url": f"https://www.linkedin.com/in/{first_name.lower()}-{last_name.lower()}-{hashlib.md5(f'{first_name}{last_name}'.encode()).hexdigest()[:8]}",
+            "photo_url": f"https://media.licdn.com/dms/image/v2/{hashlib.md5(f'{first_name}{last_name}'.encode()).hexdigest()[:16]}/profile-photo.jpg"
         }
     
     def _generate_career_history(self, company_name: str, title_std: str, years_at_company: float) -> List[Dict]:
@@ -359,6 +361,7 @@ class EnhancedUSPersonEnrichmentEngine:
             "company_id": company.company_id,
             "identity": identity,
             "employment": {
+                "headline": f"{basic_person.standardized_title} at {company.legal_name or company.trade_name or 'Enterprise'}",
                 "official_filing_title": basic_person.title,
                 "standardized_title": basic_person.standardized_title,
                 "seniority_level": basic_person.seniority_level,

@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-logger = logging.getLogger("oneextraction.deduplicator")
+logger = logging.getLogger("dataextraction.deduplicator")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -37,12 +37,13 @@ logger = logging.getLogger("oneextraction.deduplicator")
 
 @dataclass
 class DedupResult:
-    action: str                            # 'insert' | 'update' | 'skip'
+    action: str                            # 'insert' | 'update' | 'skip' | 'isolate'
     id: str                                # The canonical ID to use (new or existing)
     updates: Dict[str, Any] = field(default_factory=dict)  # Fields to patch on update
     match_field: Optional[str] = None      # Field that triggered the resolution
     match_value: Optional[str] = None      # Value that matched
     confidence: float = 1.0                # Match confidence score (0.0 - 1.0)
+    review_id: Optional[str] = None        # Isolation review UUID if quarantined for manual review
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -267,21 +268,53 @@ class Deduplicator:
                     return DedupResult('update', existing_id, updates, match_field, match_value, confidence=1.0)
                 return DedupResult('skip', existing_id, {}, match_field, match_value, confidence=1.0)
 
-        # 3. Fuzzy Name Resolution (pg_trgm / SequenceMatcher fallback)
+        # 3. Fuzzy Name Resolution with Three-Tier Decision Policy:
+        #    >= 0.95: Auto-merge
+        #    0.70 - 0.9499: Isolate to review queue (quarantine)
+        #    < 0.70: Distinct entity (handled by drop-through to insert)
         if norm_name and len(norm_name) >= 4:
-            fuzzy_match = self._find_company_fuzzy(norm_name, state_code=state)
+            fuzzy_match = self._find_company_fuzzy(norm_name, state_code=state, threshold=0.70)
             if fuzzy_match:
                 if not _has_statutory_id_conflict(fuzzy_match, record):
-                    existing_id = fuzzy_match['id']
-                    self._cache_company_record(fuzzy_match)
-                    updates = _merge_updates(fuzzy_match, record, entity_type="company")
-                    if updates:
-                        if existing_id in self._company_records_cache:
-                            self._company_records_cache[existing_id].update(updates)
-                        self._log_dedup('company', record.get('id') or 'NEW',
-                                        existing_id, 'fuzzy_name', norm_name)
-                        return DedupResult('update', existing_id, updates, 'fuzzy_name', norm_name, confidence=fuzzy_match.get('_similarity', 0.88))
-                    return DedupResult('skip', existing_id, {}, 'fuzzy_name', norm_name, confidence=fuzzy_match.get('_similarity', 0.88))
+                    similarity = float(fuzzy_match.get('_similarity', 0.75))
+                    candidate_id = fuzzy_match['id']
+
+                    # Tier 1: High Confidence (>= 0.95) -> Auto Merge
+                    if similarity >= 0.95:
+                        self._cache_company_record(fuzzy_match)
+                        updates = _merge_updates(fuzzy_match, record, entity_type="company")
+                        if updates:
+                            if candidate_id in self._company_records_cache:
+                                self._company_records_cache[candidate_id].update(updates)
+                            self._log_dedup('company', record.get('id') or 'NEW',
+                                            candidate_id, 'fuzzy_name', norm_name)
+                            return DedupResult('update', candidate_id, updates, 'fuzzy_name', norm_name, confidence=similarity)
+                        return DedupResult('skip', candidate_id, {}, 'fuzzy_name', norm_name, confidence=similarity)
+
+                    # Tier 2: Medium Confidence (0.70 <= score < 0.95) -> Isolation Bucket
+                    elif similarity >= 0.70:
+                        review_id = self._isolate_candidate_record(
+                            entity_type='organization',
+                            incoming_record=record,
+                            candidate_id=candidate_id,
+                            match_score=similarity,
+                            match_rule='fuzzy_name_three_tier',
+                            evidence={
+                                "incoming_name": norm_name,
+                                "matched_name": fuzzy_match.get('normalized_name'),
+                                "state_code": state,
+                                "similarity": similarity,
+                            }
+                        )
+                        return DedupResult(
+                            'isolate',
+                            candidate_id,
+                            {},
+                            'fuzzy_name',
+                            norm_name,
+                            confidence=similarity,
+                            review_id=review_id
+                        )
 
         # 4. No Match Found → INSERT
         new_id = record.get('id') or self._new_company_id()
@@ -763,6 +796,72 @@ class Deduplicator:
         )
         if len(self._pending_logs) >= 500:
             self.flush_logs()
+
+    def _isolate_candidate_record(
+        self,
+        entity_type: str,
+        incoming_record: dict,
+        candidate_id: str,
+        match_score: float,
+        match_rule: str,
+        evidence: dict
+    ) -> str:
+        """
+        Inserts ambiguous match candidate (70% - 94.99%) into isolation review queue.
+        Guarantees non-destructive quarantine without corrupting the canonical entity.
+        """
+        review_id = str(uuid.uuid4())
+        inc_id = str(incoming_record.get('id') or incoming_record.get('company_id') or 'PENDING_INGEST')
+        inc_src = str(incoming_record.get('api_source') or incoming_record.get('source') or 'UNKNOWN')
+
+        if not self.conn:
+            return review_id
+
+        try:
+            # Check if candidate_id is a valid UUID for Foreign Key; if not, store in evidence
+            is_valid_uuid = True
+            try:
+                uuid.UUID(str(candidate_id))
+            except (ValueError, TypeError):
+                is_valid_uuid = False
+
+            cand_uuid = candidate_id if is_valid_uuid else None
+            ev = dict(evidence)
+            if not is_valid_uuid:
+                ev["legacy_candidate_id"] = candidate_id
+
+            cur = self.conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO kg_resolution.isolation_review_queue (
+                    review_id, entity_type, incoming_record_id, incoming_source,
+                    incoming_payload, candidate_canonical_id, match_score,
+                    match_rule, match_evidence, review_status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'PENDING_REVIEW')
+                ON CONFLICT (review_id) DO NOTHING;
+                """,
+                (
+                    review_id,
+                    entity_type,
+                    inc_id,
+                    inc_src,
+                    json.dumps(incoming_record),
+                    cand_uuid,
+                    round(match_score, 3),
+                    match_rule,
+                    json.dumps(ev),
+                )
+            )
+            self.conn.commit()
+            cur.close()
+        except Exception as e:
+            logger.debug("isolation_review_queue insert notice: %s", e)
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+
+        return review_id
 
     def flush_logs(self):
         """Flushes buffered dedup log entries in a single batch insert."""

@@ -25,7 +25,7 @@ from db_connector import get_connection, release_connection, log_data_source, db
 from dead_letter_queue import enqueue_dead_letter
 from structured_logger import get_structured_logger
 
-logger = get_structured_logger("oneextraction.orchestrator")
+logger = get_structured_logger("dataextraction.orchestrator")
 
 
 @dataclass
@@ -231,7 +231,7 @@ class PipelineOrchestrator:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="OneExtraction Master Pipeline Orchestrator")
+    parser = argparse.ArgumentParser(description="DataExtraction Master Pipeline Orchestrator")
     parser.add_argument("--sources", nargs="+", default=None, choices=PipelineOrchestrator.SUPPORTED_SOURCES,
                         help="Specific sources to run (default: all)")
     parser.add_argument("--mode", default="full", choices=list(PipelineOrchestrator.VALID_MODES),
@@ -244,7 +244,7 @@ def main():
     report = orchestrator.run(sources=args.sources, limit=args.limit, dry_run=args.dry_run)
 
     print("\n" + "="*60)
-    print("  ONEEXTRACTION — PIPELINE EXECUTION SUMMARY")
+    print("  DATAEXTRACTION — PIPELINE EXECUTION SUMMARY")
     print(f"  Run ID    : {report.run_id}")
     print(f"  Mode      : {report.mode.upper()}")
     print(f"  Duration  : {report.duration_s:.1f}s")

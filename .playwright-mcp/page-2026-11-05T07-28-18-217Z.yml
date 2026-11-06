@@ -1,0 +1,249 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - complementary [ref=f4e13]:
+      - generic [ref=f4e14]:
+        - generic [ref=f4e21]:
+          - generic [ref=f4e22]: DataExtraction
+          - generic [ref=f4e23]: v2.1
+        - button "Da DataExtraction" [ref=f4e25] [cursor=pointer]:
+          - generic [ref=f4e26]: Da
+          - generic [ref=f4e28]: DataExtraction
+        - navigation [ref=f4e31]:
+          - paragraph [ref=f4e32]: Platform
+          - link "Temporal Orchestration LIVE" [ref=f4e33] [cursor=pointer]:
+            - /url: /orchestration
+            - generic [ref=f4e37]: Temporal Orchestration
+            - generic [ref=f4e39]: LIVE
+          - paragraph [ref=f4e40]: Data
+          - link "Dashboard" [ref=f4e41] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f4e48] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f4e54]: US Leads
+            - generic [ref=f4e55]: 906K
+          - link "MX Leads 50K" [ref=f4e56] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f4e62]: MX Leads
+            - generic [ref=f4e63]: 50K
+          - link "AI Query" [ref=f4e64] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f4e68]: Tools
+          - link "Scraper" [ref=f4e69] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f4e78] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f4e82] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f4e87] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f4e92] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f4e98] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@dataextraction.com" [ref=f4e104] [cursor=pointer]:
+          - generic [ref=f4e105]: A
+          - generic [ref=f4e107]:
+            - paragraph [ref=f4e108]: Admin
+            - paragraph [ref=f4e109]: admin@dataextraction.com
+    - generic [ref=f4e110]:
+      - banner [ref=f4e111]:
+        - navigation [ref=f4e112]:
+          - generic [ref=f4e113]: Dashboard
+        - generic [ref=f4e115]:
+          - button "Search... ⌘ K" [ref=f4e116] [cursor=pointer]:
+            - generic [ref=f4e120]: Search...
+            - generic [ref=f4e121]:
+              - generic [ref=f4e122]: ⌘
+              - generic [ref=f4e123]: K
+          - button "Toggle theme" [ref=f4e124] [cursor=pointer]
+          - button [ref=f4e126] [cursor=pointer]
+      - generic [ref=f4e129]:
+        - link "Dashboard" [ref=f4e130] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Orchestration LIVE" [ref=f4e138] [cursor=pointer]:
+          - /url: /orchestration
+          - generic [ref=f4e142]: Orchestration
+          - generic [ref=f4e143]: LIVE
+        - link "Data Pipeline" [ref=f4e145] [cursor=pointer]:
+          - /url: /pipeline
+        - link "Observability" [ref=f4e151] [cursor=pointer]:
+          - /url: /orchestration#observability
+        - link "OneReach" [ref=f4e155] [cursor=pointer]:
+          - /url: /orchestration#onereach
+        - link "Freshness" [ref=f4e160] [cursor=pointer]:
+          - /url: /orchestration#freshness
+        - link "Administration" [ref=f4e165] [cursor=pointer]:
+          - /url: /settings
+      - main [ref=f4e170]:
+        - generic [ref=f4e171]:
+          - generic [ref=f4e172]:
+            - generic [ref=f4e173]:
+              - generic [ref=f4e174]:
+                - heading "Overview" [level=1] [ref=f4e175]
+                - generic [ref=f4e176]: 210,450 Certified Golden Records
+              - paragraph [ref=f4e178]: DataExtraction Platform · Autonomous B2B Intelligence & Master Vault Engine
+            - generic [ref=f4e179]:
+              - button "Refresh" [ref=f4e180] [cursor=pointer]
+              - link "Scrapers" [ref=f4e181] [cursor=pointer]:
+                - /url: /scraper
+              - link "Export Vault" [ref=f4e182] [cursor=pointer]:
+                - /url: /export
+          - generic [ref=f4e183]:
+            - heading "Certified Master Vault Metrics" [level=2] [ref=f4e185]
+            - generic [ref=f4e186]:
+              - link "Master Golden Records 213,129 Certified Vault (US) +213K" [ref=f4e187] [cursor=pointer]:
+                - /url: /leads
+                - generic [ref=f4e188]:
+                  - generic [ref=f4e189]: Master Golden Records
+                  - paragraph [ref=f4e199]: 213,129
+                  - generic [ref=f4e200]:
+                    - generic [ref=f4e201]: Certified Vault (US)
+                    - generic [ref=f4e202]: +213K
+              - link "Mexico Leads 50,208 Certified Vault (MX)" [ref=f4e203] [cursor=pointer]:
+                - /url: /leads/mexico
+                - generic [ref=f4e204]:
+                  - generic [ref=f4e205]: Mexico Leads
+                  - paragraph [ref=f4e217]: 50,208
+                  - generic [ref=f4e218]: Certified Vault (MX)
+              - link "Direct Phone Coverage 201,150 94% verified phone rate" [ref=f4e220] [cursor=pointer]:
+                - /url: /leads
+                - generic [ref=f4e221]:
+                  - generic [ref=f4e222]: Direct Phone Coverage
+                  - paragraph [ref=f4e233]: 201,150
+                  - generic [ref=f4e234]: 94% verified phone rate
+              - link "Verified Deliverable Emails 200,995 RFC 5322 & SMTP certified" [ref=f4e236] [cursor=pointer]:
+                - /url: /export
+                - generic [ref=f4e237]:
+                  - generic [ref=f4e238]: Verified Deliverable Emails
+                  - paragraph [ref=f4e249]: 200,995
+                  - generic [ref=f4e250]: RFC 5322 & SMTP certified
+          - generic [ref=f4e252]:
+            - generic [ref=f4e253]:
+              - generic [ref=f4e254]:
+                - heading "Records by Verified Data Source" [level=2] [ref=f4e255]
+                - generic [ref=f4e256]: 213,129 total entities
+              - img [ref=f4e259]:
+                - generic [ref=f4e263]:
+                  - generic [ref=f4e264]: "0"
+                  - generic [ref=f4e266]: 20K
+                  - generic [ref=f4e268]: 40K
+                  - generic [ref=f4e270]: 60K
+                  - generic [ref=f4e272]: 80K
+                - generic [ref=f4e275]:
+                  - generic [ref=f4e276]: SEC
+                  - generic [ref=f4e278]: CMS
+                  - generic [ref=f4e280]: FDIC
+                  - generic [ref=f4e282]: SAM_GOV
+                  - generic [ref=f4e284]: OpenStreetMap
+                  - generic [ref=f4e286]: GoogleMaps
+            - generic [ref=f4e302]:
+              - heading "Verified Contact Coverage" [level=2] [ref=f4e304]
+              - generic [ref=f4e305]:
+                - generic [ref=f4e306]:
+                  - generic [ref=f4e307]: US — Phone
+                  - generic [ref=f4e310]: 94%
+                - generic [ref=f4e311]:
+                  - generic [ref=f4e312]: US — Email ✓
+                  - generic [ref=f4e315]: 79%
+                - generic [ref=f4e316]:
+                  - generic [ref=f4e317]: MX — Email ✓
+                  - generic [ref=f4e320]: 65%
+                - generic [ref=f4e321]:
+                  - generic [ref=f4e322]: MX — Phone
+                  - generic [ref=f4e325]: 85%
+              - generic [ref=f4e326]:
+                - generic [ref=f4e327]:
+                  - generic [ref=f4e328]: US Golden Vault
+                  - generic [ref=f4e329]: 213,129
+                - generic [ref=f4e330]:
+                  - generic [ref=f4e331]: MX Golden Vault
+                  - generic [ref=f4e332]: 50,208
+                - generic [ref=f4e333]:
+                  - generic [ref=f4e334]: Combined Entities
+                  - generic [ref=f4e335]: 263,337
+          - generic [ref=f4e336]:
+            - generic [ref=f4e337]:
+              - generic [ref=f4e338]:
+                - heading "Top Industries by Record Volume" [level=2] [ref=f4e339]
+                - link "View Vault →" [ref=f4e340] [cursor=pointer]:
+                  - /url: /leads
+              - generic [ref=f4e341]:
+                - generic [ref=f4e342]:
+                  - generic [ref=f4e343]: "1"
+                  - generic [ref=f4e344]: Healthcare & Life Sciences
+                  - generic [ref=f4e347]: 52,180
+                - generic [ref=f4e348]:
+                  - generic [ref=f4e349]: "2"
+                  - generic [ref=f4e350]: Financial Services & Banking
+                  - generic [ref=f4e353]: 44,520
+                - generic [ref=f4e354]:
+                  - generic [ref=f4e355]: "3"
+                  - generic [ref=f4e356]: Professional & Business Services
+                  - generic [ref=f4e359]: 38,910
+                - generic [ref=f4e360]:
+                  - generic [ref=f4e361]: "4"
+                  - generic [ref=f4e362]: Manufacturing & Industrial
+                  - generic [ref=f4e365]: 31,450
+                - generic [ref=f4e366]:
+                  - generic [ref=f4e367]: "5"
+                  - generic [ref=f4e368]: Technology, Cloud & Software
+                  - generic [ref=f4e371]: 24,190
+                - generic [ref=f4e372]:
+                  - generic [ref=f4e373]: "6"
+                  - generic [ref=f4e374]: Construction & Real Estate
+                  - generic [ref=f4e377]: 19,200
+            - generic [ref=f4e378]:
+              - heading "Regional Distribution (Top US States)" [level=2] [ref=f4e380]
+              - generic [ref=f4e381]:
+                - generic [ref=f4e382]:
+                  - generic [ref=f4e383]: "1"
+                  - generic [ref=f4e384]: CA
+                  - generic [ref=f4e387]: 38,420
+                - generic [ref=f4e388]:
+                  - generic [ref=f4e389]: "2"
+                  - generic [ref=f4e390]: TX
+                  - generic [ref=f4e393]: 28,910
+                - generic [ref=f4e394]:
+                  - generic [ref=f4e395]: "3"
+                  - generic [ref=f4e396]: NY
+                  - generic [ref=f4e399]: 24,560
+                - generic [ref=f4e400]:
+                  - generic [ref=f4e401]: "4"
+                  - generic [ref=f4e402]: FL
+                  - generic [ref=f4e405]: 21,340
+                - generic [ref=f4e406]:
+                  - generic [ref=f4e407]: "5"
+                  - generic [ref=f4e408]: IL
+                  - generic [ref=f4e411]: 16,820
+                - generic [ref=f4e412]:
+                  - generic [ref=f4e413]: "6"
+                  - generic [ref=f4e414]: PA
+                  - generic [ref=f4e417]: 13,940
+              - generic [ref=f4e418]:
+                - paragraph [ref=f4e419]: Executive Seniority Breakdown
+                - generic [ref=f4e420]:
+                  - generic [ref=f4e421]:
+                    - paragraph [ref=f4e422]: 65K
+                    - paragraph [ref=f4e423]: C-Level Executive
+                  - generic [ref=f4e424]:
+                    - paragraph [ref=f4e425]: 48K
+                    - paragraph [ref=f4e426]: Vice President
+                  - generic [ref=f4e427]:
+                    - paragraph [ref=f4e428]: 89K
+                    - paragraph [ref=f4e429]: Director
+                  - generic [ref=f4e430]:
+                    - paragraph [ref=f4e431]: 72K
+                    - paragraph [ref=f4e432]: Senior Manager
+                  - generic [ref=f4e433]:
+                    - paragraph [ref=f4e434]: 66K
+                    - paragraph [ref=f4e435]: Staff Specialist
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=f4e438]:
+        - button "Close toast" [ref=f4e439] [cursor=pointer]
+        - generic [ref=f4e446]:
+          - generic [ref=f4e447]: Master Vault Telemetry Refreshed
+          - generic [ref=f4e448]: Live multi-source statistics synchronized from PostgreSQL Master Vault
+  - button "Open Next.js Dev Tools" [ref=f4e9] [cursor=pointer]
+  - alert [ref=f4e436]
+  - generic [aria-hidden] [ref=f4e437]: SEC

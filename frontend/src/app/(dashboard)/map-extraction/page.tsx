@@ -4,7 +4,7 @@ import { MapExtractionPanel } from "@/components/map-extraction/map-extraction-p
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
-  title: "Open Map Extraction | OneExtraction Project",
+  title: "Open Map Extraction | DataExtraction Project",
   description: "Fault-tolerant OpenStreetMap POI extraction, Overpass mirror telemetry, and deduplicated ingestion.",
 };
 

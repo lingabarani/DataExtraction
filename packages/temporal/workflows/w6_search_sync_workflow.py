@@ -24,17 +24,9 @@ with workflow.unsafe.imports_passed_through():
         maintain_kg_partitions_activity,
         sync_opensearch_cdc_activity,
     )
-    from packages.infrastructure.config_manager import config_manager
+    from packages.temporal.config import QUEUE_SEARCH, SEARCH_RETRY_POLICY
 
-TASK_QUEUE = config_manager.QUEUE_SEARCH
-
-SEARCH_RETRY_POLICY = RetryPolicy(
-    initial_interval=timedelta(seconds=10),
-    backoff_coefficient=2.0,
-    maximum_interval=timedelta(minutes=15),
-    maximum_attempts=4,
-    non_retryable_error_types=["PermissionError"],
-)
+TASK_QUEUE = QUEUE_SEARCH
 
 
 @workflow.defn(name="Agent6SearchSyncWorkflow")

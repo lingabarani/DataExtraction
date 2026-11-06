@@ -1,0 +1,47 @@
+[
+  {
+    "id": "e2e-comp-001",
+    "legal_name": "Apex Cloud Systems Inc",
+    "domain": "apexcloud.io",
+    "website": "https://apexcloud.io",
+    "is_canonical": true,
+    "email": null,
+    "mock_html": "<html><body><header>Apex Cloud</header><p>Contact: <a href=\"mailto:info@apexcloud.io\">info@apexcloud.io</a></p></body></html>",
+    "expected_email": "info@apexcloud.io",
+    "expected_deliverability": "DELIVERABLE"
+  },
+  {
+    "id": "e2e-comp-002",
+    "legal_name": "Cloudflare Guarded Logistics LLC",
+    "domain": "guardlogistics.com",
+    "website": "https://guardlogistics.com",
+    "is_canonical": true,
+    "email": null,
+    "mock_html": "<html><body><p>Direct inquiries: <a href=\"/cdn-cgi/l/email-protection#24474b4a50454750644351455640484b434d57504743500a474b49\"><span class=\"__cf_email__\" data-cfemail=\"24474b4a50454750644351455640484b434d57504d47570a474b49\">[email&#160;protected]</span></a></p></body></html>",
+    "expected_email": "contact@guardlogistics.com",
+    "expected_deliverability": "DELIVERABLE"
+  },
+  {
+    "id": "e2e-comp-003",
+    "legal_name": "Secured Medical Devices Corp",
+    "domain": "medsecured.org",
+    "website": "https://medsecured.org",
+    "is_canonical": true,
+    "email": null,
+    "mock_html": "<html><body><p>Reach us: support&#64;medsecured&#46;org</p><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Organization\",\"email\":\"legal@medsecured.org\"}</script></body></html>",
+    "expected_email": "support@medsecured.org",
+    "expected_deliverability": "DELIVERABLE"
+  },
+  {
+    "id": "e2e-comp-004",
+    "legal_name": "Omni CatchAll Enterprises",
+    "domain": "omnicatch.net",
+    "website": "https://omnicatch.net",
+    "is_canonical": true,
+    "email": null,
+    "mock_html": "<html><body><p>Hello: hello@omnicatch.net</p></body></html>",
+    "expected_email": "hello@omnicatch.net",
+    "is_catchall": true,
+    "expected_deliverability": "RISKY"
+  }
+]

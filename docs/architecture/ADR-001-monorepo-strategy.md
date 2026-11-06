@@ -26,12 +26,12 @@ packages/
   pipeline/    # Data transformation
   temporal/    # Orchestration layer (new)
   agents/      # AI agent framework (new)
-  api/         # FastAPI backend
+  api/         # FastAPI backendxplain detail about 
   infrastructure/ # Shared utilities
   frontend/    # Next.js
 ```
 
-## Alternatives Considered
+## Alternatives 
 
 | Option | Pros | Cons | Verdict |
 |:-------|:-----|:-----|:--------|

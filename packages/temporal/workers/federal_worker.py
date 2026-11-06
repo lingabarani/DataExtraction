@@ -26,6 +26,16 @@ from packages.temporal.activities.federal_activities import (
     run_propublica_activity,
     run_sam_gov_activity,
 )
+from packages.temporal.activities.open_data_activities import (
+    run_sam_gov_extraction_activity,
+    run_census_cbp_extraction_activity,
+    run_openfda_extraction_activity,
+    run_bls_extraction_activity,
+    run_bea_extraction_activity,
+    run_eia_extraction_activity,
+    run_usgs_extraction_activity,
+    run_datagov_extraction_activity,
+)
 from packages.temporal.activities.pipeline_activities import normalize_batch_activity
 from packages.temporal.activities.storage_activities import (
     fetch_dlq_records_activity,
@@ -35,6 +45,7 @@ from packages.temporal.activities.storage_activities import (
     check_gmp_budget_activity,
 )
 from packages.temporal.workflows.federal_ingestion_workflow import FederalIngestionWorkflow
+from packages.temporal.workflows.open_data_ingestion_workflow import OpenDataIngestionWorkflow
 from packages.temporal.workflows.master_orchestration_workflow import MasterOrchestrationWorkflow
 from packages.temporal.workflows.dlq_replay_workflow import DLQReplayWorkflow
 
@@ -61,6 +72,7 @@ async def run_worker():
         task_queue=TASK_QUEUE,
         workflows=[
             FederalIngestionWorkflow,
+            OpenDataIngestionWorkflow,
             MasterOrchestrationWorkflow,
             DLQReplayWorkflow,
         ],
@@ -71,6 +83,14 @@ async def run_worker():
             run_usaspending_activity,
             run_propublica_activity,
             run_sam_gov_activity,
+            run_sam_gov_extraction_activity,
+            run_census_cbp_extraction_activity,
+            run_openfda_extraction_activity,
+            run_bls_extraction_activity,
+            run_bea_extraction_activity,
+            run_eia_extraction_activity,
+            run_usgs_extraction_activity,
+            run_datagov_extraction_activity,
             normalize_batch_activity,
             fetch_dlq_records_activity,
             resolve_dlq_record_activity,

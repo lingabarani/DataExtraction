@@ -21,7 +21,7 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
         sys.path.insert(0, p)
 
 from packages.temporal.client import get_temporal_client
-from packages.infrastructure.config_manager import config_manager
+from packages.temporal.config import QUEUE_REGISTRY, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.federal_activities import (
     run_cms_npi_activity,
     run_sec_edgar_activity,
@@ -29,6 +29,7 @@ from packages.temporal.activities.federal_activities import (
     run_usaspending_activity,
     run_propublica_activity,
     run_sam_gov_activity,
+    enrich_gleif_lei_activity,
 )
 from packages.temporal.activities.pipeline_activities import normalize_batch_activity
 from packages.temporal.activities.storage_activities import (
@@ -37,6 +38,7 @@ from packages.temporal.activities.storage_activities import (
 )
 from packages.temporal.workflows.w1_registry_workflow import Agent1RegistryWorkflow
 from packages.temporal.workflows.federal_ingestion_workflow import FederalIngestionWorkflow
+from packages.temporal.workflows.master_orchestrator import MasterOrchestrator
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
@@ -44,9 +46,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dataextraction.worker.registry")
 
-TASK_QUEUE = config_manager.QUEUE_REGISTRY
+TASK_QUEUE = QUEUE_REGISTRY
 LEGACY_QUEUE = "federal-ingestion"
-MAX_ACTIVITIES = int(os.getenv("REGISTRY_WORKER_MAX_CONCURRENT_ACTIVITIES", "6"))
+MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_REGISTRY, 6)
 
 
 async def run_worker():
@@ -60,11 +62,13 @@ async def run_worker():
         run_usaspending_activity,
         run_propublica_activity,
         run_sam_gov_activity,
+        enrich_gleif_lei_activity,
         normalize_batch_activity,
         ingest_kg_observation_activity,
         storage_query_activity,
     ]
     workflows = [
+        MasterOrchestrator,
         Agent1RegistryWorkflow,
         FederalIngestionWorkflow,
     ]

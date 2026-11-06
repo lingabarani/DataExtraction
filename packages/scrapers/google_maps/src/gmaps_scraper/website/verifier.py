@@ -317,3 +317,18 @@ class WebsiteVerifier:
         finally:
             if not client_provided:
                 await client.aclose()
+
+
+async def verify_url_target(candidate_url: str, business_name: str = "") -> bool:
+    """
+    Verifies reachability and authenticity of a candidate business URL.
+    Returns True if valid and reachable, False otherwise.
+    """
+    if not candidate_url:
+        return False
+    verifier = WebsiteVerifier()
+    try:
+        result = await verifier.verify(candidate_url, {"name": business_name})
+        return bool(result.get("verified", False) or result.get("status") == "success")
+    except Exception:
+        return False

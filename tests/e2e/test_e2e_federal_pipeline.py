@@ -29,9 +29,20 @@ for p in [
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from normalizer import normalize_company, normalize_person
-from tax_validator import validate_ein
-from dead_letter_queue import enqueue_dead_letter, _FALLBACK_FILE
+try:
+    from packages.domain.normalizer import normalize_company, normalize_person
+except ImportError:
+    from normalizer import normalize_company, normalize_person
+
+try:
+    from packages.domain.tax_validator import validate_ein
+except ImportError:
+    from tax_validator import validate_ein
+
+try:
+    from packages.infrastructure.dead_letter_queue import enqueue_dead_letter, _FALLBACK_FILE
+except ImportError:
+    from dead_letter_queue import enqueue_dead_letter, _FALLBACK_FILE
 from db_test_cleaner import EphemeralDatabaseHarness
 from wiremock_controller import load_fixture
 

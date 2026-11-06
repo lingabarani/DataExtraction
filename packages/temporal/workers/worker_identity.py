@@ -21,15 +21,18 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
         sys.path.insert(0, p)
 
 from packages.temporal.client import get_temporal_client
-from packages.infrastructure.config_manager import config_manager
+from packages.temporal.config import QUEUE_IDENTITY, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.pipeline_activities import (
     normalize_batch_activity,
     validate_tax_ids_activity,
     deduplicate_batch_activity,
+    link_records_splink_activity,
+    populate_working_organizations_activity,
 )
 from packages.temporal.activities.storage_activities import (
     resolve_cluster_membership_activity,
     unmerge_cluster_member_activity,
+    ingest_working_organization_activity,
     ingest_kg_organization_activity,
     storage_query_activity,
 )
@@ -41,8 +44,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dataextraction.worker.identity")
 
-TASK_QUEUE = config_manager.QUEUE_IDENTITY
-MAX_ACTIVITIES = int(os.getenv("IDENTITY_WORKER_MAX_CONCURRENT_ACTIVITIES", "8"))
+TASK_QUEUE = QUEUE_IDENTITY
+MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_IDENTITY, 8)
 
 
 async def run_worker():
@@ -53,8 +56,11 @@ async def run_worker():
         normalize_batch_activity,
         validate_tax_ids_activity,
         deduplicate_batch_activity,
+        link_records_splink_activity,
+        populate_working_organizations_activity,
         resolve_cluster_membership_activity,
         unmerge_cluster_member_activity,
+        ingest_working_organization_activity,
         ingest_kg_organization_activity,
         storage_query_activity,
     ]

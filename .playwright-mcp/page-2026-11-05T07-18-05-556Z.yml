@@ -1,0 +1,240 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e39]:
+    - complementary [ref=f1e40]:
+      - generic [ref=f1e41]:
+        - generic [ref=f1e48]:
+          - generic [ref=f1e49]: DataExtraction
+          - generic [ref=f1e50]: v2.1
+        - button "Da DataExtraction" [ref=f1e52] [cursor=pointer]:
+          - generic [ref=f1e53]: Da
+          - generic [ref=f1e55]: DataExtraction
+        - navigation [ref=f1e58]:
+          - paragraph [ref=f1e59]: Platform
+          - link "Temporal Orchestration LIVE" [ref=f1e60] [cursor=pointer]:
+            - /url: /orchestration
+            - generic [ref=f1e64]: Temporal Orchestration
+            - generic [ref=f1e66]: LIVE
+          - paragraph [ref=f1e67]: Data
+          - link "Dashboard" [ref=f1e68] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f1e75] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f1e81]: US Leads
+            - generic [ref=f1e82]: 906K
+          - link "MX Leads 50K" [ref=f1e83] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f1e89]: MX Leads
+            - generic [ref=f1e90]: 50K
+          - link "AI Query" [ref=f1e91] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f1e95]: Tools
+          - link "Scraper" [ref=f1e96] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f1e105] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f1e109] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f1e114] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f1e119] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f1e125] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@dataextraction.com" [ref=f1e131] [cursor=pointer]:
+          - generic [ref=f1e132]: A
+          - generic [ref=f1e134]:
+            - paragraph [ref=f1e135]: Admin
+            - paragraph [ref=f1e136]: admin@dataextraction.com
+    - generic [ref=f1e137]:
+      - banner [ref=f1e138]:
+        - navigation [ref=f1e139]:
+          - generic [ref=f1e140]: Dashboard
+        - generic [ref=f1e142]:
+          - button "Search... ⌘ K" [ref=f1e143] [cursor=pointer]:
+            - generic [ref=f1e147]: Search...
+            - generic [ref=f1e148]:
+              - generic [ref=f1e149]: ⌘
+              - generic [ref=f1e150]: K
+          - button "Toggle theme" [ref=f1e151] [cursor=pointer]
+          - button [ref=f1e153] [cursor=pointer]
+      - generic [ref=f1e156]:
+        - link "Dashboard" [active] [ref=f1e157] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Orchestration LIVE" [ref=f1e165] [cursor=pointer]:
+          - /url: /orchestration
+          - generic [ref=f1e169]: Orchestration
+          - generic [ref=f1e170]: LIVE
+        - link "Data Pipeline" [ref=f1e172] [cursor=pointer]:
+          - /url: /pipeline
+        - link "Observability" [ref=f1e178] [cursor=pointer]:
+          - /url: /orchestration#observability
+        - link "OneReach" [ref=f1e182] [cursor=pointer]:
+          - /url: /orchestration#onereach
+        - link "Freshness" [ref=f1e187] [cursor=pointer]:
+          - /url: /orchestration#freshness
+        - link "Administration" [ref=f1e192] [cursor=pointer]:
+          - /url: /settings
+      - main [ref=f1e197]:
+        - generic [ref=f1e1321]:
+          - generic [ref=f1e1322]:
+            - generic [ref=f1e1323]:
+              - heading "Overview" [level=1] [ref=f1e1324]
+              - paragraph [ref=f1e1325]: DataExtraction Project · US & Mexico B2B intelligence platform
+            - generic [ref=f1e1326]:
+              - link "Scrapers" [ref=f1e1327] [cursor=pointer]:
+                - /url: /scraper
+              - link "Export" [ref=f1e1328] [cursor=pointer]:
+                - /url: /export
+          - generic [ref=f1e1329]:
+            - heading "Key metrics" [level=2] [ref=f1e1331]
+            - generic [ref=f1e1332]:
+              - link "Master Golden Records 210,450 Certified Vault (US) +210K" [ref=f1e1333] [cursor=pointer]:
+                - /url: /leads
+                - generic [ref=f1e1334]:
+                  - generic [ref=f1e1335]: Master Golden Records
+                  - paragraph [ref=f1e1340]: 210,450
+                  - generic [ref=f1e1341]:
+                    - generic [ref=f1e1342]: Certified Vault (US)
+                    - generic [ref=f1e1343]: +210K
+              - link "Mexico Leads 50,208 Certified Vault (MX)" [ref=f1e1344] [cursor=pointer]:
+                - /url: /leads/mexico
+                - generic [ref=f1e1345]:
+                  - generic [ref=f1e1346]: Mexico Leads
+                  - paragraph [ref=f1e1351]: 50,208
+                  - generic [ref=f1e1352]: Certified Vault (MX)
+              - link "Direct Phone Coverage 198,240 94% verified phone rate" [ref=f1e1354] [cursor=pointer]:
+                - /url: /leads
+                - generic [ref=f1e1355]:
+                  - generic [ref=f1e1356]: Direct Phone Coverage
+                  - paragraph [ref=f1e1361]: 198,240
+                  - generic [ref=f1e1362]: 94% verified phone rate
+              - link "Verified Deliverable Emails 200,995 RFC 5322 & SMTP certified" [ref=f1e1364] [cursor=pointer]:
+                - /url: /export
+                - generic [ref=f1e1365]:
+                  - generic [ref=f1e1366]: Verified Deliverable Emails
+                  - paragraph [ref=f1e1371]: 200,995
+                  - generic [ref=f1e1372]: RFC 5322 & SMTP certified
+          - generic [ref=f1e1374]:
+            - generic [ref=f1e1375]:
+              - generic [ref=f1e1376]:
+                - heading "Records by data source" [level=2] [ref=f1e1377]
+                - generic [ref=f1e1378]: 210,450 total
+              - img [ref=f1e1381]:
+                - generic [ref=f1e1385]:
+                  - generic [ref=f1e1386]: "0"
+                  - generic [ref=f1e1388]: 20K
+                  - generic [ref=f1e1390]: 40K
+                  - generic [ref=f1e1392]: 60K
+                  - generic [ref=f1e1394]: 80K
+                - generic [ref=f1e1397]:
+                  - generic [ref=f1e1398]: SEC
+                  - generic [ref=f1e1400]: CMS
+                  - generic [ref=f1e1402]: FDIC
+                  - generic [ref=f1e1404]: SAM_GOV
+                  - generic [ref=f1e1406]: OpenStreetMap
+                  - generic [ref=f1e1408]: GoogleMaps
+            - generic [ref=f1e1424]:
+              - heading "Contact coverage" [level=2] [ref=f1e1426]
+              - generic [ref=f1e1427]:
+                - generic [ref=f1e1428]:
+                  - generic [ref=f1e1429]: US — Phone
+                  - generic [ref=f1e1432]: 94%
+                - generic [ref=f1e1433]:
+                  - generic [ref=f1e1434]: US — Email ✓
+                  - generic [ref=f1e1437]: 80%
+                - generic [ref=f1e1438]:
+                  - generic [ref=f1e1439]: MX — Email ✓
+                  - generic [ref=f1e1442]: 65%
+                - generic [ref=f1e1443]:
+                  - generic [ref=f1e1444]: MX — Phone
+                  - generic [ref=f1e1447]: 85%
+              - generic [ref=f1e1448]:
+                - generic [ref=f1e1449]:
+                  - generic [ref=f1e1450]: US total
+                  - generic [ref=f1e1451]: 210,450
+                - generic [ref=f1e1452]:
+                  - generic [ref=f1e1453]: MX total
+                  - generic [ref=f1e1454]: 50,208
+                - generic [ref=f1e1455]:
+                  - generic [ref=f1e1456]: Combined
+                  - generic [ref=f1e1457]: 260,658
+          - generic [ref=f1e1458]:
+            - generic [ref=f1e1459]:
+              - generic [ref=f1e1460]:
+                - heading "Top industries" [level=2] [ref=f1e1461]
+                - link "View all →" [ref=f1e1462] [cursor=pointer]:
+                  - /url: /leads
+              - generic [ref=f1e1463]:
+                - generic [ref=f1e1464]:
+                  - generic [ref=f1e1465]: "1"
+                  - generic [ref=f1e1466]: Healthcare & Life Sciences
+                  - generic [ref=f1e1469]: 52,180
+                - generic [ref=f1e1470]:
+                  - generic [ref=f1e1471]: "2"
+                  - generic [ref=f1e1472]: Financial Services & Banking
+                  - generic [ref=f1e1475]: 44,520
+                - generic [ref=f1e1476]:
+                  - generic [ref=f1e1477]: "3"
+                  - generic [ref=f1e1478]: Professional & Business Services
+                  - generic [ref=f1e1481]: 38,910
+                - generic [ref=f1e1482]:
+                  - generic [ref=f1e1483]: "4"
+                  - generic [ref=f1e1484]: Manufacturing & Industrial
+                  - generic [ref=f1e1487]: 31,450
+                - generic [ref=f1e1488]:
+                  - generic [ref=f1e1489]: "5"
+                  - generic [ref=f1e1490]: Technology, Cloud & Software
+                  - generic [ref=f1e1493]: 24,190
+                - generic [ref=f1e1494]:
+                  - generic [ref=f1e1495]: "6"
+                  - generic [ref=f1e1496]: Construction & Real Estate
+                  - generic [ref=f1e1499]: 19,200
+            - generic [ref=f1e1500]:
+              - heading "Top US states" [level=2] [ref=f1e1502]
+              - generic [ref=f1e1503]:
+                - generic [ref=f1e1504]:
+                  - generic [ref=f1e1505]: "1"
+                  - generic [ref=f1e1506]: CA
+                  - generic [ref=f1e1509]: 38,420
+                - generic [ref=f1e1510]:
+                  - generic [ref=f1e1511]: "2"
+                  - generic [ref=f1e1512]: TX
+                  - generic [ref=f1e1515]: 28,910
+                - generic [ref=f1e1516]:
+                  - generic [ref=f1e1517]: "3"
+                  - generic [ref=f1e1518]: NY
+                  - generic [ref=f1e1521]: 24,560
+                - generic [ref=f1e1522]:
+                  - generic [ref=f1e1523]: "4"
+                  - generic [ref=f1e1524]: FL
+                  - generic [ref=f1e1527]: 21,340
+                - generic [ref=f1e1528]:
+                  - generic [ref=f1e1529]: "5"
+                  - generic [ref=f1e1530]: IL
+                  - generic [ref=f1e1533]: 16,820
+                - generic [ref=f1e1534]:
+                  - generic [ref=f1e1535]: "6"
+                  - generic [ref=f1e1536]: PA
+                  - generic [ref=f1e1539]: 13,940
+              - generic [ref=f1e1540]:
+                - paragraph [ref=f1e1541]: Seniority breakdown
+                - generic [ref=f1e1542]:
+                  - generic [ref=f1e1543]:
+                    - paragraph [ref=f1e1544]: 65K
+                    - paragraph [ref=f1e1545]: C-Level Executive
+                  - generic [ref=f1e1546]:
+                    - paragraph [ref=f1e1547]: 48K
+                    - paragraph [ref=f1e1548]: Vice President
+                  - generic [ref=f1e1549]:
+                    - paragraph [ref=f1e1550]: 89K
+                    - paragraph [ref=f1e1551]: Director
+                  - generic [ref=f1e1552]:
+                    - paragraph [ref=f1e1553]: 72K
+                    - paragraph [ref=f1e1554]: Senior Manager
+                  - generic [ref=f1e1555]:
+                    - paragraph [ref=f1e1556]: 66K
+                    - paragraph [ref=f1e1557]: Staff Specialist
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f1e34] [cursor=pointer]
+  - alert [ref=f1e38]: Dashboard | DataExtraction Project
+  - generic [aria-hidden] [ref=f1e435]: SEC

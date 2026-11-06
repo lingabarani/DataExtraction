@@ -21,7 +21,7 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
         sys.path.insert(0, p)
 
 from packages.temporal.client import get_temporal_client
-from packages.infrastructure.config_manager import config_manager
+from packages.temporal.config import QUEUE_SEARCH, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.storage_activities import (
     maintain_kg_partitions_activity,
     sync_opensearch_cdc_activity,
@@ -35,8 +35,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dataextraction.worker.search")
 
-TASK_QUEUE = config_manager.QUEUE_SEARCH
-MAX_ACTIVITIES = int(os.getenv("SEARCH_WORKER_MAX_CONCURRENT_ACTIVITIES", "4"))
+TASK_QUEUE = QUEUE_SEARCH
+MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_SEARCH, 12)
 
 
 async def run_worker():

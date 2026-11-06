@@ -20,6 +20,7 @@ Usage:
 import json
 import re
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -49,6 +50,86 @@ try:
 except ImportError:
     def normalize_postal_code(code, country="US"):
         return str(code).strip() if code else None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Legal Suffix Normalization
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Comprehensive terminal legal suffix patterns for US, MX, Commonwealth, and Europe.
+# Longest / multi-token forms MUST precede shorter single tokens to prevent partial matches.
+LEGAL_SUFFIX_PATTERNS = [
+    # Multi-token Mexican corporate regimes
+    r"S\.?\s*A\.?\s*B\.?\s*DE\s*C\.?\s*V\.?",
+    r"S\.?\s*A\.?\s*DE\s*C\.?\s*V\.?",
+    r"S\.?\s*DE\s*R\.?\s*L\.?\s*DE\s*C\.?\s*V\.?",
+    r"S\.?\s*P\.?\s*R\.?\s*DE\s*R\.?\s*L\.?",
+    r"S\.?\s*DE\s*R\.?\s*L\.?",
+    r"S\.?\s*A\.?\s*S\.?",
+    r"S\.?\s*A\.?",
+    r"S\.?\s*C\.?",
+    r"S\.?\s*R\.?\s*L\.?",
+    # Multi-token US / Commonwealth
+    r"PVT\.?\s*LTD\.?",
+    r"PRIVATE\s*LIMITED",
+    r"PUBLIC\s*LIMITED\s*COMPANY",
+    r"LIMITED\s*LIABILITY\s*COMPANY",
+    r"LIMITED\s*PARTNERSHIP",
+    r"&\s*CO\.?",
+    r"LTD\.?\s*CO\.?",
+    r"L\.?\s*L\.?\s*C\.?",
+    r"L\.?\s*L\.?\s*P\.?",
+    r"L\.?\s*P\.?",
+    r"P\.?\s*C\.?",
+    r"P\.?\s*L\.?\s*L\.?\s*C\.?",
+    r"INC\.?",
+    r"INCORPORATED",
+    r"CORP\.?",
+    r"CORPORATION",
+    r"LIMITED",
+    r"LTD\.?",
+    r"CO\.?",
+    # European / Global
+    r"G\.?\s*M\.?\s*B\.?\s*H\.?",
+    r"A\.?\s*G\.?",
+    r"S\.?\s*E\.?",
+    r"B\.?\s*V\.?",
+    r"N\.?\s*V\.?",
+    r"SPA",
+    r"SARL",
+]
+
+_LEGAL_SUFFIX_REGEX = re.compile(
+    r"(?:[\s,\.\-_/]+(?:" + "|".join(LEGAL_SUFFIX_PATTERNS) + r"))+$",
+    re.IGNORECASE,
+)
+
+
+def clean_legal_suffixes(name: Optional[str]) -> Optional[str]:
+    """
+    Remove terminal legal entity suffixes while preserving the base corporate name.
+    
+    Supports US (Inc, LLC, Corp, LLP), Mexico (S.A. de C.V., S.A.B. de C.V., S. de R.L.),
+    Commonwealth (Ltd, Pvt Ltd), and European regimes (GmbH, AG, SE).
+
+    Only removes suffixes when they occur as terminal tokens; inner or leading occurrences
+    (e.g., 'Incorporate Global Inc.', 'Company Global Ltd') are preserved.
+
+    Returns:
+        Cleaned, uppercase normalized corporate name, or None if input is empty.
+    """
+    if name is None:
+        return None
+    s = str(name).strip()
+    if not s:
+        return None
+
+    # Strip terminal legal suffixes
+    cleaned = _LEGAL_SUFFIX_REGEX.sub("", s).strip()
+    # Remove any trailing punctuation left after suffix removal (e.g., trailing comma or period)
+    cleaned = re.sub(r"[\s,\.\-_/]+$", "", cleaned).strip()
+
+    return cleaned.upper() if cleaned else s.strip().upper()
 
 
 def _clean_domain(website_or_domain):
@@ -116,7 +197,7 @@ def _normalize_company_internal_json(raw: dict) -> dict:
         'name':                   _clean(raw.get('trade_name') or raw.get('legal_name')),
         'legal_name':             _clean(raw.get('legal_name')),
         'trade_name':             _clean(raw.get('trade_name')),
-        'normalized_name':        _clean(raw.get('normalized_name')),
+        'normalized_name':        clean_legal_suffixes(raw.get('normalized_name') or raw.get('legal_name') or raw.get('trade_name')),
         'entity_type':            _clean(raw.get('entity_type')),
         'website':                _clean(raw.get('website')),
         'domain':                 _clean_domain(raw.get('domain') or raw.get('website')),
@@ -162,7 +243,7 @@ def _normalize_company_csv(raw: dict) -> dict:
         'name':               _clean(raw.get('company_name') or raw.get('name')),
         'legal_name':         _clean(raw.get('company_name') or raw.get('legal_name')),
         'trade_name':         _clean(raw.get('company_name')),
-        'normalized_name':    _clean((raw.get('company_name') or '').upper()),
+        'normalized_name':    clean_legal_suffixes(raw.get('company_name') or raw.get('legal_name')),
         'website':            _clean(raw.get('website') or (f'https://{domain}' if domain else None)),
         'domain':             domain,
         'email':              None,
@@ -188,7 +269,7 @@ def _normalize_company_pdl(raw: dict) -> dict:
         'name':               _clean(raw.get('display_name') or raw.get('name')),
         'legal_name':         _clean(raw.get('legal_name') or raw.get('name')),
         'trade_name':         _clean(raw.get('display_name')),
-        'normalized_name':    _clean((raw.get('name') or '').upper()),
+        'normalized_name':    clean_legal_suffixes(raw.get('name') or raw.get('legal_name') or raw.get('display_name')),
         'website':            website,
         'domain':             _clean_domain(raw.get('website')),
         'email':              None,
@@ -216,7 +297,7 @@ def _normalize_company_sec(raw: dict) -> dict:
         'id':                 None,
         'name':               _clean(raw.get('name') or raw.get('company_name')),
         'legal_name':         _clean(raw.get('name') or raw.get('company_name')),
-        'normalized_name':    _clean((raw.get('name') or '').upper()),
+        'normalized_name':    clean_legal_suffixes(raw.get('name') or raw.get('company_name')),
         'cik':                _clean(raw.get('cik')),
         'ein':                _clean(raw.get('ein')),
         'sic_code':           _clean(raw.get('sic')),
@@ -236,7 +317,7 @@ def _normalize_company_apollo(raw: dict) -> dict:
         'id':                 None,
         'name':               _clean(raw.get('Company') or raw.get('company_name')),
         'legal_name':         _clean(raw.get('Company')),
-        'normalized_name':    _clean((raw.get('Company') or '').upper()),
+        'normalized_name':    clean_legal_suffixes(raw.get('Company') or raw.get('company_name')),
         'website':            _clean(raw.get('Website') or raw.get('website')),
         'domain':             _clean_domain(raw.get('Website') or raw.get('website')),
         'phone':              _clean(raw.get('Company Phone')),
@@ -259,7 +340,7 @@ def _normalize_company_zoominfo(raw: dict) -> dict:
         'id':                 None,
         'name':               _clean(raw.get('Company Name')),
         'legal_name':         _clean(raw.get('Company Name')),
-        'normalized_name':    _clean((raw.get('Company Name') or '').upper()),
+        'normalized_name':    clean_legal_suffixes(raw.get('Company Name')),
         'website':            _clean(raw.get('Website')),
         'domain':             _clean_domain(raw.get('Website')),
         'phone':              _clean(raw.get('Company Phone')),
@@ -546,7 +627,7 @@ def _normalize_company_osm(raw: dict) -> dict:
         'name':                   _clean(name),
         'legal_name':             _clean(raw.get('operator') or tags.get('operator') or name),
         'trade_name':             _clean(raw.get('brand') or tags.get('brand') or name),
-        'normalized_name':        _clean((name or '').upper()),
+        'normalized_name':        clean_legal_suffixes(name),
         'website':                _clean(website),
         'domain':                 domain,
         'email':                  _clean(email),
@@ -643,6 +724,14 @@ def supported_sources():
 # ─────────────────────────────────────────────────────────────────────────────
 # Quick self-test
 # ─────────────────────────────────────────────────────────────────────────────
+__all__ = [
+    "clean_legal_suffixes",
+    "normalize_company",
+    "normalize_person",
+    "supported_sources",
+]
+
+
 if __name__ == '__main__':
     # Test INTERNAL_JSON company
     sample_company = {
@@ -690,3 +779,18 @@ if __name__ == '__main__':
     print(f"✅ CSV person normalized: {p2['full_name']} | email={p2['email']} | source={p2['api_source']}")
 
     print(f"\n✅ Supported sources: {supported_sources()}")
+
+# Re-export modern title and industry taxonomy normalizers
+try:
+    from packages.domain.normalizer import (
+        normalize_executive_title,
+        normalize_executive_title_heuristic,
+        normalize_executive_title_llm,
+        normalize_executive_titles_batch,
+        classify_industry,
+        classify_industry_heuristic,
+        classify_industry_llm,
+        classify_industries_batch,
+    )
+except ImportError:
+    pass

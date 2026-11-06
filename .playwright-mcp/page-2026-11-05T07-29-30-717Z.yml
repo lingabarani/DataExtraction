@@ -1,0 +1,751 @@
+- generic:
+  - generic [aria-hidden]:
+    - complementary:
+      - generic:
+        - generic:
+          - generic:
+            - generic: DataExtraction
+            - generic: v2.1
+        - generic:
+          - button:
+            - generic: Da
+            - generic: DataExtraction
+        - navigation:
+          - paragraph: Platform
+          - link:
+            - /url: /orchestration
+            - generic: Temporal Orchestration
+            - generic: LIVE
+          - paragraph: Data
+          - link:
+            - /url: /dashboard
+            - generic: Dashboard
+          - link:
+            - /url: /leads
+            - generic: US Leads
+            - generic: 906K
+          - link:
+            - /url: /leads/mexico
+            - generic: MX Leads
+            - generic: 50K
+          - link:
+            - /url: /analytics
+            - generic: AI Query
+          - paragraph: Tools
+          - link:
+            - /url: /scraper
+            - generic: Scraper
+          - link:
+            - /url: /pipeline
+            - generic: Pipeline & DLQ
+          - link:
+            - /url: /map-extraction
+            - generic: Map Extraction
+          - link:
+            - /url: /duplicates
+            - generic: Duplicates
+          - link:
+            - /url: /export
+            - generic: Export
+        - generic:
+          - link:
+            - /url: /settings
+            - generic: Settings
+        - generic:
+          - button:
+            - generic: A
+            - generic:
+              - paragraph: Admin
+              - paragraph: admin@dataextraction.com
+    - generic:
+      - banner:
+        - navigation:
+          - generic: Temporal Orchestration
+        - generic:
+          - button:
+            - generic: Search...
+            - generic:
+              - generic: ⌘
+              - generic: K
+          - button:
+            - generic: Toggle theme
+          - button
+      - generic:
+        - generic:
+          - link:
+            - /url: /dashboard
+            - generic: Dashboard
+          - link:
+            - /url: /orchestration
+            - generic: Orchestration
+            - generic: LIVE
+          - link:
+            - /url: /pipeline
+            - generic: Data Pipeline
+          - link:
+            - /url: /orchestration#observability
+            - generic: Observability
+          - link:
+            - /url: /orchestration#onereach
+            - generic: OneReach
+          - link:
+            - /url: /orchestration#freshness
+            - generic: Freshness
+          - link:
+            - /url: /settings
+            - generic: Administration
+      - main:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=1]:
+                      - text: Temporal Orchestration Command Center
+                      - generic: LIVE TELEMETRY
+                    - paragraph: Autonomous B2B data extraction, entity resolution, and certified Master Golden Record pipeline
+              - generic:
+                - button: Refresh Status
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Platform
+                  - generic:
+                    - text: ONLINE
+                    - generic: (12ms)
+              - generic:
+                - generic:
+                  - generic: Temporal
+                  - generic: DURABLE 7233
+              - generic:
+                - generic:
+                  - generic: Database
+                  - generic: 210,450 Master
+              - generic:
+                - generic:
+                  - generic: OpenSearch
+                  - generic: SYNCED CDC
+              - generic:
+                - generic:
+                  - generic: OneReach
+                  - generic: ACTIVE Webhook
+            - generic:
+              - generic:
+                - generic:
+                  - paragraph: Active Workflows
+                  - paragraph: "0"
+              - generic:
+                - generic:
+                  - paragraph: Pending Workflows
+                  - paragraph: "0"
+              - generic:
+                - generic:
+                  - paragraph: Last Successful Run
+                  - paragraph: Certified Golden Run
+                  - paragraph: Ready for Ingestion
+          - generic:
+            - generic:
+              - generic: "Workflow Control:"
+              - generic: Cluster Standby
+            - generic:
+              - button:
+                - generic: Start Scraping
+              - button [disabled]:
+                - generic: Pause
+              - button [disabled]:
+                - generic: Resume
+              - button [disabled]:
+                - generic: Retry Failed Phase
+              - button [disabled]:
+                - generic: Restart Workflow
+              - button [disabled]:
+                - generic: Stop Workflow
+              - button:
+                - generic: Emergency Halt
+          - generic:
+            - generic:
+              - generic:
+                - generic: Pipeline Live Progression Ribbon
+                - generic: (13 Monitored Vault Nodes)
+              - generic:
+                - generic: Harvester
+                - generic: Working Layer
+                - generic: Governance
+                - generic: Master Vault
+            - generic:
+              - generic:
+                - generic: Orgs Scraped
+                - generic:
+                  - text: 215,400
+                  - paragraph: staging.companies
+              - generic:
+                - generic: Employees Found
+                - generic:
+                  - text: 885,500
+                  - paragraph: staging.persons
+              - generic:
+                - generic: Domains Verified
+                - generic:
+                  - text: 212,300
+                  - paragraph: Agent 2 Spatial
+              - generic:
+                - generic: Identity Clusters
+                - generic:
+                  - text: 210,950
+                  - paragraph: working_orgs
+              - generic:
+                - generic: Emails Found
+                - generic:
+                  - text: 645,000
+                  - paragraph: RFC 5322 Raw
+              - generic:
+                - generic: Emails Verified
+                - generic:
+                  - text: 580,200
+                  - paragraph: working_emails
+              - generic:
+                - generic: Execs Found
+                - generic:
+                  - text: 340,100
+                  - paragraph: working_persons
+              - generic:
+                - generic: Employment Edges
+                - generic:
+                  - text: 720,400
+                  - paragraph: kg_graph.edges
+              - generic:
+                - generic: Gov Approved
+                - generic:
+                  - text: 210,450
+                  - paragraph: Agent 5 Bayesian
+              - generic:
+                - generic: Promoted Records
+                - generic:
+                  - text: 210,450
+                  - paragraph: Promotion Gate
+              - generic:
+                - generic: Master Golden
+                - generic:
+                  - text: 210,450
+                  - paragraph: master_orgs (Vault)
+              - generic:
+                - generic: OpenSearch Docs
+                - generic:
+                  - text: 210,450
+                  - paragraph: Agent 6 CDC Sync
+              - generic:
+                - generic: OneReach Delivered
+                - generic:
+                  - text: 18,450
+                  - paragraph: Outbound Webhooks
+          - main:
+            - generic:
+              - generic:
+                - tablist:
+                  - tab [selected]: Topology & Execution
+                  - tab: Working Layer & Funnels
+                  - tab: Queues & Freshness SLA
+                  - tab: OneReach Outbound
+                  - tab: Logs & Error Center
+                - generic: "Single Source of Truth Vault: master_dataextraction"
+              - tabpanel:
+                - generic:
+                  - generic:
+                    - generic:
+                      - heading [level=2]: Topological Pipeline Directed Acyclic Graph (DAG)
+                      - generic: 8 Sequential Certified Vault Stages
+                    - generic: Click any stage node to inspect activity telemetry
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 1
+                                - heading [level=3]: Registry Harvester
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: staging_companies
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 2
+                                - heading [level=3]: Spatial & Domain Harvester
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: staging.locations
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 3
+                                - heading [level=3]: Identity Resolution
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: working_organizations
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 7
+                                - heading [level=3]: Email Discovery & 5-Tier
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: working_emails
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 4
+                                - heading [level=3]: Executive Discovery
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: working_persons
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 5
+                                - heading [level=3]: Governance & Certification
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: certification_scores
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Promotion Gate
+                                - heading [level=3]: PROMOTION GATE
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: master_dataextraction
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic:
+                            - generic: PENDING
+                            - generic: GATE ≥ 80
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Agent 6
+                                - heading [level=3]: Search, CDC & OneReach
+                          - generic:
+                            - generic:
+                              - generic: "Target:"
+                              - generic: OpenSearch & OneReach
+                            - generic:
+                              - generic: "Processed:"
+                              - generic: "0"
+                            - generic:
+                              - generic: "Duration:"
+                              - generic: "--"
+                          - generic: PENDING
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - heading [level=3]: Temporal Execution Telemetry
+                        - paragraph: "Workflow ID: No active execution"
+                    - generic: IDLE
+                  - generic:
+                    - generic:
+                      - generic: Pipeline Completion
+                      - generic: 0.0%
+                    - progressbar
+                  - generic:
+                    - generic:
+                      - generic: Current Phase
+                      - generic: STANDBY
+                    - generic:
+                      - generic: Current Agent
+                      - generic: None (Idle)
+                    - generic:
+                      - generic: Workflow Duration
+                      - generic: 0s
+                    - generic:
+                      - generic: Current Queue
+                      - generic: default
+                    - generic:
+                      - generic: Processed
+                      - generic: "0"
+                    - generic:
+                      - generic: In Backlog
+                      - generic: "0"
+                    - generic:
+                      - generic: Failures
+                      - generic: "0"
+                    - generic:
+                      - generic: Retries
+                      - generic: "0"
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - heading [level=3]: Autonomous Agent Fleet Telemetry
+                        - paragraph: Real-time monitoring across all 7 distributed worker services
+                    - generic: 7 AGENTS CONFIGURED
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 1: Registry Harvester"
+                              - paragraph: SEC EDGAR, CMS NPI, SAM.gov, FDIC
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: registry-harvester
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 2: Spatial & Domain"
+                              - paragraph: OSM Quadtrees, Google Places, Clearbit
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: spatial-domain
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 3: Identity Resolution"
+                              - paragraph: Splink 5.0, DuckDB Fellegi-Sunter Clusters
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: identity-splink
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 7: Email Discovery"
+                              - paragraph: 5-Tier RFC 5322 & SMTP Handshake
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: email-enrichment
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 4: Executive Discovery"
+                              - paragraph: Decision Makers & Career Employment Edges
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: executive-discovery
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 5: Governance & Certification"
+                              - paragraph: Bayesian Quality, Freshness SLA, Sanctions
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: governance-certification
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - heading [level=4]: "Agent 6: CDC, Search & OneReach"
+                              - paragraph: OpenSearch 2.x Sync & OneReach Delivery
+                          - generic: IDLE
+                        - generic:
+                          - generic:
+                            - generic: Progress
+                            - generic: 0%
+                          - progressbar
+                      - generic:
+                        - generic:
+                          - generic: Processed
+                          - text: "0"
+                        - generic:
+                          - generic: Failed
+                          - text: "0"
+                        - generic:
+                          - generic: Retries
+                          - text: "0"
+                      - generic:
+                        - generic:
+                          - generic: "Queue:"
+                          - generic: search-onereach-cdc
+                        - generic:
+                          - generic: "Activity:"
+                          - generic: Awaiting Trigger
+                        - generic:
+                          - generic: "Elapsed:"
+                          - generic: 0.0s
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f4e9] [cursor=pointer]
+  - alert: Temporal Orchestration Command Center | DataExtraction
+  - generic [aria-hidden]: SEC
+  - dialog [ref=f4e1334]:
+    - generic [ref=f4e1335]:
+      - heading "Start Master Orchestration Workflow" [level=2] [ref=f4e1340]
+      - paragraph [ref=f4e1341]: Launch the autonomous 8-stage pipeline across Harvesters, Identity Resolution, Email Enrichment, Executive Discovery, and Promotion Gate.
+    - generic [ref=f4e1342]:
+      - generic [ref=f4e1343]:
+        - generic [ref=f4e1344]:
+          - generic [ref=f4e1345]: Data Extraction Count
+          - generic [ref=f4e1346]: 5,000 targets
+        - generic [ref=f4e1347]:
+          - button "100" [active] [ref=f4e1348] [cursor=pointer]
+          - button "500" [ref=f4e1350] [cursor=pointer]
+          - button "1k" [ref=f4e1352] [cursor=pointer]
+          - button "5k" [ref=f4e1354] [cursor=pointer]
+          - button "10k" [ref=f4e1356] [cursor=pointer]
+          - button "50k" [ref=f4e1358] [cursor=pointer]
+          - button "100k" [ref=f4e1360] [cursor=pointer]
+      - generic [ref=f4e1362]:
+        - text: Geographic Scope
+        - generic [ref=f4e1363]:
+          - button "🇺🇸 United States" [ref=f4e1364] [cursor=pointer]:
+            - generic [ref=f4e1365]:
+              - generic [ref=f4e1366]: 🇺🇸
+              - generic [ref=f4e1367]: United States
+          - button "🇲🇽 Mexico" [ref=f4e1370] [cursor=pointer]:
+            - generic [ref=f4e1371]:
+              - generic [ref=f4e1372]: 🇲🇽
+              - generic [ref=f4e1373]: Mexico
+          - button "🇨🇦 Canada" [ref=f4e1374] [cursor=pointer]:
+            - generic [ref=f4e1375]:
+              - generic [ref=f4e1376]: 🇨🇦
+              - generic [ref=f4e1377]: Canada
+          - button "🌐 Global Cross-Border" [ref=f4e1378] [cursor=pointer]:
+            - generic [ref=f4e1379]:
+              - generic [ref=f4e1380]: 🌐
+              - generic [ref=f4e1381]: Global Cross-Border
+      - generic [ref=f4e1382]:
+        - text: Harvester Ingestion Sources
+        - generic [ref=f4e1383]:
+          - generic [ref=f4e1384] [cursor=pointer]:
+            - checkbox "Registry Sources" [checked] [ref=f4e1385]
+            - generic [ref=f4e1390]: Registry Sources
+          - generic [ref=f4e1391] [cursor=pointer]:
+            - checkbox "Google Maps" [checked] [ref=f4e1392]
+            - generic [ref=f4e1396]: Google Maps
+          - generic [ref=f4e1397] [cursor=pointer]:
+            - checkbox "OpenStreetMap" [checked] [ref=f4e1398]
+            - generic [ref=f4e1403]: OpenStreetMap
+      - generic [ref=f4e1404]:
+        - text: Execution Mode
+        - generic [ref=f4e1405]:
+          - button "Incremental Sync FAST Processes new changes; respects 30d/90d freshness SLA windows." [ref=f4e1406] [cursor=pointer]:
+            - generic [ref=f4e1407]:
+              - generic [ref=f4e1408]: Incremental Sync
+              - generic [ref=f4e1409]: FAST
+            - paragraph [ref=f4e1410]: Processes new changes; respects 30d/90d freshness SLA windows.
+          - button "Full Refresh DEEP SCAN Forces end-to-end re-harvesting and re-validates all records." [ref=f4e1411] [cursor=pointer]:
+            - generic [ref=f4e1412]:
+              - generic [ref=f4e1413]: Full Refresh
+              - generic [ref=f4e1414]: DEEP SCAN
+            - paragraph [ref=f4e1415]: Forces end-to-end re-harvesting and re-validates all records.
+    - generic [ref=f4e1416]:
+      - button "Cancel" [ref=f4e1417] [cursor=pointer]
+      - button "Start Workflow" [ref=f4e1418] [cursor=pointer]
+    - button "Close" [ref=f4e1419] [cursor=pointer]

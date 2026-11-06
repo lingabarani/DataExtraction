@@ -11,7 +11,7 @@ from typing import Callable, Optional
 from fastapi import Request, Response
 from fastapi.responses import PlainTextResponse
 
-logger = logging.getLogger("oneextraction.metrics")
+logger = logging.getLogger("dataextraction.metrics")
 
 try:
     from prometheus_client import (
@@ -48,9 +48,17 @@ if PROMETHEUS_AVAILABLE:
         "oneextraction_db_pool_active_connections",
         "Number of database connections currently checked out by workers",
     )
+    DATAEXTRACTION_DB_POOL_ACTIVE_CONNECTIONS = Gauge(
+        "dataextraction_db_pool_active_connections",
+        "Number of database connections currently checked out by workers",
+    )
 
     DB_POOL_CAPACITY = Gauge(
         "oneextraction_db_pool_capacity",
+        "Total maximum capacity of the PostgreSQL connection pool",
+    )
+    DATAEXTRACTION_DB_POOL_CAPACITY = Gauge(
+        "dataextraction_db_pool_capacity",
         "Total maximum capacity of the PostgreSQL connection pool",
     )
 
@@ -59,9 +67,17 @@ if PROMETHEUS_AVAILABLE:
         "oneextraction_dlq_pending_records",
         "Total un-replayed quarantined records in Dead-Letter Queue",
     )
+    DATAEXTRACTION_DLQ_PENDING_RECORDS = Gauge(
+        "dataextraction_dlq_pending_records",
+        "Total un-replayed quarantined records in Dead-Letter Queue",
+    )
 
     DLQ_ALERT_STATUS = Gauge(
         "oneextraction_dlq_alert_status",
+        "1 if DLQ backpressure exceeds the critical threshold (e.g., > 100), else 0",
+    )
+    DATAEXTRACTION_DLQ_ALERT_STATUS = Gauge(
+        "dataextraction_dlq_alert_status",
         "1 if DLQ backpressure exceeds the critical threshold (e.g., > 100), else 0",
     )
 
@@ -117,21 +133,26 @@ def update_system_gauges() -> None:
 
     # Update DB pool gauges
     try:
-        from db_connector import _pool, _pool_max
-        if _pool is not None:
-            active = len(getattr(_pool, "_used", []))
+        from packages.infrastructure.db_connector import _PG_POOL, DB_POOL_MAX
+        if _PG_POOL is not None:
+            active = len(getattr(_PG_POOL, "_used", []))
             DB_POOL_ACTIVE_CONNECTIONS.set(active)
-            DB_POOL_CAPACITY.set(_pool_max)
+            DATAEXTRACTION_DB_POOL_ACTIVE_CONNECTIONS.set(active)
+            DB_POOL_CAPACITY.set(DB_POOL_MAX)
+            DATAEXTRACTION_DB_POOL_CAPACITY.set(DB_POOL_MAX)
     except Exception:
         pass
 
     # Update DLQ gauges
     try:
-        from dead_letter_queue import get_dlq_stats
+        from packages.infrastructure.dead_letter_queue import get_dlq_stats
         stats = get_dlq_stats()
         pending = stats.get("pending_count", 0)
         DLQ_PENDING_RECORDS.set(pending)
-        DLQ_ALERT_STATUS.set(1 if pending > 100 else 0)
+        DATAEXTRACTION_DLQ_PENDING_RECORDS.set(pending)
+        alert_val = 1 if pending > 100 else 0
+        DLQ_ALERT_STATUS.set(alert_val)
+        DATAEXTRACTION_DLQ_ALERT_STATUS.set(alert_val)
     except Exception:
         pass
 

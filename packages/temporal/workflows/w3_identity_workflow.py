@@ -25,23 +25,17 @@ with workflow.unsafe.imports_passed_through():
         normalize_batch_activity,
         deduplicate_batch_activity,
         validate_tax_ids_activity,
+        populate_working_organizations_activity,
     )
     from packages.temporal.activities.storage_activities import (
         resolve_cluster_membership_activity,
         unmerge_cluster_member_activity,
+        ingest_working_organization_activity,
         ingest_kg_organization_activity,
     )
-    from packages.infrastructure.config_manager import config_manager
+    from packages.temporal.config import QUEUE_IDENTITY, IDENTITY_RETRY_POLICY
 
-TASK_QUEUE = config_manager.QUEUE_IDENTITY
-
-IDENTITY_RETRY_POLICY = RetryPolicy(
-    initial_interval=timedelta(seconds=15),
-    backoff_coefficient=2.0,
-    maximum_interval=timedelta(minutes=15),
-    maximum_attempts=3,
-    non_retryable_error_types=["PermissionError"],
-)
+TASK_QUEUE = QUEUE_IDENTITY
 
 
 @workflow.defn(name="Agent3IdentityWorkflow")
@@ -89,7 +83,7 @@ class Agent3IdentityWorkflow:
     async def run(self, config: dict = None) -> dict:
         config = config or {}
         self._status = "RUNNING"
-        target_table = config.get("target_table", "companies")
+        target_table = config.get("target_table", "staging_dataextraction.staging_companies")
         batch_size = config.get("batch_size", 5000)
 
         workflow.logger.info("[Agent 3] Identity Resolution started on queue: %s", TASK_QUEUE)
@@ -139,7 +133,25 @@ class Agent3IdentityWorkflow:
         except Exception as exc:
             self._results["deduplication"] = {"status": "FAILED", "error": str(exc)}
 
-        # ── Step 4: Identity Cluster Membership & Canonical Golden Record ─────
+        # ── Step 4: Populate Pre-Master Working Organizations Canvas ──────────
+        # Sprint 2 Redirection: Canonical entities are materialized directly into
+        # staging_dataextraction.working_organizations with PENDING verification statuses.
+        # Master database receives 0 writes here.
+        self._step = "POPULATE_WORKING_LAYER"
+        await workflow.wait_condition(lambda: not self._paused)
+        try:
+            pop_res = await workflow.execute_activity(
+                populate_working_organizations_activity,
+                args=[target_table, batch_size],
+                task_queue=TASK_QUEUE,
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=IDENTITY_RETRY_POLICY,
+            )
+            self._results["populate_working_layer"] = {"status": "SUCCESS", **pop_res}
+        except Exception as exc:
+            self._results["populate_working_layer"] = {"status": "FAILED", "error": str(exc)}
+
+        # ── Step 5: Identity Cluster Membership & Canonical Working Record ────
         self._step = "CLUSTER_RESOLUTION"
         cluster_records = config.get("cluster_records", [])
         if cluster_records:
@@ -154,11 +166,19 @@ class Agent3IdentityWorkflow:
                         retry_policy=IDENTITY_RETRY_POLICY,
                     )
                     cluster_outcomes.append(c_res)
+                    # Also stage working organization
+                    await workflow.execute_activity(
+                        ingest_working_organization_activity,
+                        args=[rec],
+                        task_queue=TASK_QUEUE,
+                        start_to_close_timeout=timedelta(minutes=5),
+                        retry_policy=IDENTITY_RETRY_POLICY,
+                    )
                 except Exception as exc:
                     cluster_outcomes.append({"status": "FAILED", "error": str(exc)})
             self._results["cluster_membership"] = cluster_outcomes
 
-        # ── Step 5: Process Any Dynamic Operator Unmerge Signals ───────────────
+        # ── Step 6: Process Any Dynamic Operator Unmerge Signals ───────────────
         self._step = "UNMERGE_DISPUTES"
         if self._unmerge_requests:
             unmerge_results = []

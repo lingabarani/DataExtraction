@@ -114,6 +114,55 @@
   </div>
 </div>
 
+<!-- Live Real-Time Scraping Feed & Category Monitor -->
+<div class="card" style="padding:18px 20px;margin-bottom:24px;background:#0b1120;border:1px solid #1e293b;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;box-shadow:0 0 10px #10b981;" id="liveStreamDot"></span>
+      <h3 style="margin:0;font-size:15px;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:8px;">
+        <span>⚡ Real-Time Scraping Stream</span>
+        <span id="liveStreamBadge" class="badge" style="font-size:10px;padding:2px 8px;border-radius:12px;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;">
+          LIVE STREAM ACTIVE
+        </span>
+      </h3>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;font-size:12px;">
+      <span style="color:#94a3b8;">Session Discoveries: <strong id="liveSessionNewCount" style="color:#10b981;font-size:14px;">+0</strong></span>
+      <span style="color:#475569;">|</span>
+      <label style="display:flex;align-items:center;gap:5px;color:#94a3b8;cursor:pointer;user-select:none;">
+        <input type="checkbox" id="liveFeedAutoScroll" checked style="accent-color:#10b981;"> Auto-scroll
+      </label>
+      <button class="btn btn-secondary btn-sm" onclick="clearLiveFeed()" style="padding:2px 8px;font-size:11px;">
+        Clear Feed
+      </button>
+    </div>
+  </div>
+
+  <!-- Live Category Status Chips Bar -->
+  <div style="margin-bottom:12px;">
+    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;font-weight:600;">
+      Concurrent Category Live Tallies
+    </div>
+    <div id="liveCategoryChipsContainer" style="display:flex;flex-wrap:wrap;gap:6px;">
+      <!-- Populated dynamically via JS -->
+      {% for cat in categories %}
+      <div id="catLiveChip_{{ cat.key }}" style="display:flex;align-items:center;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:11.5px;color:#cbd5e1;transition:all 0.3s ease;">
+        <span style="font-weight:600;">{{ cat.label }}</span>
+        <span id="catLiveBadge_{{ cat.key }}" style="font-weight:700;color:#64748b;background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:4px;font-family:var(--font-mono);font-size:11px;">+0</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Live Event Stream Terminal Box -->
+  <div id="liveScrapingFeed" style="max-height:220px;min-height:110px;overflow-y:auto;background:#050811;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:#cbd5e1;line-height:1.7;">
+    <div id="liveFeedPlaceholder" style="color:#475569;font-style:italic;">
+      Waiting for real-time scraping events... Start or resume the pipeline to watch live data stream in here.
+    </div>
+  </div>
+</div>
+
 <!-- Geographic Tile Map & Live Coverage Monitor (Section 7) -->
 <div class="card" style="padding:20px;margin-bottom:24px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:12px;">
@@ -342,8 +391,9 @@
         <div>
           <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">Collection Limit/Task</label>
           <select id="cfgCollectionLimit" class="rail-search-input" onchange="saveConfigAndPlan()" style="margin:0;">
+            <option value="0" selected>All Available (No limit)</option>
             <option value="25">25 places</option>
-            <option value="50" selected>50 places (Safe)</option>
+            <option value="50">50 places (Safe)</option>
             <option value="100">100 places</option>
             <option value="200">200 places</option>
           </select>
@@ -354,6 +404,30 @@
             <option value="3">3 pages</option>
             <option value="5" selected>5 pages</option>
             <option value="10">10 pages</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div>
+          <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">Category Workers</label>
+          <select id="cfgCategoryWorkers" class="rail-search-input" onchange="saveConfigAndPlan()" style="margin:0;">
+            <option value="all">All Categories Concurrently (Unbounded Workers)</option>
+            <option value="1">1 (Sequential)</option>
+            <option value="2">2 workers</option>
+            <option value="3" selected>3 workers (Default)</option>
+            <option value="5">5 workers</option>
+            <option value="8">8 workers</option>
+            <option value="10">10 workers</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">Request Concurrency</label>
+          <select id="cfgRequestConcurrency" class="rail-search-input" onchange="saveConfigAndPlan()" style="margin:0;">
+            <option value="1">1 req</option>
+            <option value="2">2 reqs</option>
+            <option value="3" selected>3 reqs (Default)</option>
+            <option value="5">5 reqs</option>
           </select>
         </div>
       </div>
@@ -718,11 +792,27 @@ function getConfigurationPayload() {
 
   const collectionLimitRaw = document.getElementById("cfgCollectionLimit")?.value;
   const collectionLimit = parseInt(collectionLimitRaw, 10);
-  const safeCollectionLimit = isNaN(collectionLimit) ? 50 : collectionLimit;
+  const safeCollectionLimit = isNaN(collectionLimit) ? null : (collectionLimit > 0 ? collectionLimit : null);
 
   const maxPagesRaw = document.getElementById("cfgMaxPages")?.value;
   const maxPages = parseInt(maxPagesRaw, 10);
   const safeMaxPages = isNaN(maxPages) ? 5 : maxPages;
+
+  const workersRaw = document.getElementById("cfgCategoryWorkers")?.value;
+  let safeWorkers = 3;
+  let allConcurrent = false;
+  if (!workersRaw || workersRaw === "all" || workersRaw === "0") {
+    safeWorkers = "all";
+    allConcurrent = true;
+  } else {
+    const parsed = parseInt(workersRaw, 10);
+    safeWorkers = isNaN(parsed) ? "all" : (parsed > 0 ? parsed : "all");
+    allConcurrent = (safeWorkers === "all");
+  }
+
+  const reqConcurrencyRaw = document.getElementById("cfgRequestConcurrency")?.value;
+  const reqConcurrency = parseInt(reqConcurrencyRaw, 10);
+  const safeReqConcurrency = isNaN(reqConcurrency) ? 3 : (reqConcurrency > 0 ? reqConcurrency : 3);
 
   const resume = !!document.getElementById("cfgResume")?.checked;
   const retryFailed = !!document.getElementById("cfgRetryFailed")?.checked;
@@ -738,8 +828,11 @@ function getConfigurationPayload() {
     country: country,
     regions: regions,
     categories: categories,
+    category_workers: safeWorkers,
+    all_categories_concurrent: allConcurrent,
+    request_concurrency: safeReqConcurrency,
     collection_limit: safeCollectionLimit,
-    batch_size: safeCollectionLimit,
+    batch_size: 50,
     max_crawl_pages: safeMaxPages,
     stages: stages,
     resume_checkpoint: resume,
@@ -1086,6 +1179,111 @@ function filterRegionsTable(query) {
   });
 }
 
+let liveSessionNewCount = 0;
+
+function clearLiveFeed() {
+  const feed = document.getElementById("liveScrapingFeed");
+  if (feed) {
+    feed.innerHTML = '<div style="color:#475569;font-style:italic;">Feed cleared. Waiting for new scraping events...</div>';
+  }
+}
+
+function handleLiveScrapingEvent(payload) {
+  if (!payload || !payload.event) return;
+  const ev = payload.event;
+  const data = payload.data || {};
+  const feed = document.getElementById("liveScrapingFeed");
+  const placeholder = document.getElementById("liveFeedPlaceholder");
+  if (placeholder && placeholder.parentNode) {
+    placeholder.parentNode.removeChild(placeholder);
+  }
+
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+
+  if (ev === "tile_completed" || ev === "tile_subdivided") {
+    const newInTile = data.new_in_tile || data.new_records || 0;
+    const cat = data.category || "";
+    const reg = `${data.country || 'US'}-${data.region || ''}`;
+    const catNew = data.category_new || 0;
+    const tot = data.businesses_collected || data.total_unique || 0;
+
+    // 1. Update session total
+    if (newInTile > 0) {
+      liveSessionNewCount += newInTile;
+      const sessEl = document.getElementById("liveSessionNewCount");
+      if (sessEl) sessEl.innerText = `+${liveSessionNewCount.toLocaleString()}`;
+    }
+
+    // 2. Update category live tally badge
+    if (cat) {
+      const badge = document.getElementById(`catLiveBadge_${cat}`);
+      const chip = document.getElementById(`catLiveChip_${cat}`);
+      if (badge) {
+        badge.innerText = `+${catNew}`;
+        if (catNew > 0) {
+          badge.style.color = "#10b981";
+          badge.style.background = "rgba(16,185,129,0.2)";
+          if (chip) chip.style.borderColor = "#10b981";
+        }
+      }
+    }
+
+    // 3. Update top businesses collected metric immediately
+    if (tot > 0) {
+      const bMetric = document.getElementById("metricBusinesses");
+      if (bMetric) bMetric.innerText = tot.toLocaleString();
+    }
+
+    // 4. Append to Live Feed if new places were found
+    if (newInTile > 0 && feed) {
+      const entry = document.createElement("div");
+      entry.style.cssText = "padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:8px;flex-wrap:wrap;align-items:center;";
+      entry.innerHTML = `
+        <span style="color:#64748b;font-size:11px;">[${timeStr}]</span>
+        <span style="color:#38bdf8;font-weight:700;">⚡ [${reg}]</span>
+        <span style="color:#f8fafc;font-weight:600;">${cat}</span>:
+        <span style="color:#10b981;font-weight:700;background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px;">+${newInTile} places</span>
+        <span style="color:#94a3b8;font-size:11.5px;">(Cat Total: <strong style="color:#cbd5e1;">+${catNew}</strong> | DB Total: <strong style="color:#38bdf8;">${tot.toLocaleString()}</strong>)</span>
+        <span style="color:#475569;font-size:10.5px;">${data.tile_id || ''}</span>
+      `;
+      feed.appendChild(entry);
+
+      // Keep maximum 150 entries in memory
+      while (feed.children.length > 150) {
+        feed.removeChild(feed.firstChild);
+      }
+
+      // Auto-scroll
+      const autoScroll = document.getElementById("liveFeedAutoScroll");
+      if (autoScroll && autoScroll.checked) {
+        feed.scrollTop = feed.scrollHeight;
+      }
+    }
+  } else if (ev === "task_completed" && feed) {
+    const cat = data.category || "";
+    const reg = `${data.country || 'US'}-${data.region || ''}`;
+    const n = data.new_records || data.records_collected || 0;
+    const entry = document.createElement("div");
+    entry.style.cssText = "padding:4px 0;border-bottom:1px solid rgba(16,185,129,0.15);background:rgba(16,185,129,0.05);color:#10b981;font-weight:600;";
+    entry.innerHTML = `
+      <span style="color:#64748b;font-size:11px;">[${timeStr}]</span>
+      <span>✓ [${reg}] Category '<strong>${cat}</strong>' completed! (+${n} new places)</span>
+    `;
+    feed.appendChild(entry);
+    const autoScroll = document.getElementById("liveFeedAutoScroll");
+    if (autoScroll && autoScroll.checked) feed.scrollTop = feed.scrollHeight;
+  } else if (ev === "region_completed" && feed) {
+    const regName = data.region_name || data.region || "";
+    const entry = document.createElement("div");
+    entry.style.cssText = "padding:5px 0;margin:4px 0;border-top:1px dashed #38bdf8;border-bottom:1px dashed #38bdf8;color:#38bdf8;font-weight:700;";
+    entry.innerHTML = `[${timeStr}] ═══ All categories completed for ${regName}! Advancing to next territory... ═══`;
+    feed.appendChild(entry);
+    const autoScroll = document.getElementById("liveFeedAutoScroll");
+    if (autoScroll && autoScroll.checked) feed.scrollTop = feed.scrollHeight;
+  }
+}
+
 function initEventSource() {
   if (eventSource) return;
   try {
@@ -1093,6 +1291,8 @@ function initEventSource() {
     eventSource.onmessage = (e) => {
       try {
         const payload = JSON.parse(e.data);
+        handleLiveScrapingEvent(payload);
+
         if (payload.event === "init") {
           renderLiveStatus(payload.data);
         } else if (payload.event && payload.event.startsWith("tile_")) {

@@ -31,3 +31,9 @@ workers:
     max_concurrent_activities: 10
     max_concurrent_workflow_tasks: 30
     graceful_shutdown_timeout_seconds: 15
+
+  email_enrichment:
+    task_queue: "email-enrichment-queue"
+    max_concurrent_activities: 10
+    max_concurrent_workflow_tasks: 20
+    graceful_shutdown_timeout_seconds: 30

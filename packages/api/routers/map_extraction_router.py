@@ -34,23 +34,43 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from api.deps import UserPrincipal, get_optional_user
-from openmap_engine import (
-    OverpassConfig,
-    default_config,
-    EndpointCircuitBreaker,
-    AdaptiveQuadtree,
-    EnterpriseCheckpointManager,
-    OpenMapConnector,
-    US_STATES,
-    STATE_CODES,
-    STATE_BOUNDING_BOXES,
-    FIELDS_TAXONOMY,
-    FIELD_BY_NAME,
-    slugify,
-    get_state_bbox,
-    get_field_info,
-)
+try:
+    from packages.api.routers.deps import UserPrincipal, get_optional_user
+except ImportError:
+    from api.deps import UserPrincipal, get_optional_user
+try:
+    from packages.scrapers.open_map.config import OverpassConfig, default_config
+    from packages.scrapers.open_map.circuit_breaker import EndpointCircuitBreaker
+    from packages.scrapers.open_map.quadtree import AdaptiveQuadtree
+    from packages.scrapers.open_map.checkpoint import EnterpriseCheckpointManager
+    from packages.scrapers.open_map.connector import OpenMapConnector
+    from packages.scrapers.open_map.taxonomy import (
+        US_STATES,
+        STATE_CODES,
+        STATE_BOUNDING_BOXES,
+        FIELDS_TAXONOMY,
+        FIELD_BY_NAME,
+        slugify,
+        get_state_bbox,
+        get_field_info,
+    )
+except ImportError:
+    from openmap_engine import (
+        OverpassConfig,
+        default_config,
+        EndpointCircuitBreaker,
+        AdaptiveQuadtree,
+        EnterpriseCheckpointManager,
+        OpenMapConnector,
+        US_STATES,
+        STATE_CODES,
+        STATE_BOUNDING_BOXES,
+        FIELDS_TAXONOMY,
+        FIELD_BY_NAME,
+        slugify,
+        get_state_bbox,
+        get_field_info,
+    )
 
 logger = logging.getLogger("oneextraction.map_extraction_router")
 

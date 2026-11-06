@@ -1,0 +1,19 @@
+{
+  "total_records": 10000,
+  "batch_size": 2500,
+  "total_batches": 4,
+  "total_duration_sec": 17.044,
+  "throughput_rps": 586.7,
+  "latency_p50_ms": 3078.0,
+  "latency_p90_ms": 7176.07,
+  "latency_p95_ms": 7176.07,
+  "latency_p99_ms": 7176.07,
+  "latency_avg_ms": 3906.19,
+  "latency_min_ms": 2159.49,
+  "latency_max_ms": 7176.07,
+  "peak_memory_mb": 18.01,
+  "memory_growth_mb": 6.79,
+  "errors_encountered": 0,
+  "dry_run": false,
+  "timestamp": "2026-11-04T07:29:45.516919+00:00"
+}

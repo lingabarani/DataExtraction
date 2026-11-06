@@ -1,0 +1,117 @@
+- generic [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - complementary [ref=f2e13]:
+      - generic [ref=f2e14]:
+        - generic [ref=f2e19]:
+          - generic [ref=f2e20]: DataExtraction
+          - generic [ref=f2e21]: v2.1
+        - button "On OneExtraction" [ref=f2e23] [cursor=pointer]:
+          - generic [ref=f2e24]: "On"
+          - generic [ref=f2e26]: OneExtraction
+        - navigation [ref=f2e29]:
+          - paragraph [ref=f2e30]: Data
+          - link "Dashboard" [ref=f2e31] [cursor=pointer]:
+            - /url: /dashboard
+          - link "US Leads 906K" [ref=f2e38] [cursor=pointer]:
+            - /url: /leads
+            - generic [ref=f2e44]: US Leads
+            - generic [ref=f2e45]: 906K
+          - link "MX Leads 50K" [ref=f2e46] [cursor=pointer]:
+            - /url: /leads/mexico
+            - generic [ref=f2e52]: MX Leads
+            - generic [ref=f2e53]: 50K
+          - link "AI Query" [ref=f2e54] [cursor=pointer]:
+            - /url: /analytics
+          - paragraph [ref=f2e58]: Orchestration
+          - link "Pipelines" [ref=f2e59] [cursor=pointer]:
+            - /url: /pipelines
+          - link "Agents 7" [ref=f2e65] [cursor=pointer]:
+            - /url: /agents
+            - generic [ref=f2e69]: Agents
+            - generic [ref=f2e70]: "7"
+          - link "Schedules" [ref=f2e71] [cursor=pointer]:
+            - /url: /schedules
+          - paragraph [ref=f2e77]: Tools
+          - link "Scraper" [ref=f2e78] [cursor=pointer]:
+            - /url: /scraper
+          - link "Pipeline & DLQ" [ref=f2e87] [cursor=pointer]:
+            - /url: /pipeline
+          - link "Map Extraction" [ref=f2e91] [cursor=pointer]:
+            - /url: /map-extraction
+          - link "Duplicates" [ref=f2e96] [cursor=pointer]:
+            - /url: /duplicates
+          - link "Export" [ref=f2e101] [cursor=pointer]:
+            - /url: /export
+        - link "Settings" [ref=f2e107] [cursor=pointer]:
+          - /url: /settings
+        - button "A Admin admin@oneextraction.internal" [ref=f2e113] [cursor=pointer]:
+          - generic [ref=f2e114]: A
+          - generic [ref=f2e116]:
+            - paragraph [ref=f2e117]: Admin
+            - paragraph [ref=f2e118]: admin@oneextraction.internal
+    - generic [ref=f2e119]:
+      - banner [ref=f2e120]:
+        - navigation [ref=f2e121]:
+          - generic [ref=f2e122]: Agents
+        - generic [ref=f2e124]:
+          - button "Search... ⌘ K" [ref=f2e125] [cursor=pointer]:
+            - generic [ref=f2e129]: Search...
+            - generic [ref=f2e130]:
+              - generic [ref=f2e131]: ⌘
+              - generic [ref=f2e132]: K
+          - button "Toggle theme" [ref=f2e133] [cursor=pointer]
+          - button [ref=f2e135] [cursor=pointer]
+      - main [ref=f2e137]:
+        - generic [ref=f2e138]:
+          - generic [ref=f2e139]:
+            - generic [ref=f2e140]:
+              - heading "Autonomous Agent Supervision & Pipeline Observability" [level=1] [ref=f2e141]
+              - paragraph [ref=f2e142]: Mission control orchestrating 7 Temporal-native AI agents across statutory scraping, identity resolution, email verification, and OpenSearch CDC.
+            - generic [ref=f2e143]: 7 Agents Online (0 In-Flight)
+          - generic [ref=f2e146]:
+            - generic [ref=f2e147]:
+              - generic [ref=f2e148]:
+                - generic [ref=f2e151]: "ID:"
+                - generic [ref=f2e152]: master-saga-1793578287
+              - generic [ref=f2e153]: SAGA COMPLETED
+            - generic [ref=f2e155]:
+              - button "Trigger Saga Run" [ref=f2e156] [cursor=pointer]
+              - button "3s Polling" [ref=f2e157] [cursor=pointer]
+              - button "Refresh telemetry" [ref=f2e158] [cursor=pointer]
+          - generic [ref=f2e159]:
+            - generic [ref=f2e161]:
+              - heading "Human Approval Decision Gate (1 Action Pending)" [level=3] [ref=f2e165]
+              - generic [ref=f2e166]: SRE Quarantine Policy
+            - generic [ref=f2e168]:
+              - generic [ref=f2e169]:
+                - generic [ref=f2e170]:
+                  - generic [ref=f2e171]: Replay 450 Quarantined Records
+                  - generic [ref=f2e172]: DataQualityAgent (Agent 5)
+                  - generic [ref=f2e173]: 12 mins ago
+                - paragraph [ref=f2e174]: DLQ backlog (450 records) exceeds auto-replay threshold of 100. Manual operator confirmation required before storage batch commit.
+              - generic [ref=f2e175]:
+                - button "Reject" [ref=f2e176] [cursor=pointer]
+                - button "Approve Batch Replay" [ref=f2e177] [cursor=pointer]
+          - generic [ref=f2e178]:
+            - tablist [ref=f2e179]:
+              - tab "Execution DAG & Agents Roster" [ref=f2e180] [cursor=pointer]
+              - tab "Data Journey & Storage Layers" [ref=f2e185] [cursor=pointer]
+              - tab "DLQ Quarantined Anomalies" [active] [selected] [ref=f2e190] [cursor=pointer]
+            - tabpanel "DLQ Quarantined Anomalies" [ref=f2e781]:
+              - generic [ref=f2e782]:
+                - generic [ref=f2e784]:
+                  - generic [ref=f2e785]:
+                    - heading "Dead-Letter Queue (DLQ) Quarantined Anomaly Inspector" [level=3] [ref=f2e789]
+                    - paragraph [ref=f2e790]: Inspect and replay records isolated by Agent 5 Bayesian Governance due to schema or validation faults.
+                  - generic [ref=f2e791]:
+                    - generic [ref=f2e792]:
+                      - button "PENDING" [ref=f2e793] [cursor=pointer]
+                      - button "REPLAYED" [ref=f2e794] [cursor=pointer]
+                      - button "DISCARDED" [ref=f2e795] [cursor=pointer]
+                    - button [ref=f2e796] [cursor=pointer]
+                - generic [ref=f2e798]:
+                  - heading "Zero Quarantined Records" [level=4] [ref=f2e802]
+                  - paragraph [ref=f2e803]: All statutory extractions and enrichment stages are executing within strict tolerance thresholds.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f2e9] [cursor=pointer]
+  - alert [ref=f2e571]
