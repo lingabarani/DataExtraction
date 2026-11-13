@@ -3395,7 +3395,7 @@ class Database:
         """
         with self.get_connection() as conn:
             today_row = conn.execute(
-                "SELECT COUNT(*) FROM raw_places WHERE date(collected_at, 'localtime') = date('now', 'localtime')"
+                "SELECT COUNT(*) FROM raw_places WHERE date(collected_at) = date('now', 'localtime') OR date(collected_at, 'localtime') = date('now', 'localtime')"
             ).fetchone()
             raw_today = today_row[0] if today_row else 0
 

@@ -424,7 +424,7 @@ def test_atomic_live_export_leaves_sqlite_intact(temp_db: Database, tmp_path: Pa
     record = {
         "raw_id": "safe_r1", "cid": "safe_c1", "name": "Safe Hospital",
         "country_code": "US", "region": "NV", "category": "healthcare",
-        "collected_at": "2026-10-29 10:00:00"
+        "collected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     temp_db.insert_raw_place(record)
 

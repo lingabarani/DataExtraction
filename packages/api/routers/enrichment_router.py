@@ -20,6 +20,13 @@ from packages.infrastructure.structured_logger import get_structured_logger
 from packages.temporal.client import get_temporal_client
 from packages.temporal.config import QUEUE_EMAIL_ENRICHMENT
 
+try:
+    from packages.scrapers.web.email_crawler import AsyncEmailWebCrawler
+    from packages.domain.email_enricher import email_enrichment_engine
+except ImportError:
+    AsyncEmailWebCrawler = None  # type: ignore
+    email_enrichment_engine = None  # type: ignore
+
 _EMAIL_WORKFLOW_CACHE = None
 
 
@@ -193,8 +200,13 @@ async def probe_single_domain(
     url = payload.website_url or f"https://{domain}"
 
     try:
-        from packages.scrapers.web.email_crawler import AsyncEmailWebCrawler
-        from packages.domain.email_enricher import email_enrichment_engine
+        global AsyncEmailWebCrawler, email_enrichment_engine
+        if AsyncEmailWebCrawler is None:
+            from packages.scrapers.web.email_crawler import AsyncEmailWebCrawler as _Crawler
+            AsyncEmailWebCrawler = _Crawler
+        if email_enrichment_engine is None:
+            from packages.domain.email_enricher import email_enrichment_engine as _Engine
+            email_enrichment_engine = _Engine
 
         crawler = AsyncEmailWebCrawler()
         crawl_results = await crawler.crawl_site(url)

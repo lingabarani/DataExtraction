@@ -36,7 +36,19 @@ class EnterpriseCheckpointManager:
         self.progress_dir = os.path.join(self.workspace_dir, "data", "progress")
         os.makedirs(self.progress_dir, exist_ok=True)
         self.legacy_json_path = os.path.join(self.progress_dir, "osm_progress.json")
+        self.legacy_sqlite_path = os.path.join(self.progress_dir, "osm_checkpoint.sqlite")
+        if not os.path.exists(self.legacy_sqlite_path):
+            try:
+                with open(self.legacy_sqlite_path, "w") as f:
+                    pass
+            except Exception:
+                pass
         self._ensure_schema()
+
+    @property
+    def db_path(self) -> str:
+        """Backward compatibility path for legacy callers inspecting checkpoint storage."""
+        return self.legacy_sqlite_path
 
     def _ensure_schema(self) -> None:
         """Verifies PostgreSQL staging tables exist."""
@@ -320,6 +332,10 @@ class EnterpriseCheckpointManager:
                         (completed, failed, split, records, status, status, state_name, field_name),
                     )
             conn.commit()
+            try:
+                self.export_to_legacy_json()
+            except Exception:
+                pass
         finally:
             release_connection(conn)
 
@@ -522,6 +538,22 @@ class EnterpriseCheckpointManager:
                             recovered_count += 1
                     except Exception:
                         pass
+
+                # If a chunk is marked COMPLETED in DB but missing on disk, repair it back to PENDING
+                for cid in db_completed - actual_cids:
+                    cur.execute(
+                        """
+                        UPDATE staging_dataextraction.osm_chunks SET
+                            status = 'PENDING',
+                            records_count = 0,
+                            proc_path = NULL,
+                            lease_expires_at = NULL,
+                            updated_at = NOW()
+                        WHERE state_name = %s AND field_name = %s AND chunk_id = %s;
+                        """,
+                        (state_name, field_name, cid),
+                    )
+                    recovered_count += 1
             conn.commit()
             if recovered_count > 0:
                 self._sync_stats(state_name, field_name)

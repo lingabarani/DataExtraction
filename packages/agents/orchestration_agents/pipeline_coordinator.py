@@ -9,9 +9,10 @@ active or managing the execution, this coordinator yields to the master saga.
 """
 
 import logging
-from typing import Dict, Any, List
-from packages.agents.base_agent import BaseAgent, AgentDecision
-from packages.agents.tools.temporal_tool import list_completed_workflows, list_active_workflows
+from typing import Any
+
+from packages.agents.base_agent import AgentDecision, BaseAgent
+from packages.agents.tools.temporal_tool import list_active_workflows, list_completed_workflows
 
 logger = logging.getLogger("dataextraction.agents.pipeline_coordinator")
 
@@ -23,11 +24,11 @@ class PipelineCoordinatorAgent(BaseAgent):
     or deduplication phase is queued safely without duplicate executions.
     """
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         super().__init__(name="pipeline-coordinator", config=config or {})
         self._processed_runs: set = set()
 
-    async def observe(self) -> Dict[str, Any]:
+    async def observe(self) -> dict[str, Any]:
         """
         Observes completed workflows, currently active workflows, and master orchestrator status.
         """
@@ -43,7 +44,7 @@ class PipelineCoordinatorAgent(BaseAgent):
             "has_active_master_saga": len(active_master) > 0,
         }
 
-    async def decide(self, observations: Dict[str, Any]) -> AgentDecision:
+    async def decide(self, observations: dict[str, Any]) -> AgentDecision:
         """
         Determines if any newly completed extraction workflow needs downstream enrichment.
         Yields to MasterOrchestrationWorkflow if active to avoid duplicate execution.

@@ -17,6 +17,7 @@ import tempfile
 import time
 import sys
 import unittest
+import uuid
 from pathlib import Path
 
 _osm_dir = Path(__file__).resolve().parent
@@ -158,8 +159,9 @@ class TestEnterpriseCheckpointManager(unittest.TestCase):
             {"chunk_id": "chunk_0001", "bbox": (30.0, -88.0, 30.5, -87.5)},
             {"chunk_id": "chunk_0002", "bbox": (30.5, -88.0, 31.0, -87.5)},
         ]
+        test_state = f"Test_Alabama_{uuid.uuid4().hex[:6]}"
         self.cp.init_field(
-            state_name="Alabama",
+            state_name=test_state,
             state_code="AL",
             field_name="healthcare",
             field_group="HEALTHCARE",
@@ -167,12 +169,12 @@ class TestEnterpriseCheckpointManager(unittest.TestCase):
             chunks_info=chunks
         )
 
-        completed_set = self.cp.get_completed_chunk_ids("Alabama", "healthcare")
+        completed_set = self.cp.get_completed_chunk_ids(test_state, "healthcare")
         self.assertEqual(len(completed_set), 0)
 
         # Mark chunk_0001 completed
         self.cp.mark_chunk_completed(
-            state_name="Alabama",
+            state_name=test_state,
             field_name="healthcare",
             chunk_id="chunk_0001",
             records_count=42,
@@ -180,16 +182,17 @@ class TestEnterpriseCheckpointManager(unittest.TestCase):
             proc_path=os.path.join(self.test_dir, "proc.json")
         )
 
-        completed_set = self.cp.get_completed_chunk_ids("Alabama", "healthcare")
+        completed_set = self.cp.get_completed_chunk_ids(test_state, "healthcare")
         self.assertEqual(completed_set, {"chunk_0001"})
 
         # Verify export to legacy JSON matches
         self.assertTrue(os.path.exists(self.cp.legacy_json_path))
         with open(self.cp.legacy_json_path, "r", encoding="utf-8") as f:
             legacy = json.load(f)
-        self.assertIn("Alabama", legacy)
-        self.assertIn("healthcare", legacy["Alabama"])
-        self.assertEqual(legacy["Alabama"]["healthcare"]["completed_chunks"], 1)
+        self.assertIn(test_state, legacy)
+        fields = legacy[test_state].get("fields", legacy[test_state])
+        self.assertIn("healthcare", fields)
+        self.assertEqual(fields["healthcare"]["completed_chunks"], 1)
 
     def test_reconcile_corrupted_or_missing_chunk(self):
         proc_dir = os.path.join(self.test_dir, "processed")
@@ -199,20 +202,21 @@ class TestEnterpriseCheckpointManager(unittest.TestCase):
             json.dump([{"osm_id": 123}], f)
 
         chunks = [{"chunk_id": "chunk_0001", "bbox": (30.0, -88.0, 30.5, -87.5)}]
-        self.cp.init_field("Alabama", "AL", "shop", "COMMERCIAL", 1, chunks)
-        self.cp.mark_chunk_completed("Alabama", "shop", "chunk_0001", 1, "", valid_proc_file)
+        test_state = f"Test_Alabama_Shop_{uuid.uuid4().hex[:6]}"
+        self.cp.init_field(test_state, "AL", "shop", "COMMERCIAL", 1, chunks)
+        self.cp.mark_chunk_completed(test_state, "shop", "chunk_0001", 1, "", valid_proc_file)
 
         # Reconcile valid file: count should remain 1
-        valid, repaired = self.cp.reconcile_disk_state("Alabama", "shop", proc_dir)
+        valid, repaired = self.cp.reconcile_disk_state(test_state, "shop", proc_dir)
         self.assertEqual(valid, 1)
         self.assertEqual(repaired, 0)
 
         # Remove the file to simulate crash/disk corruption
         os.remove(valid_proc_file)
-        valid, repaired = self.cp.reconcile_disk_state("Alabama", "shop", proc_dir)
+        valid, repaired = self.cp.reconcile_disk_state(test_state, "shop", proc_dir)
         self.assertEqual(valid, 0)
         self.assertEqual(repaired, 1)
-        self.assertEqual(len(self.cp.get_completed_chunk_ids("Alabama", "shop")), 0)
+        self.assertEqual(len(self.cp.get_completed_chunk_ids(test_state, "shop")), 0)
 
 
 class TestResponseValidation(unittest.TestCase):
