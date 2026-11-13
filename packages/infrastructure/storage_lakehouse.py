@@ -16,13 +16,15 @@ import hashlib
 import io
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import boto3
-from botocore.client import Config
-from botocore.exceptions import ClientError
+# boto3 is imported lazily inside LakehouseObservationClient.__init__ to avoid
+# the 300-500ms module-level import cost on every server startup when S3/MinIO
+# is not needed. This is the single most impactful cold-start optimisation for
+# environments that don't use the lakehouse feature.
 
 try:
     import pyarrow as pa
@@ -69,10 +71,23 @@ class LakehouseObservationClient:
         self.secret_key = secret_key or cfg.get("secret_key")
         self.region_name = region_name or cfg.get("region_name", "us-east-1")
         self.use_ssl = use_ssl if use_ssl is not None else cfg.get("use_ssl", False)
+        self._bucket_verified: bool = False
 
         if s3_client:
             self.s3 = s3_client
         else:
+            # Lazy-import boto3 here so it is only loaded when the lakehouse
+            # client is actually instantiated, not at module import time.
+            try:
+                import boto3
+                from botocore.client import Config
+            except ImportError as exc:
+                raise LakehouseStorageError(
+                    "boto3 is not installed. Install it with: pip install boto3"
+                ) from exc
+
+            connect_to = int(cfg.get("connect_timeout_sec", 5))
+            read_to = int(cfg.get("read_timeout_sec", 30))
             client_kwargs = {
                 "service_name": "s3",
                 "region_name": self.region_name,
@@ -82,8 +97,8 @@ class LakehouseObservationClient:
                 "config": Config(
                     signature_version="s3v4",
                     retries={"max_attempts": 3, "mode": "standard"},
-                    connect_timeout=10,
-                    read_timeout=30,
+                    connect_timeout=connect_to,
+                    read_timeout=read_to,
                 ),
             }
             if self.endpoint_url:
@@ -94,23 +109,38 @@ class LakehouseObservationClient:
     def ensure_bucket_exists(self) -> bool:
         """
         Verify or idempotently create the target lakehouse bucket.
+        Caches positive checks per client instance so hot writes incur zero extra HEAD calls.
         """
+        if self._bucket_verified:
+            return True
         try:
             self.s3.head_bucket(Bucket=self.bucket_name)
+            self._bucket_verified = True
             logger.info("Lakehouse bucket '%s' verified.", self.bucket_name)
             return True
-        except ClientError as e:
-            error_code = str(e.response.get("Error", {}).get("Code", ""))
-            if error_code in ("404", "NoSuchBucket"):
-                logger.info("Bucket '%s' does not exist. Creating...", self.bucket_name)
-                create_kwargs: Dict[str, Any] = {"Bucket": self.bucket_name}
-                if self.region_name and self.region_name != "us-east-1":
-                    create_kwargs["CreateBucketConfiguration"] = {
-                        "LocationConstraint": self.region_name
-                    }
-                self.s3.create_bucket(**create_kwargs)
-                logger.info("Successfully provisioned lakehouse bucket '%s'.", self.bucket_name)
-                return True
+        except Exception as e:
+            try:
+                from botocore.exceptions import ClientError
+            except ImportError:
+                ClientError = ()  # type: ignore
+
+            if ClientError and isinstance(e, ClientError):
+                error_code = str(e.response.get("Error", {}).get("Code", ""))
+                if error_code in ("404", "NoSuchBucket"):
+                    logger.info("Bucket '%s' does not exist. Creating...", self.bucket_name)
+                    create_kwargs: Dict[str, Any] = {"Bucket": self.bucket_name}
+                    if self.region_name and self.region_name != "us-east-1":
+                        create_kwargs["CreateBucketConfiguration"] = {
+                            "LocationConstraint": self.region_name
+                        }
+                    try:
+                        self.s3.create_bucket(**create_kwargs)
+                        self._bucket_verified = True
+                        logger.info("Successfully provisioned lakehouse bucket '%s'.", self.bucket_name)
+                        return True
+                    except Exception as ce:
+                        logger.error("Failed to create bucket '%s': %s", self.bucket_name, ce)
+                        raise LakehouseStorageError(f"Bucket creation failed: {ce}") from ce
             logger.error("Failed to verify bucket '%s': %s", self.bucket_name, e)
             raise LakehouseStorageError(f"Bucket check failed: {e}") from e
 
@@ -200,6 +230,7 @@ class LakehouseObservationClient:
             body_bytes = gzip.compress(json.dumps(envelope).encode("utf-8"))
             content_type = "application/gzip"
 
+        self.ensure_bucket_exists()
         try:
             self.s3.put_object(
                 Bucket=self.bucket_name,
@@ -213,8 +244,24 @@ class LakehouseObservationClient:
                 },
             )
         except Exception as e:
-            logger.error("Failed to upload observation to s3://%s/%s: %s", self.bucket_name, key, e)
-            raise LakehouseStorageError(f"Upload to S3 failed: {e}") from e
+            # Handle late bucket deletion by resetting cache and retrying once
+            if "NoSuchBucket" in str(e):
+                self._bucket_verified = False
+                self.ensure_bucket_exists()
+                self.s3.put_object(
+                    Bucket=self.bucket_name,
+                    Key=key,
+                    Body=body_bytes,
+                    ContentType=content_type,
+                    Metadata={
+                        "sha256": sha256,
+                        "source": source_name,
+                        "record_id": source_record_id,
+                    },
+                )
+            else:
+                logger.error("Failed to upload observation to s3://%s/%s: %s", self.bucket_name, key, e)
+                raise LakehouseStorageError(f"Upload to S3 failed: {e}") from e
 
         s3_uri = f"s3://{self.bucket_name}/{key}"
         logger.debug("Persisted observation to %s (%d bytes)", s3_uri, len(body_bytes))
@@ -225,6 +272,134 @@ class LakehouseObservationClient:
             "byte_size": len(body_bytes),
             "source_name": source_name,
             "source_record_id": source_record_id,
+            "key": key,
+            "bucket": self.bucket_name,
+            "ingested_at": ingested_at.isoformat(),
+        }
+
+    def write_batch_observations(
+        self,
+        source_name: str,
+        records: List[Dict[str, Any]],
+        observed_at: Optional[datetime] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Writes a multi-record batch of observations into a single columnar Snappy Parquet file
+        so bulk extractions (GMaps/OSM) don't emit thousands of tiny S3 PUTs.
+        """
+        if not records:
+            raise LakehouseStorageError("Cannot write empty batch observation")
+
+        if observed_at is None:
+            observed_at = datetime.now(timezone.utc)
+        elif observed_at.tzinfo is None:
+            observed_at = observed_at.replace(tzinfo=timezone.utc)
+
+        ingested_at = datetime.now(timezone.utc)
+        src_list: List[str] = []
+        id_list: List[str] = []
+        payload_list: List[str] = []
+        hash_list: List[str] = []
+        meta_list: List[str] = []
+        obs_ts_list: List[datetime] = []
+        ing_ts_list: List[datetime] = []
+        meta_base = metadata or {}
+
+        for idx, rec in enumerate(records):
+            rec_id = str(
+                rec.get("source_record_id")
+                or rec.get("id")
+                or rec.get("cid")
+                or rec.get("place_id")
+                or f"batch_{idx}"
+            )
+            payload_str = json.dumps(rec, sort_keys=True, default=str)
+            rec_sha = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
+            src_list.append(source_name)
+            id_list.append(rec_id)
+            payload_list.append(payload_str)
+            hash_list.append(rec_sha)
+            meta_list.append(json.dumps(meta_base, sort_keys=True, default=str))
+            obs_ts_list.append(observed_at)
+            ing_ts_list.append(ingested_at)
+
+        batch_digest = hashlib.sha256(
+            "|".join(hash_list).encode("utf-8")
+        ).hexdigest()
+        batch_id = f"{batch_digest[:24]}_{len(records)}"
+        key = (
+            f"observations/source={source_name}/"
+            f"year={ingested_at.year}/month={ingested_at.month:02d}/day={ingested_at.day:02d}/"
+            f"batch_{batch_id}.parquet"
+        )
+
+        if PYARROW_AVAILABLE:
+            arrow_schema = pa.schema([
+                ("source_name", pa.string()),
+                ("source_record_id", pa.string()),
+                ("payload_text", pa.string()),
+                ("payload_hash_sha256", pa.string()),
+                ("metadata_json", pa.string()),
+                ("observed_at", pa.timestamp("us", tz="UTC")),
+                ("ingested_at", pa.timestamp("us", tz="UTC")),
+            ])
+            table = pa.Table.from_arrays(
+                [
+                    pa.array(src_list, type=pa.string()),
+                    pa.array(id_list, type=pa.string()),
+                    pa.array(payload_list, type=pa.string()),
+                    pa.array(hash_list, type=pa.string()),
+                    pa.array(meta_list, type=pa.string()),
+                    pa.array(obs_ts_list, type=pa.timestamp("us", tz="UTC")),
+                    pa.array(ing_ts_list, type=pa.timestamp("us", tz="UTC")),
+                ],
+                schema=arrow_schema,
+            )
+            buf = io.BytesIO()
+            pq.write_table(table, buf, compression="snappy")
+            body_bytes = buf.getvalue()
+            content_type = "application/x-parquet"
+        else:
+            key = key.replace(".parquet", ".json.gz")
+            envelope = [
+                {
+                    "source_name": src_list[i],
+                    "source_record_id": id_list[i],
+                    "payload_text": payload_list[i],
+                    "payload_hash_sha256": hash_list[i],
+                    "metadata": meta_base,
+                    "observed_at": observed_at.isoformat(),
+                    "ingested_at": ingested_at.isoformat(),
+                }
+                for i in range(len(records))
+            ]
+            body_bytes = gzip.compress(json.dumps(envelope).encode("utf-8"))
+            content_type = "application/gzip"
+
+        self.ensure_bucket_exists()
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=body_bytes,
+                ContentType=content_type,
+                Metadata={
+                    "sha256": batch_digest,
+                    "source": source_name,
+                    "record_count": str(len(records)),
+                },
+            )
+        except Exception as e:
+            logger.error("Failed batch upload to s3://%s/%s: %s", self.bucket_name, key, e)
+            raise LakehouseStorageError(f"Batch upload to S3 failed: {e}") from e
+
+        return {
+            "lakehouse_s3_uri": f"s3://{self.bucket_name}/{key}",
+            "payload_hash_sha256": batch_digest,
+            "byte_size": len(body_bytes),
+            "record_count": len(records),
+            "source_name": source_name,
             "key": key,
             "bucket": self.bucket_name,
             "ingested_at": ingested_at.isoformat(),

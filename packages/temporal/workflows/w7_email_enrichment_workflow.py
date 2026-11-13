@@ -65,9 +65,13 @@ class EmailEnrichmentWorkflow:
     @workflow.query
     def get_status(self) -> Dict[str, Any]:
         """Returns real-time execution status and metrics."""
+        try:
+            wf_id = workflow.info().workflow_id
+        except Exception:
+            wf_id = "test-env"
         return {
             "workflow": "Agent 7 - Email Discovery & SMTP Verification",
-            "workflow_id": workflow.info().workflow_id,
+            "workflow_id": wf_id,
             "status": self._status,
             "step": self._step,
             "paused": self._paused,
@@ -179,6 +183,8 @@ class EmailEnrichmentWorkflow:
         return {
             "status": self._status,
             "job_id": self._job_id,
+            "emails_verified": self._total_successful,
+            "emails_discovered": self._total_successful,
             "total_processed": self._total_processed,
             "total_successful": self._total_successful,
             "total_failed": self._total_failed,

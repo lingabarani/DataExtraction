@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Globe2, BarChart3, Settings,
   Download, Copy, Radio, Database, ChevronDown,
@@ -115,7 +114,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ── Sidebar content ───────────────────────────────────────────────────────────
 
 export function SidebarContent() {
-  const router = useRouter();
   const { user, workspace, logout } = useAuth();
 
   return (
@@ -203,10 +201,10 @@ export function SidebarContent() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => { logout(); router.push("/login"); }}
+              onClick={() => logout()}
               className="text-destructive focus:text-destructive"
             >
-              <LogOut className="w-3.5 h-3.5 mr-2" /> Sign out
+              <LogOut className="w-3.5 h-3.5 mr-2" /> Reset session
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

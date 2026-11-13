@@ -1,100 +1,58 @@
 """
 DataExtraction — Infrastructure & Persistence Layer
 ===================================================
-Exports all external adapters, storage bridges, connection poolers, and telemetry sinks:
-  - config_manager: Unified settings, secrets resolution, and environment loader
-  - db_connector: PostgreSQL connection pooler and transactional context managers
-  - dead_letter_queue: Zero-data-loss poison-pill capture with disk fallback
-  - kg_ingestion_bridge: Knowledge Graph schema ingestion engine
-  - partition_manager: Declarative hash/range table partition maintenance
-  - opensearch_cdc_sync: OpenSearch 2.x CDC pipeline and index mapping synchronizer
-  - storage_lakehouse: S3/MinIO multi-tier lakehouse client (landing, raw, bronze)
-  - structured_logger: Contextual JSON structured logging & audit trail
-  - http_client: Enterprise HTTP client with backoff and retry
+Lazily exports all external adapters, storage bridges, connection poolers,
+and telemetry sinks via PEP 562 __getattr__ to keep cold-start imports fast.
 """
 
-from packages.infrastructure.config_manager import config_manager, ConfigurationError
-from packages.infrastructure.db_connector import (
-    get_connection,
-    get_cursor,
-    get_db_pool_status,
-    close_connection_pool,
-)
-from packages.infrastructure.dead_letter_queue import (
-    enqueue_dead_letter,
-    get_dead_letter_records,
-    get_dead_letter_stats,
-    replay_dead_letter,
-    discard_dead_letter,
-    drain_fallback_to_db,
-)
-from packages.infrastructure.kg_ingestion_bridge import (
-    KnowledgeGraphIngestionBridge,
-    kg_bridge,
-)
-from packages.infrastructure.partition_manager import (
-    PartitionManager,
-    partition_manager,
-)
-from packages.infrastructure.opensearch_cdc_sync import (
-    OpenSearchCDCSyncClient,
-    opensearch_cdc_sync,
-)
-from packages.infrastructure.storage_lakehouse import (
-    LakehouseObservationClient,
-    LakehouseStorageError,
-    lakehouse_client,
-)
-from packages.infrastructure.structured_logger import (
-    get_structured_logger,
-    log_agent_decision,
-    get_pipeline_health_metrics,
-)
-from packages.infrastructure.http_client import (
-    get_http_client,
-    EnterpriseHttpClient,
-)
+import importlib
 
-# Aliases for convenience
-KGIngestionBridge = KnowledgeGraphIngestionBridge
-OpenSearchCDCSync = OpenSearchCDCSyncClient
-
-__all__ = [
+_SYMBOL_MAP = {
     # Configuration
-    "config_manager",
-    "ConfigurationError",
+    "config_manager": ("packages.infrastructure.config_manager", "config_manager"),
+    "ConfigurationError": ("packages.infrastructure.config_manager", "ConfigurationError"),
     # Database Pool
-    "get_connection",
-    "get_cursor",
-    "get_db_pool_status",
-    "close_connection_pool",
+    "get_connection": ("packages.infrastructure.db_connector", "get_connection"),
+    "get_cursor": ("packages.infrastructure.db_connector", "get_cursor"),
+    "get_db_pool_status": ("packages.infrastructure.db_connector", "get_db_pool_status"),
+    "close_connection_pool": ("packages.infrastructure.db_connector", "close_connection_pool"),
     # Dead Letter Queue
-    "enqueue_dead_letter",
-    "get_dead_letter_records",
-    "get_dead_letter_stats",
-    "replay_dead_letter",
-    "discard_dead_letter",
-    "drain_fallback_to_db",
+    "enqueue_dead_letter": ("packages.infrastructure.dead_letter_queue", "enqueue_dead_letter"),
+    "get_dead_letter_records": ("packages.infrastructure.dead_letter_queue", "get_dead_letter_records"),
+    "get_dead_letter_stats": ("packages.infrastructure.dead_letter_queue", "get_dead_letter_stats"),
+    "replay_dead_letter": ("packages.infrastructure.dead_letter_queue", "replay_dead_letter"),
+    "discard_dead_letter": ("packages.infrastructure.dead_letter_queue", "discard_dead_letter"),
+    "drain_fallback_to_db": ("packages.infrastructure.dead_letter_queue", "drain_fallback_to_db"),
     # Knowledge Graph Bridge
-    "KnowledgeGraphIngestionBridge",
-    "KGIngestionBridge",
-    "kg_bridge",
+    "KnowledgeGraphIngestionBridge": ("packages.infrastructure.kg_ingestion_bridge", "KnowledgeGraphIngestionBridge"),
+    "KGIngestionBridge": ("packages.infrastructure.kg_ingestion_bridge", "KnowledgeGraphIngestionBridge"),
+    "kg_bridge": ("packages.infrastructure.kg_ingestion_bridge", "kg_bridge"),
     # Partition Manager
-    "PartitionManager",
-    "partition_manager",
+    "PartitionManager": ("packages.infrastructure.partition_manager", "PartitionManager"),
+    "partition_manager": ("packages.infrastructure.partition_manager", "partition_manager"),
     # OpenSearch CDC Sync
-    "OpenSearchCDCSyncClient",
-    "OpenSearchCDCSync",
-    "opensearch_cdc_sync",
+    "OpenSearchCDCSyncClient": ("packages.infrastructure.opensearch_cdc_sync", "OpenSearchCDCSyncClient"),
+    "OpenSearchCDCSync": ("packages.infrastructure.opensearch_cdc_sync", "OpenSearchCDCSyncClient"),
+    "opensearch_cdc_sync": ("packages.infrastructure.opensearch_cdc_sync", "opensearch_cdc_sync"),
     # Lakehouse S3/MinIO
-    "LakehouseObservationClient",
-    "LakehouseStorageError",
-    "lakehouse_client",
+    "LakehouseObservationClient": ("packages.infrastructure.storage_lakehouse", "LakehouseObservationClient"),
+    "LakehouseStorageError": ("packages.infrastructure.storage_lakehouse", "LakehouseStorageError"),
+    "lakehouse_client": ("packages.infrastructure.storage_lakehouse", "lakehouse_client"),
     # Observability & Logging
-    "get_structured_logger",
-    "log_agent_decision",
-    "get_pipeline_health_metrics",
+    "get_structured_logger": ("packages.infrastructure.structured_logger", "get_structured_logger"),
+    "log_agent_decision": ("packages.infrastructure.structured_logger", "log_agent_decision"),
+    "get_pipeline_health_metrics": ("packages.infrastructure.structured_logger", "get_pipeline_health_metrics"),
     # HTTP Client
-    "get_http_client",
-    "EnterpriseHttpClient",
-]
+    "get_http_client": ("packages.infrastructure.http_client", "get_http_client"),
+    "EnterpriseHttpClient": ("packages.infrastructure.http_client", "EnterpriseHttpClient"),
+}
+
+
+def __getattr__(name: str):
+    if name in _SYMBOL_MAP:
+        mod_path, attr = _SYMBOL_MAP[name]
+        return getattr(importlib.import_module(mod_path), attr)
+    return importlib.import_module(f"packages.infrastructure.{name}")
+
+
+__all__ = list(_SYMBOL_MAP.keys())

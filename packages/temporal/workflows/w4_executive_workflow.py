@@ -14,11 +14,35 @@ Orchestrates professional people & contact discovery:
 - Queries: get_status
 """
 
+import logging
 from datetime import timedelta
 from typing import Any, Dict, List
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+
+_std_logger = logging.getLogger("dataextraction.workflow.executive")
+
+
+def _log_info(msg: str, *args: Any) -> None:
+    try:
+        workflow.logger.info(msg, *args)
+    except Exception:
+        _std_logger.info(msg, *args)
+
+
+def _log_warning(msg: str, *args: Any) -> None:
+    try:
+        workflow.logger.warning(msg, *args)
+    except Exception:
+        _std_logger.warning(msg, *args)
+
+
+def _log_error(msg: str, *args: Any) -> None:
+    try:
+        workflow.logger.error(msg, *args)
+    except Exception:
+        _std_logger.error(msg, *args)
 
 with workflow.unsafe.imports_passed_through():
     from packages.temporal.activities.pipeline_activities import (
@@ -26,6 +50,7 @@ with workflow.unsafe.imports_passed_through():
         build_leads_activity,
     )
     from packages.temporal.activities.storage_activities import (
+        discover_executives_activity,
         ingest_working_person_activity,
         complete_executive_enrichment_activity,
         ingest_kg_person_activity,
@@ -53,19 +78,23 @@ class Agent4ExecutiveWorkflow:
 
     @workflow.signal
     def pause(self) -> None:
-        workflow.logger.warning("[Agent 4] Pause signal received")
+        _log_warning("[Agent 4] Pause signal received")
         self._paused = True
 
     @workflow.signal
     def resume(self) -> None:
-        workflow.logger.info("[Agent 4] Resume signal received")
+        _log_info("[Agent 4] Resume signal received")
         self._paused = False
 
     @workflow.query
     def get_status(self) -> Dict[str, Any]:
+        try:
+            wf_id = workflow.info().workflow_id
+        except Exception:
+            wf_id = "agent4-executive"
         return {
             "agent": "Agent 4 - Executive Discovery & Contact Intelligence",
-            "workflow_id": workflow.info().workflow_id,
+            "workflow_id": wf_id,
             "status": self._status,
             "step": self._step,
             "paused": self._paused,
@@ -79,7 +108,7 @@ class Agent4ExecutiveWorkflow:
         table = config.get("source_table", "staging_dataextraction.working_organizations")
         limit = config.get("contact_batch_limit", 5000)
 
-        workflow.logger.info("[Agent 4] Executive Contact Intelligence started on queue: %s (source=%s)", TASK_QUEUE, table)
+        _log_info("[Agent 4] Executive Contact Intelligence started on queue: %s (source=%s)", TASK_QUEUE, table)
 
         # ── Step 1: 5-Tier Contact Validation ─────────────────────────────────
         self._step = "CONTACT_VALIDATION"
@@ -115,6 +144,7 @@ class Agent4ExecutiveWorkflow:
         # ── Step 3: Ingest Person Entities into Pre-Master Working Layer ───────
         self._step = "PERSON_INGESTION"
         persons = config.get("persons", [])
+        total_execs = 0
         if persons:
             person_outcomes = []
             for p in persons:
@@ -127,9 +157,24 @@ class Agent4ExecutiveWorkflow:
                         retry_policy=EXECUTIVE_RETRY_POLICY,
                     )
                     person_outcomes.append(p_res)
+                    total_execs += 1
                 except Exception as exc:
                     person_outcomes.append({"status": "FAILED", "error": str(exc)})
             self._results["persons"] = person_outcomes
+        else:
+            # Autonomous discovery of executives for pending working organizations
+            try:
+                disc_res = await workflow.execute_activity(
+                    discover_executives_activity,
+                    args=[config.get("batch_limit", 1000)],
+                    task_queue=TASK_QUEUE,
+                    start_to_close_timeout=timedelta(hours=2),
+                    retry_policy=EXECUTIVE_RETRY_POLICY,
+                )
+                self._results["executive_discovery"] = disc_res
+                total_execs += disc_res.get("executives_discovered", 0)
+            except Exception as exc:
+                self._results["executive_discovery"] = {"status": "FAILED", "error": str(exc)}
 
         # Mark working organizations executive enrichment status
         try:
@@ -202,6 +247,7 @@ class Agent4ExecutiveWorkflow:
         self._status = "COMPLETED"
         return {
             "status": self._status,
+            "executives_identified": total_execs,
             "results": self._results,
         }
 

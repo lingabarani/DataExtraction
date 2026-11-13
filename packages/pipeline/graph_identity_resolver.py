@@ -21,6 +21,41 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("dataextraction.pipeline.identity_resolver")
 
+VALID_MATCH_TYPES = {
+    "deterministic_tax_id",
+    "deterministic_domain",
+    "probabilistic_splink",
+    "graph_transitive",
+    "manual_override",
+}
+
+
+def _ensure_uuid(val: Any) -> uuid.UUID:
+    """Safely converts an arbitrary ID string to a valid UUID."""
+    if isinstance(val, uuid.UUID):
+        return val
+    s_val = str(val or "").strip()
+    try:
+        return uuid.UUID(s_val)
+    except (ValueError, TypeError, AttributeError):
+        return uuid.uuid5(uuid.NAMESPACE_DNS, s_val or "unknown_entity")
+
+
+def _normalize_match_type(match_type: Optional[str]) -> str:
+    """Maps internal match type labels to valid kg_resolution.match_type enum."""
+    mt = str(match_type or "").strip().lower()
+    if mt in VALID_MATCH_TYPES:
+        return mt
+    if "splink" in mt or "probabilistic" in mt:
+        return "probabilistic_splink"
+    if any(k in mt for k in ("tax", "ein", "rfc", "cik", "npi", "statutory")):
+        return "deterministic_tax_id"
+    if "graph" in mt or "transitive" in mt:
+        return "graph_transitive"
+    if "override" in mt or "manual" in mt:
+        return "manual_override"
+    return "deterministic_domain"
+
 
 class GraphIdentityResolver:
     """
@@ -106,6 +141,8 @@ class GraphIdentityResolver:
         if not conn:
             return None
 
+        canon_uuid = str(_ensure_uuid(canonical_id))
+
         with conn.cursor() as cur:
             # 1. Fetch cluster
             cur.execute(
@@ -115,7 +152,7 @@ class GraphIdentityResolver:
                 WHERE canonical_entity_id = %s
                 LIMIT 1;
                 """,
-                (canonical_id,),
+                (canon_uuid,),
             )
             c_row = cur.fetchone()
             if not c_row:
@@ -128,10 +165,10 @@ class GraphIdentityResolver:
             cur.execute(
                 """
                 SELECT member_id, source_record_id, source_name, match_type,
-                       match_probability, match_features, is_active, linked_at
+                       match_probability, match_features, is_active, assigned_at
                 FROM kg_resolution.cluster_members
                 WHERE cluster_id = %s
-                ORDER BY linked_at ASC;
+                ORDER BY assigned_at ASC;
                 """,
                 (cluster_id,),
             )
@@ -144,7 +181,7 @@ class GraphIdentityResolver:
                     "match_probability": float(r[4] or 1.0),
                     "match_features": r[5] if isinstance(r[5], dict) else json.loads(r[5] or "{}"),
                     "is_active": r[6],
-                    "linked_at": r[7].isoformat() if r[7] else None,
+                    "assigned_at": r[7].isoformat() if r[7] else None,
                 }
                 for r in cur.fetchall()
             ]
@@ -201,6 +238,9 @@ class GraphIdentityResolver:
         Binds a source record into an identity cluster for the canonical entity.
         Creates a new cluster if none exists.
         """
+        canon_uuid = str(_ensure_uuid(canonical_id))
+        eff_match_type = _normalize_match_type(match_type)
+
         with conn.cursor() as cur:
             # 1. Find or create identity cluster
             cur.execute(
@@ -210,7 +250,7 @@ class GraphIdentityResolver:
                 WHERE canonical_entity_id = %s AND entity_type = %s
                 LIMIT 1;
                 """,
-                (canonical_id, entity_type),
+                (canon_uuid, entity_type),
             )
             row = cur.fetchone()
 
@@ -225,7 +265,7 @@ class GraphIdentityResolver:
                         cluster_id, canonical_entity_id, entity_type, status, created_at
                     ) VALUES (%s, %s, %s, 'stable', CLOCK_TIMESTAMP());
                     """,
-                    (cluster_id, canonical_id, entity_type),
+                    (cluster_id, canon_uuid, entity_type),
                 )
                 created_new = True
 
@@ -241,14 +281,15 @@ class GraphIdentityResolver:
                 """,
                 (
                     member_id, cluster_id, str(source_record_id), source_name,
-                    match_type, match_probability, features_json,
+                    eff_match_type, match_probability, features_json,
                 ),
             )
 
         return {
             "cluster_id": cluster_id,
             "member_id": member_id,
-            "canonical_entity_id": canonical_id,
+            "canonical_entity_id": str(canonical_id),
+            "canonical_uuid": canon_uuid,
             "is_new_cluster": created_new,
         }
 

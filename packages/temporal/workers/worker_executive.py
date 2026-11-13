@@ -27,6 +27,7 @@ from packages.temporal.activities.pipeline_activities import (
     build_leads_activity,
 )
 from packages.temporal.activities.storage_activities import (
+    discover_executives_activity,
     ingest_working_person_activity,
     complete_executive_enrichment_activity,
     ingest_kg_person_activity,
@@ -53,6 +54,7 @@ async def run_worker():
     logger.info("Starting Worker 4 (Executive & Contact Intelligence) on queue: %s", TASK_QUEUE)
 
     activities = [
+        discover_executives_activity,
         validate_contacts_activity,
         build_leads_activity,
         ingest_working_person_activity,

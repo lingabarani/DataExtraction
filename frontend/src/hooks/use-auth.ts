@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 export const TOKEN_KEY = "dataextraction_token";
 export const USER_KEY = "dataextraction_user";
 const LEGACY_TOKEN_KEYS = ["oneextraction_token", "prospex_token"];
 const LEGACY_USER_KEYS = ["oneextraction_user", "prospex_user"];
+const LEGACY_PLACEHOLDER_TOKEN = "dataextraction-admin-session-active";
 
 export interface AuthUser {
   id: string;
@@ -33,6 +34,10 @@ export function getToken(): string | null {
       }
     }
   }
+  if (token === LEGACY_PLACEHOLDER_TOKEN) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
   return token;
 }
 
@@ -58,12 +63,20 @@ export function useAuth() {
       try {
         const parsed = JSON.parse(raw);
         const u = parsed.user || parsed;
-        const w = parsed.workspace || { id: "ws-001", name: "DataExtraction", slug: "dataextraction" };
+        const w = parsed.workspace || {
+          id: "ws-001",
+          name: process.env.NEXT_PUBLIC_APP_NAME || "DataExtraction",
+          slug: "dataextraction",
+        };
         setUser(u);
         setWorkspace(w);
       } catch {
         /* ignore invalid json */
       }
+    } else {
+      const appName = process.env.NEXT_PUBLIC_APP_NAME || "DataExtraction";
+      setUser({ id: "operator-local", name: "Operator", email: "operator@localhost" });
+      setWorkspace({ id: "ws-001", name: appName, slug: appName.toLowerCase().replace(/\s+/g, "-") });
     }
     setLoading(false);
   }, []);
@@ -72,42 +85,24 @@ export function useAuth() {
     load();
   }, [load]);
 
-  const login = async (email?: string, password?: string) => {
-    const targetEmail = email?.trim() || "admin@dataextraction.com";
-    const targetPassword = password || "admin123";
-
-    try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: targetEmail, password: targetPassword }),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { token: string; user: AuthUser; workspace: AuthWorkspace };
-        localStorage.setItem(TOKEN_KEY, data.token);
-        localStorage.setItem(USER_KEY, JSON.stringify({ user: data.user, workspace: data.workspace }));
-        LEGACY_TOKEN_KEYS.forEach((k) => localStorage.removeItem(k));
-        LEGACY_USER_KEYS.forEach((k) => localStorage.removeItem(k));
-        setUser(data.user);
-        setWorkspace(data.workspace);
-        return data;
-      }
-    } catch {
-      // Offline fallback: provision default admin session
+  const login = async (email: string, password: string) => {
+    const res = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string; message?: string }).detail || (err as { message?: string }).message || "Authentication failed");
     }
-
-    const fallbackData: { token: string; user: AuthUser; workspace: AuthWorkspace } = {
-      token: "dataextraction-admin-session-active",
-      user: { id: "admin-001", name: "Admin", email: targetEmail },
-      workspace: { id: "ws-001", name: "DataExtraction", slug: "dataextraction" },
-    };
-    localStorage.setItem(TOKEN_KEY, fallbackData.token);
-    localStorage.setItem(USER_KEY, JSON.stringify({ user: fallbackData.user, workspace: fallbackData.workspace }));
+    const data = (await res.json()) as { token: string; user: AuthUser; workspace: AuthWorkspace };
+    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify({ user: data.user, workspace: data.workspace }));
     LEGACY_TOKEN_KEYS.forEach((k) => localStorage.removeItem(k));
     LEGACY_USER_KEYS.forEach((k) => localStorage.removeItem(k));
-    setUser(fallbackData.user);
-    setWorkspace(fallbackData.workspace);
-    return fallbackData;
+    setUser(data.user);
+    setWorkspace(data.workspace);
+    return data;
   };
 
   const register = async (name: string, email: string, password: string, workspaceName: string) => {
@@ -146,7 +141,7 @@ export function useAuth() {
     LEGACY_USER_KEYS.forEach((k) => localStorage.removeItem(k));
     setUser(null);
     setWorkspace(null);
-    window.location.href = "/login";
+    window.location.href = "/dashboard";
   };
 
   return { user, workspace, loading, login, register, logout };

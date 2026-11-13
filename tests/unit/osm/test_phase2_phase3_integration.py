@@ -56,7 +56,7 @@ for _p in [
         sys.path.insert(0, str(_p))
 from fastapi.testclient import TestClient
 
-from normalizer import normalize_company, supported_sources
+from packages.pipeline.normalizer import normalize_company, supported_sources
 from openmap_engine import (
     OverpassConfig,
     default_config,
@@ -68,7 +68,7 @@ from openmap_engine import (
     STATE_BOUNDING_BOXES,
     FIELDS_TAXONOMY,
 )
-from api_server import app
+from packages.api.api_server import app
 
 
 class TestPhase2NormalizationAndConnector(unittest.TestCase):

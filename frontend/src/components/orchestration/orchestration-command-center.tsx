@@ -200,22 +200,42 @@ export function OrchestrationCommandCenter() {
       `/orchestration/${activeWorkflowId}/stream`,
       (event) => {
         if (event.data && typeof event.data === "object") {
+          const raw = event.data;
           setWorkflowStatus((prev) => ({
             ...prev,
-            ...event.data,
+            ...raw,
             workflow_id: activeWorkflowId,
+            current_stage: raw.current_stage || raw.phase || prev?.current_stage || "REGISTRY_INGESTION",
+            current_agent: raw.current_agent || prev?.current_agent || "Agent 1 (Registry Harvester)",
+            records_processed: raw.records_processed !== undefined ? raw.records_processed : (raw.metrics?.organizations_processed ?? prev?.records_processed ?? 0),
+            progress_pct: raw.progress_pct !== undefined ? raw.progress_pct : prev?.progress_pct ?? 0,
+            stages: raw.stages || prev?.stages || {},
           }));
 
-          // Append live log if present
-          if (event.data.log) {
+          // Sync live logs from stream
+          if (Array.isArray(raw.logs) && raw.logs.length > 0) {
+            setLogs((prev) => {
+              const existingSet = new Set(prev.map((l) => `${l.agent}|${l.message}`));
+              const newLogs = raw.logs
+                .filter((l: any) => l && l.message && !existingSet.has(`${l.agent || "SAGA MONITOR"}|${l.message}`))
+                .map((l: any, idx: number) => ({
+                  id: `stream_log_${Date.now()}_${idx}`,
+                  timestamp: l.timestamp || new Date().toISOString(),
+                  agent: l.agent || "SAGA MONITOR",
+                  message: l.message || "",
+                  type: l.type || "info",
+                }));
+              return newLogs.length > 0 ? [...prev, ...newLogs] : prev;
+            });
+          } else if (raw.log) {
             setLogs((prev) => [
               ...prev,
               {
                 id: `stream_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                timestamp: new Date().toISOString(),
-                agent: event.data.log.agent || "SAGA MONITOR",
-                message: event.data.log.message || "",
-                type: event.data.log.type || "info",
+                timestamp: raw.log.timestamp || new Date().toISOString(),
+                agent: raw.log.agent || "SAGA MONITOR",
+                message: raw.log.message || "",
+                type: raw.log.type || "info",
               },
             ]);
           }

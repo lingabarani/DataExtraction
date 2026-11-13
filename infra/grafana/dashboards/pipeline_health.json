@@ -285,6 +285,66 @@
           "unit": "short"
         }
       }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 103,
+      "title": "Agent 2 — Geospatial & Domain Intelligence Telemetry",
+      "type": "row"
+    },
+    {
+      "id": 9,
+      "title": "Agent 2 Places & POIs Persisted",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(agent2_gmaps_places_persisted_total[1m])) by (region)",
+          "legendFormat": "GMaps {{region}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(agent2_osm_pois_persisted_total[1m])) by (region)",
+          "legendFormat": "OSM {{region}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Agent 2 Lakehouse Outbox & Website Throughput",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "agent2_lakehouse_outbox_backlog",
+          "legendFormat": "Outbox Pending",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(agent2_website_verifications_total[1m])) by (status)",
+          "legendFormat": "Verify {{status}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(agent2_website_crawls_total[1m])) by (status)",
+          "legendFormat": "Crawl {{status}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
     }
   ],
   "refresh": "5s",

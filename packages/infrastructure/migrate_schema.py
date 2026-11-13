@@ -16,7 +16,12 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
     except Exception:
         pass
 
-from db_connector import get_connection, db_info
+try:
+    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.db_connector import release_connection as _release_connection
+except ImportError:
+    from db_connector import get_connection, db_info  # type: ignore
+    from db_connector import release_connection as _release_connection  # type: ignore
 
 def log_msg(msg: str):
     try:
@@ -257,11 +262,11 @@ def m09_postgis_pg_trgm_extensions(cur):
         cur.execute("ROLLBACK TO SAVEPOINT sp_postgis")
         log_msg(f"  [INFO] postgis extension optional / not available on host: {e}")
 
-    # 3. Spatial column & GIST index on companies
-    if postgis_available:
+    # 3. Spatial column & GIST index on companies (only when companies is a base table)
+    if postgis_available and not _is_view(cur, "companies"):
         try:
-            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS geom GEOMETRY(Point, 4326)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_companies_geom ON companies USING GIST(geom)")
+            cur.execute("ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS geom GEOMETRY(Point, 4326)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_companies_geom ON public.companies USING GIST(geom)")
             log_msg("  [OK] companies geom column & GIST index provisioned")
         except Exception as e:
             log_msg(f"  [INFO] companies geom skipped: {e}")
@@ -309,8 +314,9 @@ def m10_data_integrity_constraints(cur):
 # ─────────────────────────────────────────────────────────────────────────────
 @migration
 def m11_dead_letter_queue(cur):
+    cur.execute("CREATE SCHEMA IF NOT EXISTS staging_dataextraction")
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS dead_letter_queue (
+        CREATE TABLE IF NOT EXISTS staging_dataextraction.dead_letter_queue (
             id              SERIAL PRIMARY KEY,
             run_id          TEXT,
             source_name     TEXT NOT NULL,
@@ -325,8 +331,30 @@ def m11_dead_letter_queue(cur):
             resolved_at     TIMESTAMPTZ
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_dlq_source_status ON dead_letter_queue(source_name, status)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_dlq_status_created ON dead_letter_queue(status, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_sdlq_source_status ON staging_dataextraction.dead_letter_queue(source_name, status)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_sdlq_status_created ON staging_dataextraction.dead_letter_queue(status, created_at DESC)")
+
+    if not _is_view(cur, "dead_letter_queue", schema="public"):
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.dead_letter_queue (
+                id              SERIAL PRIMARY KEY,
+                run_id          TEXT,
+                source_name     TEXT NOT NULL,
+                entity_type     TEXT NOT NULL DEFAULT 'company',
+                raw_payload     JSONB NOT NULL,
+                error_reason    TEXT NOT NULL,
+                error_traceback TEXT,
+                status          TEXT NOT NULL DEFAULT 'PENDING',
+                retry_count     INTEGER NOT NULL DEFAULT 0,
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                last_retried_at TIMESTAMPTZ,
+                resolved_at     TIMESTAMPTZ
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dlq_source_status ON public.dead_letter_queue(source_name, status)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dlq_status_created ON public.dead_letter_queue(status, created_at DESC)")
+    else:
+        log_msg("  [INFO] public.dead_letter_queue is a view; skipping view index creation")
     log_msg("  [OK] phase 5 - dead_letter_queue table & indexes verified")
 
 
@@ -460,7 +488,6 @@ def m12_pre_master_working_layer_and_master_lifecycle(cur):
 # ─────────────────────────────────────────────────────────────────────────────
 def run_migrations():
     log_msg(f"\n🔧 Running schema migrations on: {db_info()}\n")
-    from db_connector import release_connection
     conn = get_connection()
     cur  = conn.cursor()
 
@@ -475,7 +502,7 @@ def run_migrations():
             failed += 1
 
     cur.close()
-    release_connection(conn)
+    _release_connection(conn)
 
 
     if failed == 0:
@@ -505,8 +532,7 @@ def verify_schema():
         log_msg(f"  {t:<25} {count:>6} rows  |  {len(cols)} columns")
 
     cur.close()
-    from db_connector import release_connection
-    release_connection(conn)
+    _release_connection(conn)
     log_msg("")
 
 

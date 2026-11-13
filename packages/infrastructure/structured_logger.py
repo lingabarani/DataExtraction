@@ -171,57 +171,76 @@ _HEALTH_CACHE_TIMESTAMP: float = 0.0
 _HEALTH_CACHE_TTL: float = 4.0
 
 
-def get_pipeline_health_metrics() -> Dict[str, Any]:
+def get_pipeline_health_metrics(force_refresh: bool = False) -> Dict[str, Any]:
     """
-    Retrieves operational pipeline health and connection pool telemetry.
-    Response latency guaranteed sub-5ms through in-memory caching and bounded checks.
+    Retrieves live operational pipeline health, PostgreSQL pool telemetry,
+    staging/location counts, and Lakehouse outbox state without hardcoded KPIs.
+    Bounded by a short 4-second cache for fast health probes.
     """
     global _HEALTH_METRICS_CACHE, _HEALTH_CACHE_TIMESTAMP
     now = time.time()
 
-    if _HEALTH_METRICS_CACHE and (now - _HEALTH_CACHE_TIMESTAMP < _HEALTH_CACHE_TTL):
+    if not force_refresh and _HEALTH_METRICS_CACHE and (now - _HEALTH_CACHE_TIMESTAMP < _HEALTH_CACHE_TTL):
         return _HEALTH_METRICS_CACHE
 
     metrics: Dict[str, Any] = {
         "status": "ONLINE",
         "service": "DataExtraction Engine",
-        "version": "2.1.0",
+        "version": "3.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "process_id": os.getpid(),
         "database": {
-            "connected": True,
-            "pool_status": "ACTIVE",
-            "ping_ms": 1.2,
-            "pool_min": 2,
-            "pool_max": 20,
-            "active_connections": 1,
+            "connected": False,
+            "pool_status": "UNKNOWN",
+            "ping_ms": None,
+            "pool_min": 0,
+            "pool_max": 0,
+            "active_connections": 0,
         },
         "database_pool": {
-            "active": True,
-            "minconn": 2,
-            "maxconn": 20,
-            "status": "ACTIVE",
+            "active": False,
+            "minconn": 0,
+            "maxconn": 0,
+            "status": "UNKNOWN",
             "closed": False,
         },
         "metrics": {
-            "total_processed": 210450,
-            "success_rate": 99.8,
-            "avg_latency_ms": 12.4,
+            "total_processed": 0,
+            "staging_companies_count": 0,
+            "master_locations_count": 0,
+            "dlq_pending_count": 0,
+            "lakehouse_outbox_pending": 0,
+            "query_latency_ms": None,
         },
         "telemetry": {
-            "active_workers": 4,
-            "dlq_backpressure": "NOMINAL",
-            "cdc_lag_ms": 15,
+            "dlq_backpressure": "UNKNOWN",
+            "prometheus_enabled": False,
         },
     }
 
-    # DB pool metrics check
     try:
-        from db_connector import _PG_POOL
+        from packages.infrastructure.metrics import PROMETHEUS_AVAILABLE
+        metrics["telemetry"]["prometheus_enabled"] = bool(PROMETHEUS_AVAILABLE)
+    except Exception:
+        pass
+
+    # Live DB pool & table telemetry
+    conn = None
+    try:
+        try:
+            from packages.infrastructure.db_connector import (
+                _PG_POOL,
+                get_connection,
+                release_connection,
+            )
+        except ImportError:
+            from db_connector import _PG_POOL, get_connection, release_connection  # type: ignore
+
         if _PG_POOL is not None:
             minc = getattr(_PG_POOL, "minconn", 2)
             maxc = getattr(_PG_POOL, "maxconn", 20)
-            closed = getattr(_PG_POOL, "closed", False)
+            closed = bool(getattr(_PG_POOL, "closed", False))
+            active_cnt = len(getattr(_PG_POOL, "_used", []))
             metrics["database_pool"] = {
                 "active": not closed,
                 "minconn": minc,
@@ -231,8 +250,52 @@ def get_pipeline_health_metrics() -> Dict[str, Any]:
             }
             metrics["database"]["pool_min"] = minc
             metrics["database"]["pool_max"] = maxc
+            metrics["database"]["active_connections"] = active_cnt
             metrics["database"]["pool_status"] = "ACTIVE" if not closed else "INACTIVE"
+
+        t0 = time.perf_counter()
+        conn = get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            (SELECT reltuples::BIGINT FROM pg_class c
+                             JOIN pg_namespace n ON n.oid = c.relnamespace
+                             WHERE n.nspname = 'staging_dataextraction' AND c.relname = 'staging_companies'),
+                            (SELECT reltuples::BIGINT FROM pg_class c
+                             JOIN pg_namespace n ON n.oid = c.relnamespace
+                             WHERE n.nspname = 'master_dataextraction' AND c.relname = 'locations'),
+                            COALESCE((SELECT COUNT(*) FROM staging_dataextraction.dead_letter_queue WHERE status = 'PENDING'), 0),
+                            COALESCE((SELECT COUNT(*) FROM kg_observation.pending_lakehouse_uploads WHERE uploaded_at IS NULL), 0)
+                        """
+                    )
+                    row = cur.fetchone()
+                ping_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+                stg_cnt = max(0, int((row[0] if row else 0) or 0))
+                loc_cnt = max(0, int((row[1] if row else 0) or 0))
+                dlq_cnt = max(0, int((row[2] if row else 0) or 0))
+                outbox_cnt = max(0, int((row[3] if row else 0) or 0))
+
+                metrics["database"]["connected"] = True
+                metrics["database"]["ping_ms"] = ping_ms
+                metrics["metrics"].update({
+                    "total_processed": stg_cnt,
+                    "staging_companies_count": stg_cnt,
+                    "master_locations_count": loc_cnt,
+                    "dlq_pending_count": dlq_cnt,
+                    "lakehouse_outbox_pending": outbox_cnt,
+                    "query_latency_ms": ping_ms,
+                })
+                metrics["telemetry"]["dlq_backpressure"] = "HIGH" if dlq_cnt > 100 else "NOMINAL"
+            finally:
+                release_connection(conn)
+        else:
+            metrics["status"] = "DEGRADED"
+            metrics["database"]["pool_status"] = "UNAVAILABLE"
     except Exception as e:
+        metrics["status"] = "DEGRADED"
         metrics["database_pool"] = {"active": False, "error": str(e)}
         metrics["database"]["pool_status"] = "DEGRADED"
 

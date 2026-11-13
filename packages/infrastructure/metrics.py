@@ -21,12 +21,22 @@ try:
         Histogram,
         REGISTRY,
         generate_latest,
+        start_http_server,
     )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
     CONTENT_TYPE_LATEST = "text/plain; charset=utf-8"
+    start_http_server = None  # type: ignore
 
+
+class _NoOpMetric:
+    """Enterprise fallback no-op metric collector when prometheus_client is not installed."""
+    def inc(self, *args, **kwargs): pass
+    def dec(self, *args, **kwargs): pass
+    def set(self, *args, **kwargs): pass
+    def observe(self, *args, **kwargs): pass
+    def labels(self, *args, **kwargs): return self
 
 if PROMETHEUS_AVAILABLE:
     # ── HTTP Request Metrics ──────────────────────────────────────────────────
@@ -94,6 +104,64 @@ if PROMETHEUS_AVAILABLE:
         ["source"],
     )
 
+    # ── Agent 2: Geospatial & Domain Intelligence Telemetry ──────────────────
+    AGENT2_GMAPS_PLACES_PERSISTED = Counter(
+        "agent2_gmaps_places_persisted_total",
+        "Total Google Maps places persisted to PostgreSQL by Agent 2",
+        ["region", "status"],
+    )
+    AGENT2_OSM_POIS_PERSISTED = Counter(
+        "agent2_osm_pois_persisted_total",
+        "Total OpenStreetMap POIs persisted to PostgreSQL by Agent 2",
+        ["region", "status"],
+    )
+    AGENT2_WEBSITE_VERIFICATIONS_TOTAL = Counter(
+        "agent2_website_verifications_total",
+        "Total company websites verified by Agent 2",
+        ["status"],
+    )
+    AGENT2_WEBSITE_CRAWLS_TOTAL = Counter(
+        "agent2_website_crawls_total",
+        "Total company websites crawled for executive/contact extraction",
+        ["status"],
+    )
+    AGENT2_KG_OBSERVATIONS_TOTAL = Counter(
+        "agent2_kg_observations_total",
+        "Total KG observations persisted directly to Lakehouse or PG outbox",
+        ["destination", "status"],
+    )
+    AGENT2_LAKEHOUSE_OUTBOX_BACKLOG = Gauge(
+        "agent2_lakehouse_outbox_backlog",
+        "Pending records waiting in kg_observation.pending_lakehouse_uploads outbox",
+    )
+    AGENT2_ACTIVITY_DURATION_SECONDS = Histogram(
+        "agent2_activity_duration_seconds",
+        "Execution latency of Agent 2 Temporal activities in seconds",
+        ["activity_name"],
+        buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 15.0, 30.0, 60.0, 300.0, 1800.0),
+    )
+else:
+    HTTP_REQUESTS_TOTAL = _NoOpMetric()
+    HTTP_REQUEST_DURATION_SECONDS = _NoOpMetric()
+    DB_POOL_ACTIVE_CONNECTIONS = _NoOpMetric()
+    DATAEXTRACTION_DB_POOL_ACTIVE_CONNECTIONS = _NoOpMetric()
+    DB_POOL_CAPACITY = _NoOpMetric()
+    DATAEXTRACTION_DB_POOL_CAPACITY = _NoOpMetric()
+    DLQ_PENDING_RECORDS = _NoOpMetric()
+    DATAEXTRACTION_DLQ_PENDING_RECORDS = _NoOpMetric()
+    DLQ_ALERT_STATUS = _NoOpMetric()
+    DATAEXTRACTION_DLQ_ALERT_STATUS = _NoOpMetric()
+    INGESTION_RUNS_TOTAL = _NoOpMetric()
+    INGESTION_RECORDS_PROCESSED = _NoOpMetric()
+    AGENT2_GMAPS_PLACES_PERSISTED = _NoOpMetric()
+    AGENT2_OSM_POIS_PERSISTED = _NoOpMetric()
+    AGENT2_WEBSITE_VERIFICATIONS_TOTAL = _NoOpMetric()
+    AGENT2_WEBSITE_CRAWLS_TOTAL = _NoOpMetric()
+    AGENT2_KG_OBSERVATIONS_TOTAL = _NoOpMetric()
+    AGENT2_LAKEHOUSE_OUTBOX_BACKLOG = _NoOpMetric()
+    AGENT2_ACTIVITY_DURATION_SECONDS = _NoOpMetric()
+
+
 
 def record_request_metrics(method: str, path: str, status_code: int, duration_sec: float) -> None:
     """Record timing and status metrics for an executed HTTP request."""
@@ -155,6 +223,36 @@ def update_system_gauges() -> None:
         DATAEXTRACTION_DLQ_ALERT_STATUS.set(alert_val)
     except Exception:
         pass
+
+    # Update Agent 2 Lakehouse Outbox backlog gauge
+    try:
+        from packages.infrastructure.db_connector import get_connection, release_connection
+        conn = get_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT COUNT(*) FROM kg_observation.pending_lakehouse_uploads WHERE uploaded_at IS NULL;"
+                    )
+                    outbox_cnt = int((cur.fetchone() or [0])[0] or 0)
+                    AGENT2_LAKEHOUSE_OUTBOX_BACKLOG.set(outbox_cnt)
+            finally:
+                release_connection(conn)
+    except Exception:
+        pass
+
+
+def start_worker_metrics_server(port: int) -> bool:
+    """Starts the Prometheus standalone HTTP metrics server for Temporal workers."""
+    if not PROMETHEUS_AVAILABLE or start_http_server is None:
+        return False
+    try:
+        start_http_server(int(port))
+        logger.info("Prometheus worker metrics server listening on :%d", int(port))
+        return True
+    except OSError as exc:
+        logger.warning("Prometheus worker metrics server port %d unavailable (%s); continuing.", port, exc)
+        return False
 
 
 def get_metrics_response() -> Response:

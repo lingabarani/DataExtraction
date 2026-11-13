@@ -27,6 +27,56 @@ agents:
     incremental_staleness_hours: 24      # Run incremental if > 24h since last run
     full_refresh_staleness_days: 30      # Run full refresh if > 30 days
     require_human_approval: true         # Full refresh is high-impact
+    heartbeat_interval_seconds: 10       # Subprocess Temporal heartbeat interval
+    error_threshold_pct: 25.0            # Abort scraper if row errors exceed % threshold
+    enabled_sources:
+      - sec_edgar
+      - fdic
+      - usaspending
+      - propublica
+      - cms_npi
+      - sam_gov
+
+  geospatial_extraction:
+    enabled: true
+    enabled_sources:
+      - google_maps
+      - openstreetmap
+    default_countries:
+      - US
+    us_regions:
+      - US-CA
+      - US-TX
+      - US-NY
+    mx_regions:
+      - MX-CMX
+      - MX-JAL
+      - MX-NLE
+    gmaps_category: commercial
+    gmaps_tile_max_depth: 5
+    gmaps_flush_batch_size: 250
+    default_batch_limit: 50
+    osm_fields:
+      - shop
+      - office
+    osm_max_chunks_per_field: 2
+    website_verification_limit: 50
+    website_verify_concurrency: 25
+    website_verify_timeout_seconds: 10.0
+    website_crawl_limit: 25
+    website_crawl_concurrency: 15
+    website_crawl_max_pages: 5
+    website_crawl_timeout_seconds: 15.0
+    website_domain_delay_seconds: 0.1
+    website_flush_batch_size: 50
+    geo_validation_limit: 10000
+    geo_validate_batch_size: 250
+    claim_lease_seconds: 600
+    ssrf_allowed_ports:
+      - 80
+      - 443
+    max_website_response_bytes: 5242880
+    kg_observation_enabled: true
 
   email_enrichment:
     enabled: true

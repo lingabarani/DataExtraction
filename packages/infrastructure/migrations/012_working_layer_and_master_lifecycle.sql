@@ -3,6 +3,12 @@
 -- ============================================================================
 -- Establishes decoupled pre-master working canvas in staging_dataextraction
 -- and adds lifecycle, freshness, and trust scoring metadata to master_dataextraction.
+--
+-- Prerequisites: migrations 001–011 must be applied first.
+-- master_dataextraction.organizations is created by migration 001 (via kg_core schema
+-- relocation in 007). This migration guards all ALTER TABLE statements so it is
+-- safe to re-run even if master_dataextraction.organizations does not yet exist.
+-- ============================================================================
 
 BEGIN;
 
@@ -79,26 +85,50 @@ CREATE TABLE IF NOT EXISTS staging_dataextraction.working_emails (
 );
 
 -- 4. Master Organizations Lifecycle & Freshness Metadata
-ALTER TABLE master_dataextraction.organizations 
-ADD COLUMN IF NOT EXISTS governance_status VARCHAR(50) DEFAULT 'CERTIFIED',
-ADD COLUMN IF NOT EXISTS trust_score NUMERIC(5, 4) DEFAULT 0.9500,
-ADD COLUMN IF NOT EXISTS freshness_score NUMERIC(5, 4) DEFAULT 1.0000,
-ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS next_verification_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '90 days'),
-ADD COLUMN IF NOT EXISTS verification_source VARCHAR(100) DEFAULT 'INITIAL_PROMOTION_GATE',
-ADD COLUMN IF NOT EXISTS website_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS email_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS executive_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS domain_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS maps_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS registry_last_verified_at TIMESTAMPTZ DEFAULT NOW();
+-- Guard: only run if master_dataextraction.organizations exists (requires migration 001+007)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'master_dataextraction' AND table_name = 'organizations'
+    ) THEN
+        ALTER TABLE master_dataextraction.organizations
+            ADD COLUMN IF NOT EXISTS governance_status VARCHAR(50) DEFAULT 'CERTIFIED',
+            ADD COLUMN IF NOT EXISTS trust_score NUMERIC(5, 4) DEFAULT 0.9500,
+            ADD COLUMN IF NOT EXISTS freshness_score NUMERIC(5, 4) DEFAULT 1.0000,
+            ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS next_verification_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '90 days'),
+            ADD COLUMN IF NOT EXISTS verification_source VARCHAR(100) DEFAULT 'INITIAL_PROMOTION_GATE',
+            ADD COLUMN IF NOT EXISTS website_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS email_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS executive_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS domain_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS maps_last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS registry_last_verified_at TIMESTAMPTZ DEFAULT NOW();
+        RAISE NOTICE 'Migration 012: master_dataextraction.organizations lifecycle columns added.';
+    ELSE
+        RAISE NOTICE 'Migration 012: master_dataextraction.organizations not found — skipping lifecycle column additions. Run migrations 001+007 first.';
+    END IF;
+END $$;
 
 -- 5. Master Persons Lifecycle Metadata
-ALTER TABLE master_dataextraction.persons
-ADD COLUMN IF NOT EXISTS governance_status VARCHAR(50) DEFAULT 'CERTIFIED',
-ADD COLUMN IF NOT EXISTS trust_score NUMERIC(5, 4) DEFAULT 0.9000,
-ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ DEFAULT NOW(),
-ADD COLUMN IF NOT EXISTS next_verification_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '90 days');
+-- Guard: only run if master_dataextraction.persons exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'master_dataextraction' AND table_name = 'persons'
+    ) THEN
+        ALTER TABLE master_dataextraction.persons
+            ADD COLUMN IF NOT EXISTS governance_status VARCHAR(50) DEFAULT 'CERTIFIED',
+            ADD COLUMN IF NOT EXISTS trust_score NUMERIC(5, 4) DEFAULT 0.9000,
+            ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS next_verification_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '90 days');
+        RAISE NOTICE 'Migration 012: master_dataextraction.persons lifecycle columns added.';
+    ELSE
+        RAISE NOTICE 'Migration 012: master_dataextraction.persons not found — skipping. Run migrations 001+007 first.';
+    END IF;
+END $$;
 
 -- 6. High-Performance B-Tree Indexing Strategy
 CREATE INDEX IF NOT EXISTS idx_working_org_domain ON staging_dataextraction.working_organizations (primary_domain);
@@ -106,11 +136,24 @@ CREATE INDEX IF NOT EXISTS idx_working_gov_status ON staging_dataextraction.work
 CREATE INDEX IF NOT EXISTS idx_working_email_status ON staging_dataextraction.working_emails (deliverability_status);
 CREATE INDEX IF NOT EXISTS idx_working_person_org ON staging_dataextraction.working_persons (org_id);
 
-CREATE INDEX IF NOT EXISTS idx_master_org_next_verif 
-ON master_dataextraction.organizations (next_verification_at ASC)
-WHERE governance_status = 'CERTIFIED';
+-- Guard master indexes — only create when the table exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'master_dataextraction' AND table_name = 'organizations'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_master_org_next_verif
+            ON master_dataextraction.organizations (next_verification_at ASC)
+            WHERE governance_status = 'CERTIFIED';
 
-CREATE INDEX IF NOT EXISTS idx_master_org_gov_freshness 
-ON master_dataextraction.organizations (governance_status, freshness_score);
+        CREATE INDEX IF NOT EXISTS idx_master_org_gov_freshness
+            ON master_dataextraction.organizations (governance_status, freshness_score);
+
+        RAISE NOTICE 'Migration 012: master_dataextraction indexes created.';
+    ELSE
+        RAISE NOTICE 'Migration 012: master_dataextraction.organizations not found — skipping master indexes.';
+    END IF;
+END $$;
 
 COMMIT;

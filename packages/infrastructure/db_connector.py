@@ -51,7 +51,15 @@ _CURRENT_DIR = Path(__file__).resolve().parent
 if str(_CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(_CURRENT_DIR))
 
-from config_manager import config_manager
+# Resolve packages root so "packages.infrastructure" is importable
+_PACKAGES_ROOT = _CURRENT_DIR.parent.parent
+if str(_PACKAGES_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PACKAGES_ROOT))
+
+try:
+    from packages.infrastructure.config_manager import config_manager
+except ImportError:
+    from config_manager import config_manager  # direct-run fallback
 
 _db_conf = config_manager.get_database_config()
 DATABASE_TYPE = _db_conf["type"]
@@ -68,27 +76,39 @@ _PG_POOL: Optional[object] = None
 
 
 def _init_pool():
-    """Initializes the PostgreSQL connection pool."""
+    """
+    Initialises the PostgreSQL connection pool.
+    Uses environment-aware timeouts:
+      - Development/test: 2s connect timeout, 2 minimum connections (fast startup)
+      - Production: configurable via POSTGRES_POOL_CONNECT_TIMEOUT (default 5s)
+    """
     global _PG_POOL
     if _PG_POOL is None and DATABASE_TYPE == "postgresql":
         try:
             import psycopg2.pool
+            import os
+            is_dev = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "test")
+            connect_timeout = int(os.getenv("POSTGRES_POOL_CONNECT_TIMEOUT", "2" if is_dev else "5"))
+            # Use 2 minconn in dev (fast startup); higher in production via env var
+            pool_min = DB_POOL_MIN if not is_dev else min(DB_POOL_MIN, 2)
             _PG_POOL = psycopg2.pool.ThreadedConnectionPool(
-                minconn=DB_POOL_MIN,
+                minconn=pool_min,
                 maxconn=DB_POOL_MAX,
                 host=DB_HOST,
                 port=DB_PORT,
                 dbname=DB_NAME,
                 user=DB_USER,
                 password=DB_PASS,
-                connect_timeout=10,
+                connect_timeout=connect_timeout,
                 options="-c search_path=staging_dataextraction,master_dataextraction,identity_resolution,raw_dataextraction,search_dataextraction,public",
             )
-            logger.info("Initialized PostgreSQL connection pool (%d-%d connections) -> %s:%d/%s",
-                        DB_POOL_MIN, DB_POOL_MAX, DB_HOST, DB_PORT, DB_NAME)
+            logger.info(
+                "Initialised PostgreSQL connection pool (min=%d max=%d timeout=%ds) → %s:%d/%s",
+                pool_min, DB_POOL_MAX, connect_timeout, DB_HOST, DB_PORT, DB_NAME,
+            )
         except Exception as e:
-            logger.error("Failed to initialize PostgreSQL connection pool: %s", e)
-            raise RuntimeError(f"PostgreSQL connection pool initialization failed: {e}")
+            logger.error("Failed to initialise PostgreSQL connection pool: %s", e)
+            raise RuntimeError(f"PostgreSQL connection pool initialisation failed: {e}") from e
 
 
 def get_connection(row_factory: bool = False):
@@ -122,13 +142,15 @@ def get_connection(row_factory: bool = False):
             logger.error("Error acquiring connection from pool: %s", e)
             # Direct fallback if pool is saturated
             import psycopg2
+            is_dev = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "test")
+            connect_timeout = int(os.getenv("POSTGRES_POOL_CONNECT_TIMEOUT", "2" if is_dev else "5"))
             return psycopg2.connect(
                 host=DB_HOST,
                 port=DB_PORT,
                 dbname=DB_NAME,
                 user=DB_USER,
                 password=DB_PASS,
-                connect_timeout=10,
+                connect_timeout=connect_timeout,
                 options="-c search_path=staging_dataextraction,master_dataextraction,identity_resolution,raw_dataextraction,search_dataextraction,public",
             )
     else:

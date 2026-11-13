@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -136,6 +137,8 @@ class OpenStreetMapSource(BaseSource):
             failure_threshold=2,
             cooldown_sec=self.config.circuit_breaker_cooldown_sec
         )
+        self._state_lock = threading.RLock()
+        self._global_cooldown_until = 0.0
         self.session.headers.update({
             "User-Agent": self.config.user_agent,
             "Accept": "application/json"
@@ -149,10 +152,27 @@ class OpenStreetMapSource(BaseSource):
     def _switch_endpoint(self, current_endpoint: str) -> str:
         """Rotates to next healthy fallback mirror via the circuit breaker."""
         new_endpoint = self.circuit_breaker.rotate_endpoint()
-        self.base_url = new_endpoint
+        with self._state_lock:
+            self.base_url = new_endpoint
         print(f"[API] Rotated active mirror to {new_endpoint}", flush=True)
         logger.info(f"Rotated active mirror from {current_endpoint} to {new_endpoint}")
         return new_endpoint
+
+    def _wait_global_cooldown_and_throttle(self) -> None:
+        """Thread-safely honors global cooldown backoff and per-source rate-limit spacing."""
+        with self._state_lock:
+            now = time.time()
+            cooldown_wait = max(0.0, self._global_cooldown_until - now)
+        if cooldown_wait > 0:
+            time.sleep(min(cooldown_wait, 60.0))
+        with self._state_lock:
+            self._throttle()
+
+    def _extend_global_cooldown(self, delay_sec: float) -> None:
+        with self._state_lock:
+            target = time.time() + max(0.0, delay_sec)
+            if target > self._global_cooldown_until:
+                self._global_cooldown_until = target
 
     # ─── Core Overpass Query ──────────────────────────────────────────────────
 
@@ -185,7 +205,7 @@ class OpenStreetMapSource(BaseSource):
         for attempt in range(1, total_attempts + 1):
             print(f"[API] Mirror={current_endpoint} Attempt={attempt}/{total_attempts}", flush=True)
             logger.info(f"Submitting Overpass request to {current_endpoint} (attempt {attempt}/{total_attempts})")
-            self._throttle()
+            self._wait_global_cooldown_and_throttle()
 
             t0 = time.time()
             try:
@@ -220,6 +240,7 @@ class OpenStreetMapSource(BaseSource):
                         flush=True
                     )
                     logger.warning(f"HTTP 429 from {current_endpoint}. Retrying in {delay:.1f}s")
+                    self._extend_global_cooldown(delay)
                     current_endpoint = self._switch_endpoint(current_endpoint)
                     if attempt < total_attempts:
                         time.sleep(delay)

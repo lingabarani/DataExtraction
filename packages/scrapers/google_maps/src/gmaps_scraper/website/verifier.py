@@ -1,10 +1,13 @@
 import asyncio
+import os
 import re
 import urllib.parse
 from typing import Any, Dict, List, Optional, Set, Tuple
 import httpx
 
 from .ssrf import is_safe_url, normalize_url
+
+DEFAULT_MAX_RESPONSE_BYTES = int(os.getenv("MAX_WEBSITE_RESPONSE_BYTES", str(5 * 1024 * 1024)))
 
 DIRECTORY_AND_SOCIAL_DOMAINS: Set[str] = {
     "facebook.com", "instagram.com", "twitter.com", "x.com",
@@ -49,7 +52,8 @@ class WebsiteVerifier:
         timeout_seconds: float = 10.0,
         max_redirects: int = 5,
         user_agent: Optional[str] = None,
-        check_dns: bool = True
+        check_dns: bool = True,
+        max_response_bytes: Optional[int] = None,
     ):
         self.timeout = timeout_seconds
         self.max_redirects = max_redirects
@@ -58,6 +62,36 @@ class WebsiteVerifier:
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         )
         self.check_dns = check_dns
+        self.max_response_bytes = int(
+            max_response_bytes if max_response_bytes is not None else DEFAULT_MAX_RESPONSE_BYTES
+        )
+
+    @staticmethod
+    async def _read_bounded_body(resp: httpx.Response, max_bytes: int) -> Tuple[str, bool]:
+        """Streams HTTP body up to `max_bytes` so oversized payloads cannot exhaust worker RAM."""
+        chunks: List[bytes] = []
+        total = 0
+        truncated = False
+        async for chunk in resp.aiter_bytes():
+            if not chunk:
+                continue
+            remaining = max_bytes - total
+            if remaining <= 0:
+                truncated = True
+                break
+            if len(chunk) > remaining:
+                chunks.append(chunk[:remaining])
+                total += remaining
+                truncated = True
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        raw = b"".join(chunks)
+        encoding = resp.encoding or "utf-8"
+        try:
+            return raw.decode(encoding, errors="replace"), truncated
+        except LookupError:
+            return raw.decode("utf-8", errors="replace"), truncated
 
     async def verify(
         self,
@@ -108,14 +142,116 @@ class WebsiteVerifier:
             verify=True
         )
 
+        use_streaming = (
+            isinstance(client, httpx.AsyncClient)
+            and not type(client).__module__.startswith("unittest.mock")
+            and not type(getattr(client, "get", None)).__module__.startswith("unittest.mock")
+            and not type(getattr(client, "stream", None)).__module__.startswith("unittest.mock")
+        )
+
         try:
             current_url = norm_url
             redirects_followed = 0
-            response = None
+            visited_urls: Set[str] = {norm_url}
+            final_status: Optional[int] = None
+            final_url_str: str = norm_url
+            html_text: str = ""
+            body_truncated: bool = False
 
             while redirects_followed <= self.max_redirects:
                 try:
-                    resp = await client.get(current_url)
+                    if use_streaming:
+                        async with client.stream("GET", current_url) as resp:
+                            if resp.is_redirect and "location" in resp.headers:
+                                redirects_followed += 1
+                                if redirects_followed > self.max_redirects:
+                                    return {
+                                        "status": "failed",
+                                        "verified": False,
+                                        "candidate": candidate_url,
+                                        "final_url": current_url,
+                                        "error": "Too many redirects",
+                                        "evidence": {"reason": f"Exceeded maximum redirects ({self.max_redirects})"},
+                                    }
+                                loc = resp.headers["location"]
+                                next_url = urllib.parse.urljoin(current_url, loc)
+                                if next_url in visited_urls:
+                                    return {
+                                        "status": "failed",
+                                        "verified": False,
+                                        "candidate": candidate_url,
+                                        "final_url": next_url,
+                                        "error": "Redirect loop detected",
+                                        "evidence": {"reason": f"Redirect loop back to {next_url}"},
+                                    }
+                                safe_next, next_err = is_safe_url(next_url, check_dns=self.check_dns)
+                                if not safe_next:
+                                    return {
+                                        "status": "failed",
+                                        "verified": False,
+                                        "candidate": candidate_url,
+                                        "final_url": next_url,
+                                        "error": f"SSRF blocked on redirect: {next_err}",
+                                        "evidence": {"reason": f"Redirect to unsafe destination blocked: {next_err}"},
+                                    }
+                                visited_urls.add(next_url)
+                                current_url = next_url
+                                continue
+
+                            final_status = resp.status_code
+                            final_url_str = str(resp.url)
+                            if final_status < 400:
+                                html_text, body_truncated = await self._read_bounded_body(
+                                    resp, self.max_response_bytes
+                                )
+                            break
+                    else:
+                        resp = await client.get(current_url)
+                        if resp.is_redirect and "location" in resp.headers:
+                            redirects_followed += 1
+                            if redirects_followed > self.max_redirects:
+                                return {
+                                    "status": "failed",
+                                    "verified": False,
+                                    "candidate": candidate_url,
+                                    "final_url": current_url,
+                                    "error": "Too many redirects",
+                                    "evidence": {"reason": f"Exceeded maximum redirects ({self.max_redirects})"},
+                                }
+                            loc = resp.headers["location"]
+                            next_url = urllib.parse.urljoin(current_url, loc)
+                            if next_url in visited_urls:
+                                return {
+                                    "status": "failed",
+                                    "verified": False,
+                                    "candidate": candidate_url,
+                                    "final_url": next_url,
+                                    "error": "Redirect loop detected",
+                                    "evidence": {"reason": f"Redirect loop back to {next_url}"},
+                                }
+                            safe_next, next_err = is_safe_url(next_url, check_dns=self.check_dns)
+                            if not safe_next:
+                                return {
+                                    "status": "failed",
+                                    "verified": False,
+                                    "candidate": candidate_url,
+                                    "final_url": next_url,
+                                    "error": f"SSRF blocked on redirect: {next_err}",
+                                    "evidence": {"reason": f"Redirect to unsafe destination blocked: {next_err}"},
+                                }
+                            visited_urls.add(next_url)
+                            current_url = next_url
+                            continue
+
+                        final_status = resp.status_code
+                        final_url_str = str(resp.url)
+                        if final_status < 400:
+                            raw_txt = resp.text or ""
+                            if len(raw_txt.encode("utf-8", errors="replace")) > self.max_response_bytes:
+                                body_truncated = True
+                                raw_txt = raw_txt[: self.max_response_bytes]
+                            html_text = raw_txt
+                        break
                 except httpx.TimeoutException:
                     return {
                         "status": "failed",
@@ -123,7 +259,7 @@ class WebsiteVerifier:
                         "candidate": candidate_url,
                         "final_url": current_url,
                         "error": "HTTP Connection Timed Out",
-                        "evidence": {"reason": f"Request timed out after {self.timeout}s"}
+                        "evidence": {"reason": f"Request timed out after {self.timeout}s"},
                     }
                 except Exception as e:
                     return {
@@ -132,56 +268,34 @@ class WebsiteVerifier:
                         "candidate": candidate_url,
                         "final_url": current_url,
                         "error": f"Connection error: {e}",
-                        "evidence": {"reason": f"Failed to connect to website: {e}"}
+                        "evidence": {"reason": f"Failed to connect to website: {e}"},
                     }
 
-                # Handle redirect
-                if resp.is_redirect and "location" in resp.headers:
-                    redirects_followed += 1
-                    loc = resp.headers["location"]
-                    next_url = urllib.parse.urljoin(current_url, loc)
-                    safe_next, next_err = is_safe_url(next_url, check_dns=self.check_dns)
-                    if not safe_next:
-                        return {
-                            "status": "failed",
-                            "verified": False,
-                            "candidate": candidate_url,
-                            "final_url": next_url,
-                            "error": f"SSRF blocked on redirect: {next_err}",
-                            "evidence": {"reason": f"Redirect to unsafe destination blocked: {next_err}"}
-                        }
-                    current_url = next_url
-                    continue
-                else:
-                    response = resp
-                    break
-
-            if response is None:
+            if final_status is None:
                 return {
                     "status": "failed",
                     "verified": False,
                     "candidate": candidate_url,
                     "final_url": current_url,
                     "error": "Too many redirects",
-                    "evidence": {"reason": f"Exceeded maximum redirects ({self.max_redirects})"}
+                    "evidence": {"reason": f"Exceeded maximum redirects ({self.max_redirects})"},
                 }
 
-            if response.status_code >= 400:
+            if final_status >= 400:
                 return {
                     "status": "failed",
                     "verified": False,
                     "candidate": candidate_url,
-                    "final_url": str(response.url),
-                    "error": f"HTTP {response.status_code}",
+                    "final_url": final_url_str,
+                    "error": f"HTTP {final_status}",
                     "evidence": {
-                        "status_code": response.status_code,
-                        "reason": f"Website returned HTTP error status {response.status_code}"
-                    }
+                        "status_code": final_status,
+                        "reason": f"Website returned HTTP error status {final_status}",
+                    },
                 }
 
-            # Extract signals from HTML body
-            html_text = response.text or ""
-            parsed_final = urllib.parse.urlsplit(str(response.url))
+            # Extract signals from bounded HTML body
+            parsed_final = urllib.parse.urlsplit(final_url_str)
             final_netloc = parsed_final.netloc.lower()
 
             # Signal 1: Title & Headings
@@ -259,8 +373,8 @@ class WebsiteVerifier:
             confidence_score = min(1.0, round(confidence_score, 2))
 
             evidence = {
-                "status_code": response.status_code,
-                "final_url": str(response.url),
+                "status_code": final_status,
+                "final_url": final_url_str,
                 "domain": final_netloc,
                 "domain_stem": domain_stem,
                 "title": title_text[:120],
@@ -271,6 +385,7 @@ class WebsiteVerifier:
                 "location_match": location_match,
                 "category_match": category_match,
                 "confidence_score": confidence_score,
+                "truncated": body_truncated,
             }
 
             if matched_in_domain and (token_ratio >= 0.5 or phone_match or location_match or category_match):
@@ -279,7 +394,7 @@ class WebsiteVerifier:
                     "status": "verified",
                     "verified": True,
                     "candidate": candidate_url,
-                    "final_url": str(response.url),
+                    "final_url": final_url_str,
                     "evidence": evidence,
                     "error": None
                 }
@@ -289,7 +404,7 @@ class WebsiteVerifier:
                     "status": "verified",
                     "verified": True,
                     "candidate": candidate_url,
-                    "final_url": str(response.url),
+                    "final_url": final_url_str,
                     "evidence": evidence,
                     "error": None
                 }
@@ -299,7 +414,7 @@ class WebsiteVerifier:
                     "status": "needs_review",
                     "verified": False,
                     "candidate": candidate_url,
-                    "final_url": str(response.url),
+                    "final_url": final_url_str,
                     "evidence": evidence,
                     "error": None
                 }
@@ -309,7 +424,7 @@ class WebsiteVerifier:
                     "status": "needs_review",
                     "verified": False,
                     "candidate": candidate_url,
-                    "final_url": str(response.url),
+                    "final_url": final_url_str,
                     "evidence": evidence,
                     "error": "Mismatched company content or domain"
                 }

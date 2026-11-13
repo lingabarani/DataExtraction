@@ -27,15 +27,18 @@ from pathlib import Path
 
 import requests
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
     from packages.infrastructure.config_manager import config_manager
-    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.db_connector import get_connection, release_connection, db_info
     from packages.domain.contact_validator import validate_contact, lead_score_from_contact
     from packages.infrastructure.http_client import http_client
 except ImportError:
     from config_manager import config_manager
-    from db_connector import get_connection, db_info
+    from db_connector import get_connection, release_connection, db_info
     from contact_validator import validate_contact, lead_score_from_contact
     from http_client import http_client
 
@@ -168,16 +171,17 @@ def _make_org_lead(cik: str, name: str, ticker: str, contact_info: dict, contact
     }
 
 
-def fetch_tickers(conn, cur, limit: int, dry_run: bool) -> int:
-    """Fast path: download company_tickers.json (~10K public companies) — no per-company API calls."""
-    print("  [*] Fetching SEC public company tickers...")
+def fetch_tickers(conn, cur, limit: int, dry_run: bool, mode: str = "tickers", stats: dict | None = None) -> int:
+    """Download company_tickers.json (~10K public companies); optionally enrich via submissions in full mode."""
+    print(f"  [*] Fetching SEC public company tickers (mode={mode})...")
     r = http_client.get(TICKERS_URL, headers=SEC_HEADERS, timeout=15)
     if r.status_code != 200:
-        print(f"  [!] Failed: HTTP {r.status_code}")
-        return 0
+        raise RuntimeError(f"SEC company_tickers HTTP {r.status_code}")
 
-    data     = r.json()
+    data = r.json()
     inserted = 0
+    errors = 0
+    enrich_submissions = str(mode).lower() == "full"
 
     for idx, (_, company) in enumerate(data.items()):
         if limit and inserted >= limit:
@@ -186,12 +190,23 @@ def fetch_tickers(conn, cur, limit: int, dry_run: bool) -> int:
         cik    = str(company.get("cik_str", "")).zfill(10)
         ticker = company.get("ticker", "")
         name   = company.get("title", "")
-        if not name: continue
+        if not name:
+            continue
 
-        # Skip per-company API call — use ticker data only (fast batch mode)
-        contact_info = {"sic": "", "state_code": None, "domain": None,
-                        "phone": None, "email": None, "officers": [],
-                        "address": {}, "website": ""}
+        if enrich_submissions:
+            contact_info = _fetch_submission_contact(cik) or {}
+            time.sleep(0.11)  # SEC Fair Access <= 10 req/sec
+        else:
+            contact_info = {}
+
+        contact_info.setdefault("sic", "")
+        contact_info.setdefault("state_code", None)
+        contact_info.setdefault("domain", None)
+        contact_info.setdefault("phone", None)
+        contact_info.setdefault("email", None)
+        contact_info.setdefault("officers", [])
+        contact_info.setdefault("address", {})
+        contact_info.setdefault("website", "")
 
         contact = validate_contact(
             email=contact_info.get("email"),
@@ -206,6 +221,8 @@ def fetch_tickers(conn, cur, limit: int, dry_run: bool) -> int:
         officers = contact_info.get("officers", [])
         if officers:
             for off in officers[:2]:
+                if limit and inserted >= limit:
+                    break
                 lead = _make_officer_lead(cik, name, ticker, contact_info, off, contact, score)
                 try:
                     if not dry_run:
@@ -213,27 +230,47 @@ def fetch_tickers(conn, cur, limit: int, dry_run: bool) -> int:
                     inserted += 1
                     if dry_run and inserted <= 2:
                         print(f"  [DRY SEC] {name} | {lead['full_name']} | {lead['title']}")
-                except Exception:
-                    if conn: conn.rollback()
+                except Exception as exc:
+                    errors += 1
+                    if errors <= 5:
+                        print(f"\n  [ERR SEC] {name}: {exc}")
+                    if conn:
+                        conn.rollback()
         else:
             lead = _make_org_lead(cik, name, ticker, contact_info, contact, score)
             try:
                 if not dry_run:
                     _upsert(cur, lead)
                 inserted += 1
-            except Exception:
-                if conn: conn.rollback()
+                if dry_run and inserted <= 2:
+                    print(f"  [DRY SEC] {name} | ticker={ticker} | cik={cik}")
+            except Exception as exc:
+                errors += 1
+                if errors <= 5:
+                    print(f"\n  [ERR SEC] {name}: {exc}")
+                if conn:
+                    conn.rollback()
 
         if not dry_run and inserted % BATCH_COMMIT == 0 and inserted > 0:
             conn.commit()
             print(f"\r  SEC tickers: {inserted:,} / {min(limit or 99999, len(data))}",
                   end="", flush=True)
 
-        # No sleep needed — no per-company API calls
-
-    if not dry_run:
+    if not dry_run and conn:
         conn.commit()
-    print(f"\n  [+] SEC tickers: {inserted:,} inserted")
+
+    if stats is not None:
+        stats["errors"] = errors
+        stats["inserted"] = inserted
+
+    total_attempted = inserted + errors
+    threshold = float(config_manager.get_registry_config().get("error_threshold_pct", 25.0))
+    if total_attempted >= 20 and (errors / total_attempted * 100.0) > threshold:
+        raise RuntimeError(
+            f"SEC EDGAR error rate {(errors / total_attempted * 100.0):.1f}% exceeded threshold {threshold}%"
+        )
+
+    print(f"\n  [+] SEC tickers: {inserted:,} inserted (errors={errors})")
     return inserted
 
 
@@ -299,13 +336,15 @@ def _fetch_submission_contact(cik: str) -> dict:
         return {}
 
 
-def run(mode: str = "tickers", limit: int = 0, dry_run: bool = False):
+def run(mode: str = "tickers", limit: int = 0, dry_run: bool = False, form_types: str | None = None):
     print(f"\n{'='*60}")
     print(f"  SEC EDGAR Company + Officer Scraper")
     print(f"{'='*60}")
     print(f"  DB      : {db_info()}")
     print(f"  Mode    : {mode}")
     print(f"  Limit   : {limit or 'unlimited'}")
+    if form_types:
+        print(f"  Forms   : {form_types}")
     print(f"  Dry run : {dry_run}")
     print(f"{'='*60}\n")
 
@@ -313,28 +352,49 @@ def run(mode: str = "tickers", limit: int = 0, dry_run: bool = False):
     conn = get_connection() if not dry_run else None
     cur  = conn.cursor() if conn else None
     start = datetime.now(timezone.utc)
+    stats = {"errors": 0, "inserted": 0}
+    db_count = 0
+    inserted = 0
 
-    inserted = fetch_tickers(conn, cur, limit, dry_run)
-
-    if not dry_run and conn:
-        cur.execute("SELECT COUNT(*) FROM us_leads WHERE api_source='SEC_EDGAR'")
-        db_count = cur.fetchone()[0]
-        conn.close()
-    else:
-        db_count = inserted
+    try:
+        inserted = fetch_tickers(conn, cur, limit, dry_run, mode=mode, stats=stats)
+        if not dry_run and conn:
+            cur.execute("SELECT COUNT(*) FROM staging_dataextraction.staging_companies WHERE source='SEC_EDGAR'")
+            db_count = cur.fetchone()[0]
+        else:
+            db_count = inserted
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            release_connection(conn)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n  {'─'*58}")
     print(f"  SEC EDGAR complete in {elapsed:.0f}s")
     print(f"  Inserted : {inserted:,}")
-    print(f"  DB total : {db_count:,} SEC records in us_leads")
+    print(f"  Errors   : {stats.get('errors', 0)}")
+    print(f"  DB total : {db_count:,} SEC records in staging_companies")
     print(f"  {'─'*58}\n")
+    print(
+        "ACTIVITY_RESULT_JSON:" + json.dumps({
+            "status": "SUCCESS",
+            "source": "SEC_EDGAR",
+            "inserted_count": inserted,
+            "error_count": stats.get("errors", 0),
+            "db_total": db_count,
+            "dry_run": dry_run,
+        }),
+        flush=True,
+    )
+    return inserted
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode",    default="tickers", choices=["tickers","full"])
-    parser.add_argument("--limit",   type=int, default=0)
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--mode",       default="tickers", choices=["tickers", "incremental", "full"])
+    parser.add_argument("--form-types", default=None, help="Comma-separated form types (metadata filter)")
+    parser.add_argument("--limit",      type=int, default=0)
+    parser.add_argument("--dry-run",    action="store_true")
     args = parser.parse_args()
-    run(mode=args.mode, limit=args.limit, dry_run=args.dry_run)
+    run(mode=args.mode, limit=args.limit, dry_run=args.dry_run, form_types=args.form_types)

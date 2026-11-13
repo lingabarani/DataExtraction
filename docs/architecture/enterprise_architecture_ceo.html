@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DataExtraction Enterprise Architecture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 2560px;
+      height: 1440px;
+      background-color: #070A11;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+        radial-gradient(#1E293B 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px;
+      color: #F8FAFC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+      display: flex;
+      flex-direction: column;
+      padding: 36px 44px;
+      overflow: hidden;
+    }
+
+    /* TOP HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+      margin-bottom: 24px;
+    }
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284C7, #2563EB, #7C3AED);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
+    }
+    .logo-badge svg {
+      width: 26px;
+      height: 26px;
+      fill: white;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #FFFFFF 0%, #E2E8F0 50%, #38BDF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .version-tag {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(14, 165, 233, 0.15);
+      color: #38BDF8;
+      border: 1px solid rgba(14, 165, 233, 0.4);
+    }
+    .subtitle {
+      font-size: 15px;
+      color: #94A3B8;
+      font-weight: 500;
+    }
+    .header-badges {
+      display: flex;
+      gap: 12px;
+    }
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+    }
+    .badge-green {
+      color: #34D399;
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(6, 78, 59, 0.3);
+    }
+    .badge-purple {
+      color: #C084FC;
+      border-color: rgba(168, 85, 247, 0.4);
+      background: rgba(88, 28, 135, 0.3);
+    }
+    .badge-blue {
+      color: #60A5FA;
+      border-color: rgba(59, 130, 246, 0.4);
+      background: rgba(30, 58, 138, 0.3);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-green { background: #10B981; box-shadow: 0 0 8px #10B981; }
+    .dot-purple { background: #A855F7; box-shadow: 0 0 8px #A855F7; }
+    .dot-blue { background: #3B82F6; box-shadow: 0 0 8px #3B82F6; }
+
+    /* ORCHESTRATION BANNER */
+    .orchestration-bar {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      border-radius: 12px;
+      padding: 14px 24px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    .orch-title-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .orch-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .orch-icon svg { width: 18px; height: 18px; fill: white; }
+    .orch-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #E2E8F0;
+      letter-spacing: 0.5px;
+    }
+    .orch-sub {
+      font-size: 12px;
+      color: #94A3B8;
+    }
+    .queue-pipeline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .q-pill {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 5px 12px;
+      border-radius: 6px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.6);
+      color: #CBD5E1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .q-pill.active {
+      border-color: #38BDF8;
+      color: #38BDF8;
+      background: rgba(14, 165, 233, 0.12);
+    }
+    .q-arr {
+      color: #475569;
+      font-size: 12px;
+    }
+    .orch-meta {
+      font-size: 12px;
+      color: #34D399;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.1);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* MAIN ARCHITECTURE GRID: 5 COLUMNS */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 460px 400px 530px 540px 450px;
+      gap: 20px;
+      flex: 1;
+      margin-bottom: 20px;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .col-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+    .col-title {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .col-1-title { color: #38BDF8; }
+    .col-2-title { color: #F59E0B; }
+    .col-3-title { color: #C084FC; }
+    .col-4-title { color: #34D399; }
+    .col-5-title { color: #60A5FA; }
+
+    .col-count {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(30, 41, 59, 0.8);
+      color: #94A3B8;
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+
+    /* CARD STYLING */
+    .card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+    }
+    .card-highlight-blue {
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(14, 165, 233, 0.1);
+    }
+    .card-highlight-amber {
+      border-color: rgba(245, 158, 11, 0.4);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(245, 158, 11, 0.1);
+    }
+    .card-highlight-purple {
+      border-color: rgba(192, 132, 252, 0.4);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(168, 85, 247, 0.1);
+    }
+    .card-highlight-green {
+      border-color: rgba(52, 211, 153, 0.4);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(16, 185, 129, 0.1);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .agent-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .agent-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+    .num-blue { background: #0284C7; }
+    .num-amber { background: #D97706; }
+    .num-purple { background: #7C3AED; }
+    .num-green { background: #059669; }
+    .num-indigo { background: #4F46E5; }
+
+    .agent-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #F8FAFC;
+    }
+    .queue-badge {
+      font-size: 10px;
+      font-family: ui-monospace, monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(30, 41, 59, 0.8);
+      color: #94A3B8;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+    }
+
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .feature-item {
+      font-size: 12px;
+      color: #CBD5E1;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      line-height: 1.35;
+    }
+    .bullet {
+      color: #38BDF8;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .tag-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .tag {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: rgba(30, 41, 59, 0.6);
+      color: #94A3B8;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .tag-blue { background: rgba(14, 165, 233, 0.12); color: #38BDF8; border-color: rgba(14, 165, 233, 0.3); }
+    .tag-green { background: rgba(16, 185, 129, 0.12); color: #34D399; border-color: rgba(16, 185, 129, 0.3); }
+    .tag-purple { background: rgba(168, 85, 247, 0.12); color: #C084FC; border-color: rgba(168, 85, 247, 0.3); }
+    .tag-amber { background: rgba(245, 158, 11, 0.12); color: #FBBF24; border-color: rgba(245, 158, 11, 0.3); }
+
+    /* ISOLATION FIREWALL BARRIER */
+    .isolation-banner {
+      background: linear-gradient(135deg, rgba(180, 83, 9, 0.25), rgba(245, 158, 11, 0.1));
+      border: 1px dashed #F59E0B;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .shield-icon {
+      font-size: 20px;
+    }
+    .barrier-text {
+      font-size: 11px;
+      font-weight: 800;
+      color: #FCD34D;
+      letter-spacing: 0.4px;
+      line-height: 1.3;
+    }
+    .barrier-sub {
+      font-size: 9.5px;
+      color: #D1D5DB;
+      font-weight: 500;
+    }
+
+    /* METRIC CHIP */
+    .metric-chip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 6px;
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+    .chip-label {
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      color: #94A3B8;
+    }
+    .chip-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: #F8FAFC;
+    }
+
+    /* FOOTER KPI BAR */
+    .footer-bar {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      border-radius: 12px;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    .kpi-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-right: 24px;
+      border-right: 1px solid rgba(51, 65, 85, 0.8);
+    }
+    .kpi-main-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #F8FAFC;
+      letter-spacing: 0.5px;
+    }
+    .kpi-sub-title {
+      font-size: 11px;
+      color: #64748B;
+    }
+    .kpi-grid {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex: 1;
+      justify-content: space-around;
+      padding: 0 12px;
+    }
+    .kpi-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .kpi-val {
+      font-size: 19px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .kpi-green { color: #34D399; }
+    .kpi-blue { color: #38BDF8; }
+    .kpi-purple { color: #C084FC; }
+    .kpi-amber { color: #FBBF24; }
+    .kpi-lbl {
+      font-size: 11px;
+      color: #94A3B8;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="title-row">
+        <div class="logo-badge">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h1>DATAEXTRACTION ENTERPRISE PLATFORM</h1>
+        <div class="version-tag">ENTERPRISE ARCHITECTURE v2.4</div>
+      </div>
+      <div class="subtitle">Autonomous B2B Sales Intelligence, Multi-Agent Entity Resolution & Deliverability Platform (US & Mexico)</div>
+    </div>
+    <div class="header-badges">
+      <div class="badge badge-green">
+        <div class="dot dot-green"></div>
+        213,129 CERTIFIED GOLDEN ORGS
+      </div>
+      <div class="badge badge-purple">
+        <div class="dot dot-purple"></div>
+        $0 CLOUD AI TOKEN COST (100% PRIVATE)
+      </div>
+      <div class="badge badge-blue">
+        <div class="dot dot-blue"></div>
+        TEMPORAL DISTRIBUTED SAGA
+      </div>
+    </div>
+  </div>
+
+  <!-- ORCHESTRATION LAYER BANNER -->
+  <div class="orchestration-bar">
+    <div class="orch-title-group">
+      <div class="orch-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+      </div>
+      <div>
+        <div class="orch-title">TEMPORAL.IO DISTRIBUTED SAGA ORCHESTRATOR &amp; SUPERVISOR</div>
+        <div class="orch-sub">MasterOrchestrator Saga • Exponential Backoff Retries • Checkpointed Resumption • Signals &amp; Queries</div>
+      </div>
+    </div>
+    <div class="queue-pipeline">
+      <div class="q-pill active">registry-queue</div>
+      <div class="q-arr">➔</div>
+      <div class="q-pill active">geospatial-domain-queue</div>
+      <div class="q-arr">➔</div>
+      <div class="q-pill active">identity-resolution-queue</div>
+      <div class="q-arr">➔</div>
+      <div class="q-pill active">email-enrichment-queue</div>
+      <div class="q-arr">➔</div>
+      <div class="q-pill active">executive-discovery-queue</div>
+      <div class="q-arr">➔</div>
+      <div class="q-pill active">governance-queue</div>
+      <div class="q-arr">➔</div>
+      <div class="q-pill active">search-sync-queue</div>
+    </div>
+    <div class="orch-meta">
+      <span>● AUTO-HEALING WORKER SUPERVISOR (&lt;100ms Revive)</span>
+    </div>
+  </div>
+
+  <!-- 5-ZONE ARCHITECTURAL PIPELINE -->
+  <div class="main-grid">
+
+    <!-- ZONE 1: INGESTION -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-title col-1-title">
+          <span>●</span> Zone 1: Ingestion Fleet
+        </div>
+        <div class="col-count">234,252 Rows</div>
+      </div>
+
+      <!-- Agent 1 Card -->
+      <div class="card card-highlight-blue">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-blue">1</div>
+            <div class="agent-name">Sovereign &amp; Registries</div>
+          </div>
+          <div class="queue-badge">registry-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet">▸</span> <strong>SEC EDGAR:</strong> 10 req/s rate-limit, CIK/10-K filings</li>
+            <li class="feature-item"><span class="bullet">▸</span> <strong>CMS NPI:</strong> Complete US healthcare provider registry</li>
+            <li class="feature-item"><span class="bullet">▸</span> <strong>SAM.gov &amp; FDIC:</strong> Federal defense contractors &amp; banks</li>
+            <li class="feature-item"><span class="bullet">▸</span> <strong>Mexico SAT/RFC:</strong> Sovereign Mexican legal entities</li>
+          </ul>
+          <div class="tag-grid">
+            <span class="tag tag-blue">Tax IDs (EIN/RFC)</span>
+            <span class="tag tag-blue">Legal Names</span>
+            <span class="tag tag-blue">SIC/NAICS Codes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent 2 Card -->
+      <div class="card card-highlight-blue">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-blue">2</div>
+            <div class="agent-name">Geospatial &amp; Web Intel</div>
+          </div>
+          <div class="queue-badge">geospatial-domain-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet">▸</span> <strong>Google Maps Scraping:</strong> Storefronts, phone, hours</li>
+            <li class="feature-item"><span class="bullet">▸</span> <strong>OSM Overpass:</strong> Quadtree tiling across 50 states + MX</li>
+            <li class="feature-item"><span class="bullet">▸</span> <strong>Corporate Web Crawler:</strong> Meta tags, JSON-LD, footers</li>
+            <li class="feature-item"><span class="bullet">▸</span> <strong>Spatial Geocoding:</strong> Latitude/Longitude centroids</li>
+          </ul>
+          <div class="tag-grid">
+            <span class="tag tag-blue">Addresses</span>
+            <span class="tag tag-blue">Web Domains</span>
+            <span class="tag tag-blue">PostGIS Lat/Lon</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ZONE 2: STAGING & ISOLATION -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-title col-2-title">
+          <span>●</span> Zone 2: Staging &amp; DLQ
+        </div>
+        <div class="col-count">Buffer Layer</div>
+      </div>
+
+      <div class="card card-highlight-amber">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-amber">S</div>
+            <div class="agent-name">staging_dataextraction</div>
+          </div>
+          <div class="queue-badge">PostgreSQL 18</div>
+        </div>
+        <div class="card-body">
+          <div class="metric-chip">
+            <span class="chip-label">staging_companies</span>
+            <span class="chip-val">234,252 rows</span>
+          </div>
+          <div class="metric-chip">
+            <span class="chip-label">working_organizations</span>
+            <span class="chip-val">44,197 rows</span>
+          </div>
+          <div class="metric-chip">
+            <span class="chip-label">working_emails</span>
+            <span class="chip-val">110 rows</span>
+          </div>
+          <div class="metric-chip">
+            <span class="chip-label">dead_letter_queue</span>
+            <span class="chip-val" style="color: #F87171;">3,601 rows</span>
+          </div>
+
+          <!-- ISOLATION BARRIER -->
+          <div class="isolation-banner">
+            <div class="shield-icon">🛡️</div>
+            <div>
+              <div class="barrier-text">STAGING ISOLATION FIREWALL</div>
+              <div class="barrier-sub">Zero direct writes to Master. Prevents unverified schema contamination.</div>
+            </div>
+          </div>
+
+          <ul class="feature-list" style="margin-top: 4px;">
+            <li class="feature-item"><span class="bullet" style="color: #F59E0B;">▸</span> <strong>Dead Letter Queue:</strong> Stores raw payload, traceback</li>
+            <li class="feature-item"><span class="bullet" style="color: #F59E0B;">▸</span> <strong>Replay API:</strong> POST /api/dlq/replay for retries</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ZONE 3: RESOLUTION & CONTACT GRAPH -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-title col-3-title">
+          <span>●</span> Zone 3: Resolution &amp; Contacts
+        </div>
+        <div class="col-count">Agents 3, 4, 7</div>
+      </div>
+
+      <!-- Agent 3 Card -->
+      <div class="card card-highlight-purple">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-purple">3</div>
+            <div class="agent-name">4-Tier Identity Resolution</div>
+          </div>
+          <div class="queue-badge">identity-resolution-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>Tier 1: Deterministic</strong> (EIN / RFC / CIK / Entity ID)</li>
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>Tier 2: Spatial Proximity</strong> (ST_DWithin &lt;= 500m)</li>
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>Tier 3: Splink 5.0 on DuckDB</strong> (170x Speedup)</li>
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>Tier 4: Local Ollama LLaMA 3.1:8B</strong> ($0 AI Disambiguation)</li>
+          </ul>
+          <div class="metric-chip" style="margin-top: 2px;">
+            <span class="chip-label">kg_resolution.identity_clusters</span>
+            <span class="chip-val" style="color: #C084FC;">820 clusters (0 backlog)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent 7 Card -->
+      <div class="card card-highlight-purple">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-purple">7</div>
+            <div class="agent-name">5-Tier Deliverability Firewall</div>
+          </div>
+          <div class="queue-badge">email-enrichment-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>RFC 5322 Regex ➔ DNS/MX Query ➔ Disposable Blacklist</strong></li>
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>Live SMTP Handshake:</strong> Non-intrusive RCPT TO probe</li>
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>100-Point Score:</strong> VALID (≥80), RISKY, INVALID</li>
+          </ul>
+          <div class="tag-grid">
+            <span class="tag tag-purple">64,810 Verified Contacts</span>
+            <span class="tag tag-green">Zero-Bounce Delivery</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent 4 Card -->
+      <div class="card card-highlight-purple">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-purple">4</div>
+            <div class="agent-name">Executive Discovery</div>
+          </div>
+          <div class="queue-badge">executive-discovery-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>SEC Part II &amp; Governance Harvest:</strong> CEOs, Founders, VPs</li>
+            <li class="feature-item"><span class="bullet" style="color: #C084FC;">▸</span> <strong>Person-to-Org Linkage:</strong> 67,050 Verified Executives</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ZONE 4: MASTER & LAKEHOUSE -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-title col-4-title">
+          <span>●</span> Zone 4: Master &amp; Lakehouse
+        </div>
+        <div class="col-count">Golden Records</div>
+      </div>
+
+      <!-- Agent 5 Governance -->
+      <div class="card card-highlight-green">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-green">5</div>
+            <div class="agent-name">Bayesian Governance &amp; Lineage</div>
+          </div>
+          <div class="queue-badge">governance-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #34D399;">▸</span> <strong>Statutory Precedence:</strong> SEC (0.95) &gt; SAM (0.90) &gt; Web (0.60)</li>
+            <li class="feature-item"><span class="bullet" style="color: #34D399;">▸</span> <strong>SCD Type 2:</strong> Historical lineage (valid_from, valid_to)</li>
+            <li class="feature-item"><span class="bullet" style="color: #34D399;">▸</span> <strong>Atomic Promotion Gate:</strong> Certified staging ➔ Master</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Master Data Model -->
+      <div class="card card-highlight-green">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-green">M</div>
+            <div class="agent-name">master_dataextraction</div>
+          </div>
+          <div class="queue-badge">Certified Golden</div>
+        </div>
+        <div class="card-body">
+          <div class="metric-chip">
+            <span class="chip-label">organizations</span>
+            <span class="chip-val" style="color: #34D399;">213,129 golden</span>
+          </div>
+          <div class="metric-chip">
+            <span class="chip-label">persons (executives)</span>
+            <span class="chip-val" style="color: #34D399;">67,050 records</span>
+          </div>
+          <div class="metric-chip">
+            <span class="chip-label">contact_emails</span>
+            <span class="chip-val" style="color: #34D399;">64,810 verified</span>
+          </div>
+          <div class="metric-chip">
+            <span class="chip-label">locations (PostGIS)</span>
+            <span class="chip-val" style="color: #34D399;">971 centroids</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent 6 Search Sync -->
+      <div class="card card-highlight-green">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-green">6</div>
+            <div class="agent-name">CDC Lakehouse &amp; Search</div>
+          </div>
+          <div class="queue-badge">search-sync-queue</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #34D399;">▸</span> <strong>Debezium CDC + Kafka:</strong> Real-time row mutation streaming</li>
+            <li class="feature-item"><span class="bullet" style="color: #34D399;">▸</span> <strong>OpenSearch 2.x:</strong> Sub-second full-text &amp; radial search</li>
+            <li class="feature-item"><span class="bullet" style="color: #34D399;">▸</span> <strong>MinIO S3 Lakehouse:</strong> Partitioned historical cold storage</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ZONE 5: APPLICATION & DELIVERY -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-title col-5-title">
+          <span>●</span> Zone 5: Delivery &amp; APIs
+        </div>
+        <div class="col-count">End Consumers</div>
+      </div>
+
+      <!-- API Gateway -->
+      <div class="card">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-indigo">API</div>
+            <div class="agent-name">FastAPI REST Gateway</div>
+          </div>
+          <div class="queue-badge">:8000</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>Interactive Swagger:</strong> /docs &amp; OpenAPI Spec</li>
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>Orchestration Controls:</strong> Start, Pause, Resume</li>
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>OneReach / CRM Export:</strong> Direct lead enrichment</li>
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>DLQ Triage:</strong> /api/dlq/records &amp; replay</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="card">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-num num-indigo">UI</div>
+            <div class="agent-name">Next.js 14 Dashboard</div>
+          </div>
+          <div class="queue-badge">:3000</div>
+        </div>
+        <div class="card-body">
+          <ul class="feature-list">
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>Real-time Telemetry:</strong> Live worker status</li>
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>Queue Freshness Monitor:</strong> Rate &amp; latency curves</li>
+            <li class="feature-item"><span class="bullet" style="color: #60A5FA;">▸</span> <strong>Identity Graph Visualizer:</strong> Cluster inspection</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Consumer Outlets -->
+      <div class="card" style="background: rgba(30, 41, 59, 0.4); border-color: rgba(71, 85, 105, 0.5);">
+        <div class="card-head">
+          <div class="agent-tag">
+            <div class="agent-name" style="font-size: 13px; color: #94A3B8;">BUSINESS OUTLETS</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="tag-grid">
+            <span class="tag tag-blue">Sales Outreach CRM</span>
+            <span class="tag tag-green">Direct Lead Enrichment</span>
+            <span class="tag tag-purple">B2B Sales Intelligence</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- FOOTER KPI & ROI BAR (CEO REVIEW) -->
+  <div class="footer-bar">
+    <div class="kpi-title-block">
+      <div class="kpi-main-title">EXECUTIVE ROI &amp; PRODUCTION PERFORMANCE WINS</div>
+      <div class="kpi-sub-title">Sprint 2 Verified Metrics • PostgreSQL 18.6 • Temporal Engine</div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-val kpi-green">$250K+ / Year</div>
+        <div class="kpi-lbl">SaaS Licensing Elimination</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val kpi-purple">$0 AI Costs</div>
+        <div class="kpi-lbl">100% Private Local LLaMA 3.1:8B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val kpi-blue">6,500x Faster</div>
+        <div class="kpi-lbl">DB Indexing (13.4s ➔ 1.9ms)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val kpi-blue">170x Faster</div>
+        <div class="kpi-lbl">Splink DuckDB Linkage</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val kpi-green">0 Backlog</div>
+        <div class="kpi-lbl">100% Autonomous Resolution</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val kpi-amber">100-Point Score</div>
+        <div class="kpi-lbl">Zero-Bounce Email Firewall</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

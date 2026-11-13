@@ -85,7 +85,11 @@ class PipelineConfig(BaseModel):
     retry_failed: bool = False
     dry_run: bool = False
     max_retries: int = 2
-    tile_max_depth: int = 2
+    tile_max_depth: int = 5
+    tile_min_span_deg: float = 0.005
+    max_tiles_per_region: int = 5000
+    max_pages_per_tile: int = 3
+    flush_batch_size: int = 250
     tile_step_deg: float = 0.5
     tile_overlap_pct: float = 10.0
     export_every_n_records: int = 500
@@ -1271,27 +1275,54 @@ class PipelineOrchestrator:
         run_id: str,
         task_id: Optional[str] = None,
         dry_run: bool = False,
-        collection_only: bool = False
+        collection_only: bool = False,
+        on_places_batch: Optional[Callable[[List[Dict[str, Any]]], Any]] = None,
+        pg_checkpoint_store: Optional[Any] = None,
+        isolated_seen_cids: bool = False,
+        tile_max_depth: Optional[int] = None,
+        tile_min_span_deg: Optional[float] = None,
+        max_tiles_per_region: Optional[int] = None,
+        max_pages_per_tile: Optional[int] = None,
+        flush_batch_size: int = 250,
     ) -> CollectionResult:
         """
         Executes Geographic Tile-Based Scraping for a region and category (Section 3).
-        Generates/retrieves deterministic tiles, searches Google Maps, deduplicates by CID,
-        persists tile metrics, detects saturation, subdivides into quadrants, and handles retries.
+        Generates/retrieves deterministic tiles (PostgreSQL-backed if `pg_checkpoint_store`
+        is given, else SQLite), supports offset pagination, adaptive quadrant subdivision,
+        streaming batch flushes, and retry/resume checkpoints.
         """
         gl, hl = get_country_bias(country_code)
         eff_task_id = task_id or f"col_{country_code.lower()}_{region.code.lower()}_{sanitize_slug(category)}"
+        eff_max_depth = int(tile_max_depth if tile_max_depth is not None else getattr(self.config, "tile_max_depth", 5))
+        eff_min_span = float(tile_min_span_deg if tile_min_span_deg is not None else getattr(self.config, "tile_min_span_deg", 0.005))
+        eff_max_tiles = int(max_tiles_per_region if max_tiles_per_region is not None else getattr(self.config, "max_tiles_per_region", 5000))
+        eff_max_pages = max(1, int(max_pages_per_tile if max_pages_per_tile is not None else getattr(self.config, "max_pages_per_tile", 3)))
+        eff_flush_size = max(1, int(flush_batch_size or 250))
 
-        # 1. Retrieve or generate geographic tiles for this task
-        existing_tiles = self.db.get_geographic_tiles(
-            country_code=country_code,
-            region_code=region.code,
-            category=category,
-            task_id=eff_task_id
-        )
+        # 1. Retrieve or generate geographic tiles (PostgreSQL checkpoint primary if provided, else SQLite)
+        existing_tiles: List[Dict[str, Any]] = []
+        if pg_checkpoint_store is not None:
+            try:
+                existing_tiles = pg_checkpoint_store.load_tiles(
+                    country_code=country_code,
+                    region_code=region.code,
+                    category=category,
+                )
+            except Exception as ckpt_err:
+                logger.warning("PG tile checkpoint load failed, falling back to SQLite: %s", ckpt_err)
+                existing_tiles = []
+
+        if not existing_tiles:
+            existing_tiles = self.db.get_geographic_tiles(
+                country_code=country_code,
+                region_code=region.code,
+                category=category,
+                task_id=eff_task_id,
+                limit=eff_max_tiles,
+            )
 
         if not existing_tiles:
             step_deg = getattr(self.config, "tile_step_deg", 0.5)
-            # Adaptive refinement for small regions
             if region.code in ("CMX", "TLA", "RI", "DE", "DC", "MOR"):
                 step_deg = 0.1
             tiles = generate_region_grid_tiles(
@@ -1300,11 +1331,18 @@ class PipelineOrchestrator:
                 category=category,
                 task_id=eff_task_id,
                 run_id=run_id,
-                step_deg=step_deg
+                step_deg=step_deg,
+                max_tiles_per_region=eff_max_tiles,
             )
-            for t in tiles:
+            tile_dicts = [t.model_dump() for t in tiles]
+            if pg_checkpoint_store is not None:
+                try:
+                    pg_checkpoint_store.upsert_tiles(tile_dicts, run_id=run_id)
+                except Exception as ckpt_err:
+                    logger.warning("PG initial tile checkpoint save failed: %s", ckpt_err)
+            for t_dict in tile_dicts:
                 async with self._db_lock:
-                    self.db.create_geographic_tile(t.model_dump())
+                    self.db.create_geographic_tile(t_dict)
             self.emit_event("tiles_generated", {
                 "task_id": eff_task_id,
                 "country": country_code,
@@ -1312,27 +1350,31 @@ class PipelineOrchestrator:
                 "category": category,
                 "count": len(tiles)
             })
-            existing_tiles = self.db.get_geographic_tiles(
-                country_code=country_code,
-                region_code=region.code,
-                category=category,
-                task_id=eff_task_id
-            )
+            existing_tiles = tile_dicts
 
         # 2. Build work queue of unfinished tiles
         work_queue: List[GeoTile] = []
         for t_dict in existing_tiles:
-            tile_obj = GeoTile(**t_dict)
+            # Normalize datetime objects if loaded from PostgreSQL
+            norm_dict = dict(t_dict)
+            for dt_key in ("started_at", "completed_at", "created_at", "updated_at", "last_checkpoint"):
+                if norm_dict.get(dt_key) is not None and not isinstance(norm_dict[dt_key], str):
+                    norm_dict[dt_key] = norm_dict[dt_key].isoformat()
+            norm_dict.setdefault("task_id", eff_task_id)
+            norm_dict.setdefault("run_id", run_id)
+            tile_obj = GeoTile(**norm_dict)
             if tile_obj.status in ("pending", "running", "retry_pending"):
                 work_queue.append(tile_obj)
-            elif tile_obj.status == "failed" and self.config.retry_failed:
+            elif tile_obj.status == "failed" and getattr(self.config, "retry_failed", False):
                 tile_obj.status = "pending"
                 work_queue.append(tile_obj)
 
-        # 3. Track unique businesses
+        # 3. Track unique businesses (isolated per run when isolated_seen_cids=True)
         seen_cids: Set[str] = set()
+        local_seen_pool: Set[str] = set()
+        shared_seen_pool = local_seen_pool if isolated_seen_cids else self._global_seen_cids
         is_col_only = collection_only or getattr(getattr(self, "_current_config", None), "collection_only", False)
-        if not is_col_only:
+        if not is_col_only and not isolated_seen_cids:
             with self.db.get_connection() as conn:
                 rows = conn.execute("""
                     SELECT cid FROM places
@@ -1340,31 +1382,56 @@ class PipelineOrchestrator:
                 """, (country_code.upper(), region.code.upper(), category)).fetchall()
                 seen_cids.update(r["cid"] for r in rows if r["cid"])
 
-        max_depth = getattr(self.config, "tile_max_depth", 2)
+        max_depth = eff_max_depth
+        min_span_deg = eff_min_span
         overlap_pct = getattr(self.config, "tile_overlap_pct", 10.0)
 
         task_new_records = 0
         task_duplicates = 0
 
-        # 4. Process tiles — parallel tile worker pool for 3-5x throughput
-        #    Number of concurrent tile workers = min(request_concurrency, queue size)
+        # 4. Process tiles — parallel tile worker pool for throughput + streaming PG flushes
         tile_concurrency = max(1, min(
             getattr(self.config, "request_concurrency", 5),
             len(work_queue) if work_queue else 1
         ))
 
-        # Shared mutable state protected by a local asyncio lock
         seen_cids_lock = asyncio.Lock()
         tile_queue: asyncio.Queue = asyncio.Queue()
         for t in work_queue:
             tile_queue.put_nowait(t)
 
-        # child tiles discovered during processing are pushed here and drained each batch
         child_tile_queue: asyncio.Queue = asyncio.Queue()
+        pending_flush_buffer: List[Dict[str, Any]] = []
+        flush_lock = asyncio.Lock()
+
+        async def _flush_places_buffer(force: bool = False) -> None:
+            if on_places_batch is None:
+                return
+            batch_to_send: List[Dict[str, Any]] = []
+            async with flush_lock:
+                if force or len(pending_flush_buffer) >= eff_flush_size:
+                    if pending_flush_buffer:
+                        batch_to_send = pending_flush_buffer[:]
+                        pending_flush_buffer.clear()
+            if batch_to_send:
+                res = on_places_batch(batch_to_send)
+                if asyncio.iscoroutine(res):
+                    await res
 
         tile_new_total = 0
         tile_dup_total = 0
         totals_lock = asyncio.Lock()
+
+        async def _save_tile_state(tile_obj: "GeoTile", fields: Dict[str, Any]) -> None:
+            async with self._db_lock:
+                self.db.update_geographic_tile(tile_obj.tile_id, fields)
+            if pg_checkpoint_store is not None:
+                try:
+                    merged = tile_obj.model_dump()
+                    merged.update(fields)
+                    pg_checkpoint_store.upsert_tiles([merged], run_id=run_id)
+                except Exception as ckpt_err:
+                    logger.debug("PG tile update notice for %s: %s", tile_obj.tile_id, ckpt_err)
 
         async def _process_one_tile(tile: "GeoTile"):
             nonlocal tile_new_total, tile_dup_total
@@ -1380,11 +1447,10 @@ class PipelineOrchestrator:
             self._category_states[category]["status"] = "RUNNING"
             tile.status = "running"
             tile.started_at = datetime.now().isoformat()
-            async with self._db_lock:
-                self.db.update_geographic_tile(tile.tile_id, {
-                    "status": "running",
-                    "started_at": tile.started_at
-                })
+            await _save_tile_state(tile, {
+                "status": "running",
+                "started_at": tile.started_at,
+            })
             self.emit_event("tile_progress", {
                 "tile_id": tile.tile_id,
                 "task_id": eff_task_id,
@@ -1402,14 +1468,16 @@ class PipelineOrchestrator:
                 "span_deg": tile.span_deg,
             })
 
-            stubs = []
+            stubs: List[PlaceStub] = []
             tile_success = False
             last_err = None
             http_status = None
+            pages_fetched = 0
 
             if dry_run:
                 await asyncio.sleep(0.01)
                 tile_success = True
+                pages_fetched = 1
                 base_idx = abs(hash(tile.tile_id)) % 100000
                 stubs_count = 20 if tile.depth == 0 and tile_queue.empty() else 5
                 for i in range(stubs_count):
@@ -1426,43 +1494,71 @@ class PipelineOrchestrator:
                         status="pending"
                     ))
             else:
-                # HttpClient already handles retries + block rotation internally;
-                # we only retry here if the response was successful but empty (could be a soft block)
-                for attempt in range(1, self.config.max_retries + 1):
-                    await self._check_pause_and_cancel()
-                    tile.attempts += 1
-                    pb = build_search_pb(tile.center_lat, tile.center_lng, span_meters=tile.span_meters, num_results=20)
-                    url = f"https://www.google.com/search?tbm=map&authuser=0&hl={hl}&gl={gl}&pb={pb}&q={urllib.parse.quote(category)}"
-                    try:
-                        resp = await http_client.get(url)
-                        http_status = resp.status_code
-                        stubs = parse_search_rpc_response(resp.text)
-                        tile_success = True
-                        break
-                    except Exception as e:
-                        last_err = str(e)
-                        tile.retry_count += 1
-                        if attempt < self.config.max_retries:
-                            async with self._db_lock:
-                                self.db.update_geographic_tile(tile.tile_id, {
+                tile_seen_local: Set[str] = set()
+                for page_idx in range(eff_max_pages):
+                    if limit and limit > 0:
+                        async with seen_cids_lock:
+                            if len(seen_cids) >= limit:
+                                tile_success = True
+                                break
+                    offset_val = page_idx * 20
+                    page_stubs: List[PlaceStub] = []
+                    page_ok = False
+                    for attempt in range(1, getattr(self.config, "max_retries", 2) + 1):
+                        await self._check_pause_and_cancel()
+                        tile.attempts += 1
+                        pb = build_search_pb(
+                            tile.center_lat,
+                            tile.center_lng,
+                            span_meters=tile.span_meters,
+                            num_results=20,
+                            offset=offset_val,
+                        )
+                        url = f"https://www.google.com/search?tbm=map&authuser=0&hl={hl}&gl={gl}&pb={pb}&q={urllib.parse.quote(category)}"
+                        try:
+                            resp = await http_client.get(url)
+                            http_status = resp.status_code
+                            page_stubs = parse_search_rpc_response(resp.text)
+                            page_ok = True
+                            tile_success = True
+                            pages_fetched += 1
+                            break
+                        except Exception as e:
+                            last_err = str(e)
+                            tile.retry_count += 1
+                            if attempt < getattr(self.config, "max_retries", 2):
+                                await _save_tile_state(tile, {
                                     "status": "retry_pending",
                                     "attempts": tile.attempts,
                                     "retry_count": tile.retry_count,
-                                    "last_error": last_err
+                                    "last_error": last_err,
                                 })
-                            await asyncio.sleep(1.0 * attempt)
+                                await asyncio.sleep(1.0 * attempt)
+
+                    if not page_ok:
+                        break
+
+                    new_on_page = 0
+                    for s in page_stubs:
+                        if s.cid and s.cid not in tile_seen_local:
+                            tile_seen_local.add(s.cid)
+                            stubs.append(s)
+                            new_on_page += 1
+
+                    # Stop paging if Google returned fewer than 20 entries or zero new places
+                    if len(page_stubs) < 20 or (page_idx > 0 and new_on_page == 0):
+                        break
 
             if not tile_success:
                 tile.status = "failed"
                 tile.last_error = last_err
-                async with self._db_lock:
-                    self.db.update_geographic_tile(tile.tile_id, {
-                        "status": "failed",
-                        "attempts": tile.attempts,
-                        "retry_count": tile.retry_count,
-                        "last_error": last_err,
-                        "http_status": http_status
-                    })
+                await _save_tile_state(tile, {
+                    "status": "failed",
+                    "attempts": tile.attempts,
+                    "retry_count": tile.retry_count,
+                    "last_error": last_err,
+                    "http_status": http_status,
+                })
                 self.emit_event("tile_failed", {
                     "tile_id": tile.tile_id,
                     "task_id": eff_task_id,
@@ -1503,7 +1599,7 @@ class PipelineOrchestrator:
                 else:
                     async with self._cids_lock:
                         async with seen_cids_lock:
-                            if (stub.cid in self._global_seen_cids) or (stub.cid in seen_cids):
+                            if (stub.cid in shared_seen_pool) or (stub.cid in seen_cids):
                                 dup_in_tile += 1
                                 if not dry_run:
                                     async with self._db_lock:
@@ -1512,7 +1608,7 @@ class PipelineOrchestrator:
                             if limit and limit > 0 and len(seen_cids) >= limit:
                                 break
                             seen_cids.add(stub.cid)
-                            self._global_seen_cids.add(stub.cid)
+                            shared_seen_pool.add(stub.cid)
 
                     stub_dict = stub.model_dump()
                     stub_dict["country_code"] = country_code.upper()
@@ -1523,10 +1619,17 @@ class PipelineOrchestrator:
                         async with self._db_lock:
                             if self.db.upsert_place_stub(stub_dict):
                                 new_in_tile += 1
+                            else:
+                                new_in_tile += 1
                             self.db.insert_raw_place(raw_dict)
                         enrich_place_dimensions({"category": stub.category, "address": stub.address})
+                        if on_places_batch is not None:
+                            async with flush_lock:
+                                pending_flush_buffer.append(stub_dict)
                     else:
                         new_in_tile += 1
+
+            await _flush_places_buffer(force=False)
 
             async with totals_lock:
                 tile_new_total += new_in_tile
@@ -1542,7 +1645,6 @@ class PipelineOrchestrator:
                 self._current_run_data["current_category"] = category
                 self._current_run_data["current_tile"] = tile.tile_id
 
-                # Update per-category tracking
                 c_st = self._category_states.setdefault(category, {})
                 c_st["active_tile_id"] = tile.tile_id
                 c_st["status"] = "RUNNING"
@@ -1550,7 +1652,6 @@ class PipelineOrchestrator:
                 c_st["run_dups"] = c_st.get("run_dups", 0) + dup_in_tile
                 c_st["results_returned"] = c_st.get("results_returned", 0) + len(stubs)
 
-                # Store live business names from newly processed search results
                 parsed_names = [s.name.strip() for s in stubs if s.name and s.name.strip()]
                 if parsed_names:
                     rec_list = self._category_recent_names.setdefault(category, [])
@@ -1560,28 +1661,33 @@ class PipelineOrchestrator:
                     if len(rec_list) > 10:
                         self._category_recent_names[category] = rec_list[-10:]
 
-            # Trigger live raw export check
             self.trigger_live_raw_export()
-
             cur_total_db = self._current_run_data.get("businesses_collected", 0)
 
-            # Check saturation (20 results hard cap) → subdivide
-            if len(stubs) >= 20 and tile.depth < max_depth and tile.span_deg > 0.02:
+            # Check saturation (>= 20 results) -> subdivide adaptively up to configured depth/min_span
+            if len(stubs) >= 20 and tile.depth < max_depth and tile.span_deg > min_span_deg:
                 tile.status = "subdivided"
                 tile.subdivision_status = "subdivided_into_4"
-                children = tile.subdivide(overlap_pct=overlap_pct, max_depth=max_depth)
+                children = tile.subdivide(overlap_pct=overlap_pct, max_depth=max_depth, min_span_deg=min_span_deg)
+                child_dicts = [c.model_dump() for c in children]
+                if pg_checkpoint_store is not None and child_dicts:
+                    try:
+                        pg_checkpoint_store.upsert_tiles(child_dicts, run_id=run_id)
+                    except Exception as ckpt_err:
+                        logger.debug("PG child tile insert notice: %s", ckpt_err)
                 async with self._db_lock:
-                    for child in children:
-                        self.db.create_geographic_tile(child.model_dump())
-                    self.db.update_geographic_tile(tile.tile_id, {
-                        "status": "subdivided",
-                        "results_count": len(stubs),
-                        "new_records": new_in_tile,
-                        "duplicate_cids": dup_in_tile,
-                        "subdivision_status": "subdivided_into_4",
-                        "completed_at": datetime.now().isoformat(),
-                        "last_checkpoint": datetime.now().isoformat()
-                    })
+                    for c_dict in child_dicts:
+                        self.db.create_geographic_tile(c_dict)
+                await _save_tile_state(tile, {
+                    "status": "subdivided",
+                    "results_count": len(stubs),
+                    "new_records": new_in_tile,
+                    "duplicate_cids": dup_in_tile,
+                    "subdivision_status": "subdivided_into_4",
+                    "completed_at": datetime.now().isoformat(),
+                    "last_checkpoint": datetime.now().isoformat(),
+                    "pages_fetched": pages_fetched,
+                })
                 for child in children:
                     child_tile_queue.put_nowait(child)
                 self.emit_event("tile_subdivided", {
@@ -1608,15 +1714,15 @@ class PipelineOrchestrator:
                     tile.status = "limit_reached"
                 else:
                     tile.status = "completed"
-                async with self._db_lock:
-                    self.db.update_geographic_tile(tile.tile_id, {
-                        "status": tile.status,
-                        "results_count": len(stubs),
-                        "new_records": new_in_tile,
-                        "duplicate_cids": dup_in_tile,
-                        "completed_at": datetime.now().isoformat(),
-                        "last_checkpoint": datetime.now().isoformat()
-                    })
+                await _save_tile_state(tile, {
+                    "status": tile.status,
+                    "results_count": len(stubs),
+                    "new_records": new_in_tile,
+                    "duplicate_cids": dup_in_tile,
+                    "completed_at": datetime.now().isoformat(),
+                    "last_checkpoint": datetime.now().isoformat(),
+                    "pages_fetched": pages_fetched,
+                })
                 self.emit_event("tile_completed", {
                     "tile_id": tile.tile_id,
                     "task_id": eff_task_id,
@@ -1651,19 +1757,17 @@ class PipelineOrchestrator:
                 finally:
                     tile_queue.task_done()
 
-        # Run the initial batch in parallel, then drain child subdivided tiles in batches
         while not tile_queue.empty():
             batch_workers = min(tile_concurrency, tile_queue.qsize())
             await asyncio.gather(*[_tile_worker() for _ in range(batch_workers)])
 
-            # Move any child tiles produced during this batch into the main queue
             while not child_tile_queue.empty():
                 tile_queue.put_nowait(child_tile_queue.get_nowait())
 
-            # Re-check limit
             if limit and limit > 0 and len(seen_cids) >= limit:
                 break
 
+        await _flush_places_buffer(force=True)
         task_new_records = tile_new_total
         task_duplicates = tile_dup_total
 

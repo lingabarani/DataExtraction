@@ -190,7 +190,7 @@ def generate_region_grid_tiles(
     task_id: str,
     run_id: str,
     step_deg: float = 0.5,
-    max_tiles_per_region: int = 150
+    max_tiles_per_region: int = 5000
 ) -> List[GeoTile]:
     """
     Generates a deterministic set of root geographic tiles covering the verified

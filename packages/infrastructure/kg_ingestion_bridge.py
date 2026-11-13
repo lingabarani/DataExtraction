@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from packages.infrastructure.config_manager import config_manager
 from packages.infrastructure.storage_lakehouse import (
     LakehouseObservationClient,
+    LakehouseStorageError,
     lakehouse_client,
 )
 
@@ -50,24 +51,63 @@ class KnowledgeGraphIngestionBridge:
     ) -> Dict[str, Any]:
         """
         1. Writes raw payload to MinIO/S3 Parquet partition.
+           If MinIO/S3 is unavailable, queues the payload cleanly into
+           `kg_observation.pending_lakehouse_uploads` (outbox pattern).
         2. Inserts metadata reference into `kg_observation.observation_metadata`.
         """
         if observed_at is None:
             observed_at = datetime.now(timezone.utc)
-
-        # 1. Lakehouse Offload
-        lake_res = self.lakehouse.write_raw_observation(
-            source_name=source_name,
-            source_record_id=source_record_id,
-            raw_payload=raw_payload,
-            observed_at=observed_at,
-            metadata={"entity_type": observed_entity_type},
-        )
+        elif observed_at.tzinfo is None:
+            observed_at = observed_at.replace(tzinfo=timezone.utc)
 
         obs_id = str(uuid.uuid4())
-        sha256 = lake_res["payload_hash_sha256"]
-        s3_uri = lake_res["lakehouse_s3_uri"]
-        summary_json = json.dumps(extracted_summary or {})
+        summary_json = json.dumps(extracted_summary or {}, default=str)
+        outbox_queued = False
+        outbox_id: Optional[str] = None
+        lakehouse_error: Optional[str] = None
+
+        try:
+            lake_res = self.lakehouse.write_raw_observation(
+                source_name=source_name,
+                source_record_id=source_record_id,
+                raw_payload=raw_payload,
+                observed_at=observed_at,
+                metadata={"entity_type": observed_entity_type, "observation_id": obs_id},
+            )
+            sha256 = lake_res["payload_hash_sha256"]
+            s3_uri = lake_res["lakehouse_s3_uri"]
+            byte_size = lake_res["byte_size"]
+        except LakehouseStorageError as l_err:
+            lakehouse_error = str(l_err)
+            outbox_queued = True
+            logger.warning(
+                "Lakehouse unavailable during observation persist (source=%s id=%s); queuing to PG outbox: %s",
+                source_name,
+                source_record_id,
+                l_err,
+            )
+            if isinstance(raw_payload, (dict, list)):
+                payload_obj = raw_payload
+                payload_bytes = json.dumps(raw_payload, sort_keys=True, default=str).encode("utf-8")
+            else:
+                payload_str = raw_payload.decode("utf-8", errors="replace") if isinstance(raw_payload, bytes) else str(raw_payload)
+                payload_obj = {"raw_text": payload_str}
+                payload_bytes = payload_str.encode("utf-8")
+
+            sha256 = hashlib.sha256(payload_bytes).hexdigest()
+            byte_size = len(payload_bytes)
+            outbox_id = self.enqueue_pending_lakehouse_upload(
+                conn=conn,
+                observation_id=obs_id,
+                source_name=source_name,
+                source_record_id=source_record_id,
+                observed_entity_type=observed_entity_type,
+                payload_json=payload_obj,
+                metadata_json={"entity_type": observed_entity_type, "observed_at": observed_at.isoformat()},
+                payload_hash_sha256=sha256,
+                error_reason=lakehouse_error,
+            )
+            s3_uri = f"outbox://{outbox_id or obs_id}"
 
         # 2. PostgreSQL Metadata Tracking
         if conn:
@@ -97,8 +137,252 @@ class KnowledgeGraphIngestionBridge:
             "observation_id": obs_id,
             "lakehouse_s3_uri": s3_uri,
             "payload_hash_sha256": sha256,
-            "byte_size": lake_res["byte_size"],
+            "byte_size": byte_size,
             "source_name": source_name,
+            "outbox_queued": outbox_queued,
+            "outbox_id": outbox_id,
+            "lakehouse_error": lakehouse_error,
+        }
+
+    def enqueue_pending_lakehouse_upload(
+        self,
+        conn: Any,
+        observation_id: Optional[str],
+        source_name: str,
+        source_record_id: str,
+        observed_entity_type: str,
+        payload_json: Any,
+        metadata_json: Optional[Dict[str, Any]] = None,
+        payload_hash_sha256: Optional[str] = None,
+        error_reason: Optional[str] = None,
+    ) -> Optional[str]:
+        """Inserts a failed Lakehouse upload into the transactional PG outbox."""
+        if not conn:
+            return None
+        payload_str = json.dumps(payload_json, sort_keys=True, default=str)
+        sha256 = payload_hash_sha256 or hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
+        meta_str = json.dumps(metadata_json or {}, default=str)
+        outbox_id = str(uuid.uuid4())
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO kg_observation.pending_lakehouse_uploads (
+                    outbox_id, observation_id, source_name, source_record_id,
+                    observed_entity_type, payload_json, metadata_json,
+                    payload_hash_sha256, status, last_error, next_retry_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, 'PENDING', %s, NOW()
+                )
+                ON CONFLICT (source_name, source_record_id, payload_hash_sha256) DO UPDATE SET
+                    last_error = COALESCE(EXCLUDED.last_error, kg_observation.pending_lakehouse_uploads.last_error),
+                    updated_at = NOW()
+                RETURNING outbox_id;
+                """,
+                (
+                    outbox_id,
+                    observation_id,
+                    source_name,
+                    source_record_id,
+                    observed_entity_type,
+                    payload_str,
+                    meta_str,
+                    sha256,
+                    (error_reason or "")[:1000],
+                ),
+            )
+            row = cur.fetchone()
+            return str(row[0]) if row else outbox_id
+
+    def replay_pending_lakehouse_uploads(self, conn: Any, limit: int = 100) -> Dict[str, int]:
+        """
+        Replays pending outbox items to MinIO/S3 using SKIP LOCKED concurrency control
+        and patches matching `observation_metadata.lakehouse_s3_uri` rows.
+        """
+        stats = {"claimed": 0, "uploaded": 0, "failed": 0}
+        if not conn:
+            return stats
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT outbox_id, observation_id, source_name, source_record_id,
+                       observed_entity_type, payload_json, metadata_json, attempts
+                FROM kg_observation.pending_lakehouse_uploads
+                WHERE status IN ('PENDING', 'FAILED')
+                  AND next_retry_at <= NOW()
+                  AND attempts < max_attempts
+                ORDER BY created_at ASC
+                LIMIT %s
+                FOR UPDATE SKIP LOCKED;
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+            stats["claimed"] = len(rows)
+
+            for r in rows:
+                outbox_id, obs_id, src, rec_id, ent_type, payload_obj, meta_obj, attempts = r
+                try:
+                    lake_res = self.lakehouse.write_raw_observation(
+                        source_name=src,
+                        source_record_id=rec_id,
+                        raw_payload=payload_obj,
+                        metadata={**(meta_obj or {}), "entity_type": ent_type, "replayed_from_outbox": str(outbox_id)},
+                    )
+                    s3_uri = lake_res["lakehouse_s3_uri"]
+                    cur.execute(
+                        """
+                        UPDATE kg_observation.pending_lakehouse_uploads
+                        SET status = 'UPLOADED',
+                            attempts = attempts + 1,
+                            uploaded_at = NOW(),
+                            updated_at = NOW(),
+                            lakehouse_s3_uri = %s,
+                            last_error = NULL
+                        WHERE outbox_id = %s;
+                        """,
+                        (s3_uri, outbox_id),
+                    )
+                    if obs_id:
+                        cur.execute(
+                            """
+                            UPDATE kg_observation.observation_metadata
+                            SET lakehouse_s3_uri = %s
+                            WHERE observation_id = %s;
+                            """,
+                            (s3_uri, obs_id),
+                        )
+                    stats["uploaded"] += 1
+                except Exception as exc:
+                    next_attempts = int(attempts or 0) + 1
+                    backoff_sec = min(3600, 30 * (2 ** min(next_attempts, 6)))
+                    cur.execute(
+                        """
+                        UPDATE kg_observation.pending_lakehouse_uploads
+                        SET status = CASE WHEN attempts + 1 >= max_attempts THEN 'EXHAUSTED' ELSE 'FAILED' END,
+                            attempts = attempts + 1,
+                            last_error = %s,
+                            next_retry_at = NOW() + make_interval(secs => %s),
+                            updated_at = NOW()
+                        WHERE outbox_id = %s;
+                        """,
+                        (str(exc)[:1000], backoff_sec, outbox_id),
+                    )
+                    stats["failed"] += 1
+
+        return stats
+
+    def ingest_geospatial_observation_batch(
+        self,
+        conn: Any,
+        source_name: str,
+        records: List[Dict[str, Any]],
+        run_id: Optional[str] = None,
+        authority_weight: float = 0.78,
+    ) -> Dict[str, Any]:
+        """
+        Records a batch-level Lakehouse observation (or outbox fallback), links
+        `master_dataextraction.organization_locations` where location_ids are known,
+        and writes lineage provenance to `kg_lineage.field_provenance`.
+        """
+        if not records or not conn:
+            return {"observation_id": None, "outbox_queued": False, "lineage_written": 0}
+
+        batch_obs_id = str(uuid.uuid4())
+        now_utc = datetime.now(timezone.utc)
+        outbox_queued = False
+
+        try:
+            lake_res = self.lakehouse.write_batch_observations(
+                source_name=source_name,
+                records=records,
+                observed_at=now_utc,
+                metadata={"run_id": run_id or "", "record_count": len(records)},
+            )
+            s3_uri = lake_res["lakehouse_s3_uri"]
+            sha256 = lake_res["payload_hash_sha256"]
+        except LakehouseStorageError as l_err:
+            outbox_queued = True
+            summary_payload = {"run_id": run_id, "count": len(records), "sample": records[:5]}
+            sha256 = hashlib.sha256(json.dumps(summary_payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+            outbox_id = self.enqueue_pending_lakehouse_upload(
+                conn=conn,
+                observation_id=batch_obs_id,
+                source_name=source_name,
+                source_record_id=f"batch_{run_id or batch_obs_id}",
+                observed_entity_type="geospatial_batch",
+                payload_json=records,
+                metadata_json={"run_id": run_id or "", "record_count": len(records)},
+                payload_hash_sha256=sha256,
+                error_reason=str(l_err),
+            )
+            s3_uri = f"outbox://{outbox_id or batch_obs_id}"
+
+        lineage_count = 0
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO kg_observation.observation_metadata (
+                    observation_id, source_name, source_record_id,
+                    observed_entity_type, payload_hash_sha256,
+                    lakehouse_s3_uri, extracted_summary, observed_at
+                ) VALUES (%s, %s, %s, 'geospatial_batch', %s, %s, %s::jsonb, %s)
+                ON CONFLICT DO NOTHING;
+                """,
+                (
+                    batch_obs_id,
+                    source_name,
+                    f"batch_{run_id or batch_obs_id[:12]}",
+                    sha256,
+                    s3_uri,
+                    json.dumps({"record_count": len(records), "run_id": run_id}),
+                    now_utc,
+                ),
+            )
+
+            # Batch record field provenance using deterministic entity UUID derived from record id
+            from psycopg2.extras import execute_values
+            prov_map: Dict[Tuple[str, str], Tuple[Any, ...]] = {}
+            for rec in records:
+                cid = str(rec.get("id") or rec.get("cid") or rec.get("place_id") or "")
+                if not cid:
+                    continue
+                entity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{source_name}:{cid}"))
+                name_val = rec.get("name")
+                if name_val:
+                    prov_map[(entity_uuid, "legal_name")] = (entity_uuid, "legal_name", str(name_val)[:500], source_name, batch_obs_id, authority_weight)
+                if rec.get("website"):
+                    prov_map[(entity_uuid, "website")] = (entity_uuid, "website", str(rec["website"])[:500], source_name, batch_obs_id, authority_weight)
+                if rec.get("phone"):
+                    prov_map[(entity_uuid, "primary_phone")] = (entity_uuid, "primary_phone", str(rec["phone"])[:128], source_name, batch_obs_id, authority_weight)
+
+            prov_rows = list(prov_map.values())
+            if prov_rows and hasattr(cur, "mogrify"):
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO kg_lineage.field_provenance (
+                        entity_id, field_name, chosen_value, source_name,
+                        observation_id, authority_weight, asserted_at
+                    ) VALUES %s
+                    ON CONFLICT (entity_id, field_name) DO UPDATE SET
+                        chosen_value = EXCLUDED.chosen_value,
+                        observation_id = EXCLUDED.observation_id,
+                        authority_weight = EXCLUDED.authority_weight,
+                        asserted_at = CLOCK_TIMESTAMP()
+                    WHERE EXCLUDED.authority_weight >= kg_lineage.field_provenance.authority_weight;
+                    """,
+                    prov_rows,
+                    template="(%s, %s, %s, %s, %s, %s, CLOCK_TIMESTAMP())",
+                    page_size=250,
+                )
+                lineage_count = len(prov_rows)
+
+        return {
+            "observation_id": batch_obs_id,
+            "lakehouse_s3_uri": s3_uri,
+            "outbox_queued": outbox_queued,
+            "lineage_written": lineage_count,
         }
 
     def ingest_organization(

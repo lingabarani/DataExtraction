@@ -8,13 +8,8 @@ import { test, expect } from '@playwright/test';
 test.describe('DataExtraction Enterprise Command Center E2E', () => {
 
   test.beforeEach(async ({ page }) => {
-    // Navigate to root and bypass login using instant sign in
-    await page.goto('http://localhost:3000/login');
-    const signInBtn = page.getByRole('button', { name: /Sign in/i });
-    if (await signInBtn.isVisible()) {
-      await signInBtn.click();
-      await page.waitForURL('**/dashboard');
-    }
+    // Navigate directly to dashboard (login UI is disabled)
+    await page.goto('http://localhost:3000/dashboard');
   });
 
   test('TC-E2E-01: Persistent Top Platform Taskbar across Modules', async ({ page }) => {

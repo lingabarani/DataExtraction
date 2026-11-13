@@ -14,17 +14,21 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from api.deps import UserPrincipal, get_current_user
-from db_connector import get_connection, release_connection
-from dead_letter_queue import (
+from packages.api.dependencies import UserPrincipal, get_current_user
+from packages.infrastructure.db_connector import get_connection, release_connection
+from packages.infrastructure.dead_letter_queue import (
     get_dead_letter_records,
     get_dead_letter_stats,
     replay_dead_letter,
     discard_dead_letter,
     drain_fallback_to_db,
 )
-from config_manager import config_manager
-from structured_logger import get_pipeline_health_metrics
+from packages.infrastructure.config_manager import config_manager
+try:
+    from packages.infrastructure.structured_logger import get_pipeline_health_metrics
+except ImportError:
+    def get_pipeline_health_metrics() -> dict:  # type: ignore
+        return {}
 
 logger = logging.getLogger("oneextraction.dlq_router")
 

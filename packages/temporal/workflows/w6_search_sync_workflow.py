@@ -13,11 +13,35 @@ Orchestrates database partition maintenance & downstream CDC search sync:
 - Queries: get_status
 """
 
+import logging
 from datetime import timedelta
 from typing import Any, Dict
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+
+_std_logger = logging.getLogger("dataextraction.workflow.search")
+
+
+def _log_info(msg: str, *args: Any) -> None:
+    try:
+        workflow.logger.info(msg, *args)
+    except Exception:
+        _std_logger.info(msg, *args)
+
+
+def _log_warning(msg: str, *args: Any) -> None:
+    try:
+        workflow.logger.warning(msg, *args)
+    except Exception:
+        _std_logger.warning(msg, *args)
+
+
+def _log_error(msg: str, *args: Any) -> None:
+    try:
+        workflow.logger.error(msg, *args)
+    except Exception:
+        _std_logger.error(msg, *args)
 
 with workflow.unsafe.imports_passed_through():
     from packages.temporal.activities.storage_activities import (
@@ -45,24 +69,28 @@ class Agent6SearchSyncWorkflow:
 
     @workflow.signal
     def pause(self) -> None:
-        workflow.logger.warning("[Agent 6] Pause signal received")
+        _log_warning("[Agent 6] Pause signal received")
         self._paused = True
 
     @workflow.signal
     def resume(self) -> None:
-        workflow.logger.info("[Agent 6] Resume signal received")
+        _log_info("[Agent 6] Resume signal received")
         self._paused = False
 
     @workflow.signal
     def force_sync(self) -> None:
-        workflow.logger.warning("[Agent 6] Force CDC sync signal received")
+        _log_warning("[Agent 6] Force CDC sync signal received")
         self._force_sync_requested = True
 
     @workflow.query
     def get_status(self) -> Dict[str, Any]:
+        try:
+            wf_id = workflow.info().workflow_id
+        except Exception:
+            wf_id = "agent6-search"
         return {
             "agent": "Agent 6 - Persistence, CDC & Search Synchronization",
-            "workflow_id": workflow.info().workflow_id,
+            "workflow_id": wf_id,
             "status": self._status,
             "step": self._step,
             "paused": self._paused,
@@ -74,7 +102,7 @@ class Agent6SearchSyncWorkflow:
     async def run(self, config: dict = None) -> dict:
         config = config or {}
         self._status = "RUNNING"
-        workflow.logger.info("[Agent 6] Search Persistence & CDC started on queue: %s", TASK_QUEUE)
+        _log_info("[Agent 6] Search Persistence & CDC started on queue: %s", TASK_QUEUE)
 
         # ── Step 1: Automated Knowledge Graph Partition Maintenance ──────────
         self._step = "PARTITION_MAINTENANCE"
@@ -110,8 +138,14 @@ class Agent6SearchSyncWorkflow:
 
         self._step = "COMPLETED"
         self._status = "COMPLETED"
+
+        synced_count = 0
+        if "opensearch_sync" in self._results and isinstance(self._results["opensearch_sync"], dict):
+            synced_count = self._results["opensearch_sync"].get("records_synced", 0)
+
         return {
             "status": self._status,
+            "search_documents_projected": synced_count,
             "results": self._results,
         }
 

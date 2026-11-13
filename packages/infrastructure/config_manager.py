@@ -161,17 +161,26 @@ class ConfigManager:
 
     def get_jwt_secret(self) -> str:
         """
-        Retrieve JWT secret. Enforces production strength and disallows default keys.
+        Retrieve JWT secret. Supports both JWT_SECRET and the documented alias
+        JWT_SECRET_KEY so that .env.example users are not silently broken.
+        Enforces production strength and disallows known insecure defaults.
         """
-        secret = self.get("JWT_SECRET")
+        # Support both documented name (JWT_SECRET_KEY) and canonical name (JWT_SECRET)
+        secret = self.get("JWT_SECRET") or self.get("JWT_SECRET_KEY")
 
         if self.is_production:
             if not secret:
-                raise ConfigurationError("FATAL: JWT_SECRET environment variable is missing in production environment!")
+                raise ConfigurationError(
+                    "FATAL: JWT_SECRET (or JWT_SECRET_KEY) environment variable is missing in production!"
+                )
             if secret.strip() in INSECURE_JWT_SECRETS:
-                raise ConfigurationError("FATAL: Insecure default JWT_SECRET detected in production! Change JWT_SECRET immediately.")
+                raise ConfigurationError(
+                    "FATAL: Insecure default JWT_SECRET detected in production! Set a strong random value."
+                )
             if len(secret.strip()) < 32:
-                raise ConfigurationError("FATAL: JWT_SECRET must be at least 32 characters in production.")
+                raise ConfigurationError(
+                    "FATAL: JWT_SECRET must be at least 32 characters in production."
+                )
 
         return secret if secret else "oneextraction-jwt-secret-change-in-prod"
 
@@ -247,16 +256,56 @@ class ConfigManager:
         """
         Retrieve administrator credentials with production checks.
         """
-        email = self.get("API_ADMIN_EMAIL", "admin@oneextraction.io").strip()
-        password = self.get("API_ADMIN_PASSWORD", "admin123").strip()
+        email = self.get("API_ADMIN_EMAIL", "admin@dataextraction.io").strip()
+        password = self.get("API_ADMIN_PASSWORD", "").strip()
         name = self.get("API_ADMIN_NAME", "Admin").strip()
 
-        if self.is_production and password in INSECURE_ADMIN_PASSWORDS:
+        if not password:
+            if self.is_production:
+                raise ConfigurationError(
+                    "FATAL: API_ADMIN_PASSWORD is not set in production environment!"
+                )
+            logger.warning(
+                "API_ADMIN_PASSWORD is not set. Set it in .env before running the platform."
+            )
+
+        if self.is_production and password and password in INSECURE_ADMIN_PASSWORDS:
             raise ConfigurationError(
                 "FATAL: Insecure default API_ADMIN_PASSWORD detected in production! Must be overridden."
             )
 
         return {"email": email, "password": password, "name": name}
+
+    def is_auth_required(self) -> bool:
+        """
+        Determines whether API routes require a validated JWT Bearer token.
+        Defaults to True (fail-closed).
+        In production environments, disabling authentication is strictly forbidden.
+        """
+        current_env = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", self._env)).lower()
+        raw = str(self.get("AUTH_REQUIRED", "true")).strip().lower()
+        required = raw not in ("false", "0", "no", "off")
+
+        if current_env in ("production", "prod") and not required:
+            raise ConfigurationError(
+                "FATAL: AUTH_REQUIRED=false is forbidden in production environment!"
+            )
+
+        return required
+
+    def get_operator_principal_config(self) -> Dict[str, Any]:
+        """
+        Returns configured operator identity used only when AUTH_REQUIRED=false
+        in non-production environments (e.g. local dashboard without login UI).
+        """
+        return {
+            "id": str(self.get("API_OPERATOR_ID", "operator-local")).strip(),
+            "email": str(self.get("API_ADMIN_EMAIL", "admin@dataextraction.io")).strip(),
+            "name": str(self.get("API_ADMIN_NAME", "Admin")).strip(),
+            "workspace_id": str(self.get("WORKSPACE_ID", "ws-001")).strip(),
+            "is_admin": str(self.get("AUTH_LOCAL_OPERATOR_ADMIN", "true")).strip().lower()
+            in ("true", "1", "yes"),
+        }
 
     # ── Database Config ───────────────────────────────────────────────────────
 
@@ -269,7 +318,11 @@ class ConfigManager:
         port = int(self.get("DATABASE_PORT") or self.get("POSTGRES_PORT") or 5432)
         dbname = self.get("DATABASE_NAME") or self.get("POSTGRES_DB") or "dataextraction"
         user = self.get("DATABASE_USER") or self.get("POSTGRES_USER") or "postgres"
-        password = self.get("DATABASE_PASSWORD") or self.get("POSTGRES_PASSWORD") or "7903"
+        password = self.get("DATABASE_PASSWORD") or self.get("POSTGRES_PASSWORD") or ""
+        if not password and not self.is_production:
+            logger.warning(
+                "POSTGRES_PASSWORD is not set. Set it in .env to connect to PostgreSQL."
+            )
         base_pool = int(self.get("DATABASE_POOL_MIN") or self.get("POSTGRES_POOL_SIZE") or 5)
         max_overflow = int(self.get("DATABASE_POOL_MAX") or self.get("POSTGRES_MAX_OVERFLOW") or 20)
         if self.get("DATABASE_POOL_MIN") and self.get("DATABASE_POOL_MAX"):
@@ -453,12 +506,12 @@ class ConfigManager:
             origins = [o.strip() for o in raw.split(",") if o.strip()]
             if origins:
                 return origins
-        # Secure default origins for local development
+        # Secure default origins for local development (port 8000 = default API port)
         return [
             "http://localhost:3000",
             "http://127.0.0.1:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3001",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
         ]
 
     # ── Email Enrichment & SMTP Probe Config ──────────────────────────────────
@@ -563,6 +616,182 @@ class ConfigManager:
             "overdue_fetch_limit": int(self.get("FRESHNESS_OVERDUE_LIMIT", 5000)),
             "stale_threshold": float(self.get("FRESHNESS_STALE_THRESHOLD", 0.70)),
             "reharvest_batch_size": int(self.get("FRESHNESS_REHARVEST_BATCH_SIZE", 1000)),
+        }
+
+    # ── Agent 1: Federal Registry Ingestion Configuration ─────────────────────
+
+    def get_registry_config(self) -> Dict[str, Any]:
+        """
+        Centralized configuration for Agent 1 official registry ingestion.
+        Supports environment overrides and config/agents.yaml defaults without hardcoding.
+        """
+        yaml_defaults: Dict[str, Any] = {}
+        agents_yaml = _REPO_ROOT / "config" / "agents.yaml"
+        if agents_yaml.exists():
+            try:
+                import yaml
+                loaded = yaml.safe_load(agents_yaml.read_text(encoding="utf-8")) or {}
+                yaml_defaults = (loaded.get("agents") or {}).get("federal_extraction") or {}
+            except Exception as exc:
+                logger.debug("Could not parse config/agents.yaml for federal_extraction: %s", exc)
+
+        default_sources = yaml_defaults.get(
+            "enabled_sources",
+            ["cms_npi", "sec_edgar", "fdic", "usaspending", "propublica", "sam_gov"],
+        )
+        raw_sources = self.get("FEDERAL_REGISTRY_SOURCES")
+        if raw_sources:
+            enabled_sources = [s.strip().lower() for s in str(raw_sources).split(",") if s.strip()]
+        else:
+            enabled_sources = [str(s).strip().lower() for s in default_sources if str(s).strip()]
+
+        return {
+            "enabled_sources": enabled_sources,
+            "scraper_timeout_seconds": int(self.get("FEDERAL_SCRAPER_TIMEOUT_SECONDS", 7200)),
+            "heartbeat_interval_seconds": float(
+                self.get(
+                    "FEDERAL_SCRAPER_HEARTBEAT_SECONDS",
+                    yaml_defaults.get("heartbeat_interval_seconds", 10.0),
+                )
+            ),
+            "error_threshold_pct": float(
+                self.get(
+                    "FEDERAL_SCRAPER_ERROR_THRESHOLD_PCT",
+                    yaml_defaults.get("error_threshold_pct", 25.0),
+                )
+            ),
+            "sec_default_mode": str(self.get("FEDERAL_SEC_DEFAULT_MODE", "tickers")).strip().lower(),
+            "fdic_default_source": str(self.get("FEDERAL_FDIC_SOURCE", "both")).strip().lower(),
+            "cms_download_timeout_seconds": int(self.get("FEDERAL_CMS_DOWNLOAD_TIMEOUT_SECONDS", 180)),
+            "sam_gov_api_key": self.get("SAM_GOV_API_KEY", ""),
+        }
+
+    # ── Agent 2: Geospatial & Domain Discovery Configuration ──────────────────
+
+    def get_geospatial_config(self) -> Dict[str, Any]:
+        """
+        Centralized configuration for Agent 2 geospatial & domain discovery
+        (Google Maps, OpenStreetMap Overpass, website verification/crawl, and spatial validation).
+        Supports environment overrides and config/agents.yaml defaults without hardcoding.
+        """
+        yaml_defaults: Dict[str, Any] = {}
+        agents_yaml = _REPO_ROOT / "config" / "agents.yaml"
+        if agents_yaml.exists():
+            try:
+                import yaml
+                loaded = yaml.safe_load(agents_yaml.read_text(encoding="utf-8")) or {}
+                yaml_defaults = (loaded.get("agents") or {}).get("geospatial_extraction") or {}
+            except Exception as exc:
+                logger.debug("Could not parse config/agents.yaml for geospatial_extraction: %s", exc)
+
+        def _csv_or_list(env_key: str, default_val: List[str], lower: bool = False) -> List[str]:
+            raw = self.get(env_key)
+            if raw:
+                items = [s.strip() for s in str(raw).split(",") if s.strip()]
+            else:
+                items = [str(s).strip() for s in default_val if str(s).strip()]
+            return [s.lower() if lower else s for s in items]
+
+        return {
+            "enabled_sources": _csv_or_list(
+                "GEOSPATIAL_SOURCES",
+                yaml_defaults.get("enabled_sources", ["google_maps", "openstreetmap"]),
+                lower=True,
+            ),
+            "default_countries": _csv_or_list(
+                "GEOSPATIAL_COUNTRIES",
+                yaml_defaults.get("default_countries", ["US"]),
+            ),
+            "us_regions": _csv_or_list(
+                "GEOSPATIAL_US_REGIONS",
+                yaml_defaults.get("us_regions", ["US-CA", "US-TX", "US-NY"]),
+            ),
+            "mx_regions": _csv_or_list(
+                "GEOSPATIAL_MX_REGIONS",
+                yaml_defaults.get("mx_regions", ["MX-CMX", "MX-JAL", "MX-NLE"]),
+            ),
+            "gmaps_category": str(
+                self.get("GEOSPATIAL_GMAPS_CATEGORY", yaml_defaults.get("gmaps_category", "commercial"))
+            ).strip(),
+            "gmaps_tile_max_depth": int(
+                self.get("GEOSPATIAL_GMAPS_TILE_MAX_DEPTH", yaml_defaults.get("gmaps_tile_max_depth", 5))
+            ),
+            "gmaps_flush_batch_size": int(
+                self.get("GEOSPATIAL_GMAPS_FLUSH_BATCH_SIZE", yaml_defaults.get("gmaps_flush_batch_size", 250))
+            ),
+            "default_batch_limit": int(
+                self.get("GEOSPATIAL_BATCH_LIMIT", yaml_defaults.get("default_batch_limit", 50))
+            ),
+            "osm_fields": _csv_or_list(
+                "GEOSPATIAL_OSM_FIELDS",
+                yaml_defaults.get("osm_fields", ["shop", "office"]),
+                lower=True,
+            ),
+            "osm_max_chunks_per_field": int(
+                self.get("GEOSPATIAL_OSM_MAX_CHUNKS_PER_FIELD", yaml_defaults.get("osm_max_chunks_per_field", 2))
+            ),
+            "website_verification_limit": int(
+                self.get("GEOSPATIAL_WEBSITE_VERIFY_LIMIT", yaml_defaults.get("website_verification_limit", 50))
+            ),
+            "website_verify_concurrency": int(
+                self.get("GEOSPATIAL_WEBSITE_VERIFY_CONCURRENCY", yaml_defaults.get("website_verify_concurrency", 25))
+            ),
+            "website_verify_timeout_seconds": float(
+                self.get(
+                    "GEOSPATIAL_WEBSITE_VERIFY_TIMEOUT_SECONDS",
+                    yaml_defaults.get("website_verify_timeout_seconds", 10.0),
+                )
+            ),
+            "website_crawl_limit": int(
+                self.get("GEOSPATIAL_WEBSITE_CRAWL_LIMIT", yaml_defaults.get("website_crawl_limit", 25))
+            ),
+            "website_crawl_concurrency": int(
+                self.get("GEOSPATIAL_WEBSITE_CRAWL_CONCURRENCY", yaml_defaults.get("website_crawl_concurrency", 15))
+            ),
+            "website_crawl_max_pages": int(
+                self.get("GEOSPATIAL_WEBSITE_CRAWL_MAX_PAGES", yaml_defaults.get("website_crawl_max_pages", 5))
+            ),
+            "website_crawl_timeout_seconds": float(
+                self.get(
+                    "GEOSPATIAL_WEBSITE_CRAWL_TIMEOUT_SECONDS",
+                    yaml_defaults.get("website_crawl_timeout_seconds", 15.0),
+                )
+            ),
+            "website_domain_delay_seconds": float(
+                self.get(
+                    "GEOSPATIAL_WEBSITE_DOMAIN_DELAY_SECONDS",
+                    yaml_defaults.get("website_domain_delay_seconds", 0.1),
+                )
+            ),
+            "website_flush_batch_size": int(
+                self.get("GEOSPATIAL_WEBSITE_FLUSH_BATCH_SIZE", yaml_defaults.get("website_flush_batch_size", 50))
+            ),
+            "geo_validation_limit": int(
+                self.get("GEOSPATIAL_GEO_VALIDATE_LIMIT", yaml_defaults.get("geo_validation_limit", 10000))
+            ),
+            "geo_validate_batch_size": int(
+                self.get("GEOSPATIAL_GEO_VALIDATE_BATCH_SIZE", yaml_defaults.get("geo_validate_batch_size", 250))
+            ),
+            "claim_lease_seconds": int(
+                self.get("GEOSPATIAL_CLAIM_LEASE_SECONDS", yaml_defaults.get("claim_lease_seconds", 600))
+            ),
+            "ssrf_allowed_ports": [
+                int(p)
+                for p in _csv_or_list(
+                    "SSRF_ALLOWED_PORTS",
+                    [str(x) for x in (yaml_defaults.get("ssrf_allowed_ports") or [80, 443])],
+                )
+                if str(p).isdigit()
+            ],
+            "max_website_response_bytes": int(
+                self.get(
+                    "MAX_WEBSITE_RESPONSE_BYTES",
+                    yaml_defaults.get("max_website_response_bytes", 5242880),
+                )
+            ),
+            "kg_observation_enabled": str(
+                self.get("GEOSPATIAL_KG_ENABLED", yaml_defaults.get("kg_observation_enabled", True))
+            ).strip().lower() in ("true", "1", "yes"),
         }
 
 

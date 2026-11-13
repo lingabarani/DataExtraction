@@ -1,25 +1,31 @@
 """
 DataExtraction — Federal Scraper Activities
 ==========================================
-Thin subprocess wrappers around all 6 federal registry scrapers.
+Managed subprocess wrappers around all 6 federal registry scrapers.
 
-CRITICAL: Scraper files (fetch_*.py) are NEVER imported or modified here.
-          They run as managed subprocesses in their original directory.
-          This guarantees zero regression in scraper behavior (ADR-003).
+CRITICAL: Scrapers run as isolated managed subprocesses in their original directory
+with periodic Temporal heartbeats and structured telemetry parsing.
 """
 
 import asyncio
+import json
 import logging
 import os
+import re
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 try:
     from temporalio import activity
 except ImportError:
     class _MockAct:
-        defn = lambda *a, **k: (lambda f: f)
+        defn = staticmethod(lambda *a, **k: (lambda f: f))
+        heartbeat = staticmethod(lambda *a, **k: None)
+        logger = logging.getLogger("dataextraction.activities.federal.mock")
     activity = _MockAct()  # type: ignore
 
 PACKAGES_DIR = Path(__file__).resolve().parents[2]
@@ -33,44 +39,135 @@ if str(PACKAGES_DIR) not in sys.path:
 if str(PACKAGES_DIR / "infrastructure") not in sys.path:
     sys.path.insert(0, str(PACKAGES_DIR / "infrastructure"))
 
-# ── Default timeout values (seconds) — can override per env ──────────────────
-SCRAPER_TIMEOUT = int(os.getenv("FEDERAL_SCRAPER_TIMEOUT_SECONDS", "7200"))  # 2h
+from packages.infrastructure.config_manager import config_manager
+
+ACTIVITY_RESULT_PREFIX = "ACTIVITY_RESULT_JSON:"
 
 
-def _run_scraper(script_name: str, cli_args: list[str], timeout: int = SCRAPER_TIMEOUT) -> dict:
-    """Execute a federal scraper as a managed subprocess."""
+def _safe_heartbeat(message: str) -> None:
+    try:
+        activity.heartbeat(message)
+    except Exception:
+        pass
+
+
+def _parse_scraper_output(script_name: str, stdout_text: str) -> Dict[str, Any]:
+    """Extract structured ACTIVITY_RESULT_JSON marker, falling back to regex summary parsing."""
+    if stdout_text:
+        for line in reversed(stdout_text.splitlines()):
+            stripped = line.strip()
+            if stripped.startswith(ACTIVITY_RESULT_PREFIX):
+                raw_json = stripped[len(ACTIVITY_RESULT_PREFIX):].strip()
+                try:
+                    payload = json.loads(raw_json)
+                    if isinstance(payload, dict):
+                        return payload
+                except Exception as exc:
+                    logger.warning("Malformed %s JSON in %s: %s", ACTIVITY_RESULT_PREFIX, script_name, exc)
+
+        match = re.search(r"Inserted\s*:\s*([\d,]+)", stdout_text, re.IGNORECASE)
+        if match:
+            return {"inserted_count": int(match.group(1).replace(",", ""))}
+        match2 = re.search(r"([\d,]+)\s+inserted", stdout_text, re.IGNORECASE)
+        if match2:
+            return {"inserted_count": int(match2.group(1).replace(",", ""))}
+    return {"inserted_count": 0}
+
+
+def _drain_stream(stream, sink: List[str]) -> None:
+    try:
+        for line in iter(stream.readline, ""):
+            sink.append(line)
+    finally:
+        try:
+            stream.close()
+        except Exception:
+            pass
+
+
+def _run_scraper(
+    script_name: str,
+    cli_args: list[str],
+    timeout: Optional[int] = None,
+    heartbeat_interval: Optional[float] = None,
+) -> dict:
+    """Execute a federal scraper as a managed subprocess with periodic heartbeats."""
+    reg_cfg = config_manager.get_registry_config()
+    eff_timeout = int(timeout if timeout is not None else reg_cfg.get("scraper_timeout_seconds", 7200))
+    eff_hb = float(heartbeat_interval if heartbeat_interval is not None else reg_cfg.get("heartbeat_interval_seconds", 10.0))
+    eff_hb = max(eff_hb, 0.5)
+
     script_path = SCRAPERS_DIR / script_name
-    cmd = [PYTHON, str(script_path)] + cli_args
+    cmd = [PYTHON, "-u", str(script_path)] + cli_args
 
-    activity.logger.info("Starting %s (args=%s)", script_name, cli_args)
+    logger.info("Starting %s (args=%s, timeout=%ss)", script_name, cli_args, eff_timeout)
+    _safe_heartbeat(f"Starting {script_name}")
 
-    # Heartbeat so Temporal knows the activity is alive during long runs
-    activity.heartbeat(f"Starting {script_name}")
+    env = {
+        **os.environ,
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": str(SCRAPERS_DIR.parent.parent.parent),
+    }
 
-    result = subprocess.run(
+    proc = subprocess.Popen(
         cmd,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(SCRAPERS_DIR),
-        timeout=timeout,
-        env={**os.environ, "PYTHONPATH": str(SCRAPERS_DIR.parent.parent.parent)},
+        env=env,
     )
 
-    activity.heartbeat(f"Completed {script_name} exit_code={result.returncode}")
+    stdout_lines: List[str] = []
+    stderr_lines: List[str] = []
+    t_out = threading.Thread(target=_drain_stream, args=(proc.stdout, stdout_lines), daemon=True)
+    t_err = threading.Thread(target=_drain_stream, args=(proc.stderr, stderr_lines), daemon=True)
+    t_out.start()
+    t_err.start()
 
-    if result.returncode != 0:
-        error_tail = result.stderr[-1000:] if result.stderr else "(no stderr)"
-        activity.logger.error(
-            "%s failed: exit_code=%d stderr=%s", script_name, result.returncode, error_tail
-        )
-        raise RuntimeError(
-            f"{script_name} exited with code {result.returncode}: {error_tail}"
-        )
+    start_ts = time.monotonic()
+    last_hb = start_ts
+
+    while proc.poll() is None:
+        now = time.monotonic()
+        elapsed = now - start_ts
+        if elapsed > eff_timeout:
+            proc.kill()
+            t_out.join(timeout=2)
+            t_err.join(timeout=2)
+            raise TimeoutError(f"{script_name} timed out after {eff_timeout}s")
+        if now - last_hb >= eff_hb:
+            _safe_heartbeat(f"Running {script_name} ({int(elapsed)}s)")
+            last_hb = now
+        time.sleep(min(0.5, eff_hb))
+
+    t_out.join(timeout=5)
+    t_err.join(timeout=5)
+
+    stdout_text = "".join(stdout_lines)
+    stderr_text = "".join(stderr_lines)
+    _safe_heartbeat(f"Completed {script_name} exit_code={proc.returncode}")
+
+    if proc.returncode != 0:
+        error_tail = stderr_text[-1000:] if stderr_text else stdout_text[-1000:] or "(no stderr)"
+        logger.error("%s failed: exit_code=%d stderr=%s", script_name, proc.returncode, error_tail)
+        raise RuntimeError(f"{script_name} exited with code {proc.returncode}: {error_tail}")
+
+    parsed = _parse_scraper_output(script_name, stdout_text)
+    default_source = script_name.replace("fetch_", "").replace(".py", "").upper()
 
     return {
-        "source": script_name.replace("fetch_", "").replace(".py", "").upper(),
-        "exit_code": result.returncode,
-        "stdout_tail": result.stdout[-3000:] if result.stdout else "",
+        "status": str(parsed.get("status", "SUCCESS")).upper(),
+        "source": parsed.get("source", default_source),
+        "exit_code": proc.returncode,
+        "inserted_count": int(parsed.get("inserted_count", 0) or 0),
+        "error_count": int(parsed.get("error_count", 0) or 0),
+        "skipped_count": int(parsed.get("skipped_count", 0) or 0),
+        "reason": parsed.get("reason"),
+        "stdout_tail": stdout_text[-3000:] if stdout_text else "",
         "script": script_name,
     }
 
@@ -79,54 +176,73 @@ def _run_scraper(script_name: str, cli_args: list[str], timeout: int = SCRAPER_T
 
 @activity.defn(name="run_cms_npi")
 async def run_cms_npi_activity(args: dict) -> dict:
+    args = args or {}
     cli_args = [
         "--limit", str(args.get("limit", 50000)),
-        "--mode", args.get("mode", "incremental"),
+        "--mode", str(args.get("mode", "incremental")),
     ]
     return await asyncio.to_thread(_run_scraper, "fetch_cms_npi.py", cli_args)
 
 
 @activity.defn(name="run_sec_edgar")
 async def run_sec_edgar_activity(args: dict) -> dict:
+    args = args or {}
+    reg_cfg = config_manager.get_registry_config()
+    raw_mode = str(args.get("mode", reg_cfg.get("sec_default_mode", "tickers"))).lower()
+    mode = "full" if raw_mode == "full" else "tickers"
     form_types = ",".join(args.get("form_types", ["10-K", "10-Q"]))
     cli_args = [
         "--form-types", form_types,
-        "--mode", args.get("mode", "incremental"),
+        "--mode", mode,
     ]
+    if "limit" in args and args["limit"] is not None:
+        cli_args += ["--limit", str(args["limit"])]
     return await asyncio.to_thread(_run_scraper, "fetch_sec_edgar.py", cli_args)
 
 
 @activity.defn(name="run_fdic")
 async def run_fdic_activity(args: dict) -> dict:
-    cli_args = ["--mode", args.get("mode", "incremental")]
-    if "limit" in args:
+    args = args or {}
+    reg_cfg = config_manager.get_registry_config()
+    cli_args = [
+        "--source", str(args.get("source", reg_cfg.get("fdic_default_source", "both"))),
+        "--mode", str(args.get("mode", "incremental")),
+    ]
+    if "limit" in args and args["limit"] is not None:
         cli_args += ["--limit", str(args["limit"])]
     return await asyncio.to_thread(_run_scraper, "fetch_fdic.py", cli_args)
 
 
 @activity.defn(name="run_usaspending")
 async def run_usaspending_activity(args: dict) -> dict:
+    args = args or {}
     import datetime
     current_fy = args.get("fiscal_year", datetime.date.today().year)
     cli_args = [
         "--fiscal-year", str(current_fy),
-        "--mode", args.get("mode", "incremental"),
+        "--mode", str(args.get("mode", "incremental")),
     ]
+    if "limit" in args and args["limit"] is not None:
+        cli_args += ["--limit", str(args["limit"])]
     return await asyncio.to_thread(_run_scraper, "fetch_usaspending.py", cli_args)
 
 
 @activity.defn(name="run_propublica")
 async def run_propublica_activity(args: dict) -> dict:
-    cli_args = ["--mode", args.get("mode", "incremental")]
-    if "limit" in args:
+    args = args or {}
+    cli_args = ["--mode", str(args.get("mode", "incremental"))]
+    if args.get("state"):
+        cli_args += ["--state", str(args["state"])]
+    if "limit" in args and args["limit"] is not None:
         cli_args += ["--limit", str(args["limit"])]
     return await asyncio.to_thread(_run_scraper, "fetch_propublica.py", cli_args)
 
 
 @activity.defn(name="run_sam_gov")
 async def run_sam_gov_activity(args: dict) -> dict:
-    cli_args = ["--mode", args.get("mode", "incremental")]
-    if "limit" in args:
+    args = args or {}
+    cli_args = ["--mode", str(args.get("mode", "incremental"))]
+    if "limit" in args and args["limit"] is not None:
         cli_args += ["--limit", str(args["limit"])]
     return await asyncio.to_thread(_run_scraper, "fetch_sam_gov.py", cli_args)
 

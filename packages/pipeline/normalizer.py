@@ -82,6 +82,7 @@ LEGAL_SUFFIX_PATTERNS = [
     r"L\.?\s*P\.?",
     r"P\.?\s*C\.?",
     r"P\.?\s*L\.?\s*L\.?\s*C\.?",
+    r"P\.?\s*L\.?\s*C\.?",
     r"INC\.?",
     r"INCORPORATED",
     r"CORP\.?",
@@ -653,19 +654,90 @@ def _normalize_company_osm(raw: dict) -> dict:
     }
 
 
+def _normalize_company_registry_merged(raw: dict) -> dict:
+    """
+    Normalizes records already present in the staging table from any prior scraper.
+
+    REGISTRY_MERGED records have been inserted by Agent 1 (Registry) or Agent 2
+    (Geospatial) and already have most unified schema columns populated.
+    This normalizer applies legal suffix cleaning, domain extraction, and
+    standard field coercion without overwriting existing valid data.
+    """
+    addr = raw.get('address') or {}
+    name = _clean(
+        raw.get('name')
+        or raw.get('legal_name')
+        or raw.get('company_name')
+        or raw.get('trade_name')
+    )
+    return {
+        'id':                     _clean(raw.get('id')),
+        'name':                   name,
+        'legal_name':             _clean(raw.get('legal_name') or name),
+        'trade_name':             _clean(raw.get('trade_name')),
+        'normalized_name':        clean_legal_suffixes(
+                                      raw.get('normalized_name')
+                                      or raw.get('legal_name')
+                                      or raw.get('name')
+                                      or raw.get('company_name')
+                                  ),
+        'entity_type':            _clean(raw.get('entity_type')),
+        'website':                _clean(raw.get('website')),
+        'domain':                 _clean_domain(
+                                      raw.get('domain')
+                                      or raw.get('website')
+                                  ),
+        'email':                  _clean(raw.get('email')),
+        'phone':                  _clean(raw.get('phone')),
+        'phones':                 _as_json(raw.get('phones') or []),
+        'emails':                 _as_json(raw.get('emails') or []),
+        'industry':               _clean(raw.get('industry')),
+        'naics_code':             _clean(raw.get('naics_code')),
+        'sic_code':               _clean(raw.get('sic_code')),
+        'ein':                    _clean(raw.get('ein')),
+        'rfc':                    _clean(raw.get('rfc')),
+        'cik':                    _clean(raw.get('cik')),
+        'npi':                    _clean(raw.get('npi')),
+        'cage_code':              _clean(raw.get('cage_code')),
+        'uei':                    _clean(raw.get('uei')),
+        'state_of_incorporation': _clean(raw.get('state_of_incorporation')),
+        'street':                 _clean(raw.get('street') or addr.get('street')),
+        'city':                   _clean(raw.get('city') or addr.get('city')),
+        'state':                  _clean(raw.get('state') or addr.get('state')),
+        'state_code':             _clean(raw.get('state_code') or addr.get('state_code')),
+        'zip_code':               normalize_postal_code(
+                                      raw.get('zip_code') or addr.get('zip_code'),
+                                      raw.get('country') or 'US',
+                                  ),
+        'county':                 _clean(raw.get('county') or addr.get('county')),
+        'country':                _clean(raw.get('country')) or 'United States',
+        'latitude':               _to_float(raw.get('latitude')),
+        'longitude':              _to_float(raw.get('longitude')),
+        'employee_min':           _to_int(raw.get('employee_min') or raw.get('employee_count_min')),
+        'employee_max':           _to_int(raw.get('employee_max') or raw.get('employee_count_max')),
+        'employee_band':          _clean(raw.get('employee_band')),
+        'source_count':           _to_int(raw.get('source_count')) or 1,
+        'data_quality_score':     _to_int(raw.get('data_quality_score')),
+        'api_source':             _clean(raw.get('api_source') or raw.get('source')) or 'REGISTRY_MERGED',
+        'source':                 _clean(raw.get('source') or raw.get('api_source')) or 'REGISTRY_MERGED',
+        'raw_payload':            _as_json(raw.get('raw_payload') or raw),
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
 _COMPANY_NORMALIZERS = {
-    'INTERNAL_JSON': _normalize_company_internal_json,
-    'CSV':           _normalize_company_csv,
-    'PDL':           _normalize_company_pdl,
-    'SEC':           _normalize_company_sec,
-    'APOLLO':        _normalize_company_apollo,
-    'ZOOMINFO':      _normalize_company_zoominfo,
-    'OPEN_MAP':      _normalize_company_osm,
-    'OSM':           _normalize_company_osm,
+    'INTERNAL_JSON':    _normalize_company_internal_json,
+    'CSV':              _normalize_company_csv,
+    'PDL':              _normalize_company_pdl,
+    'SEC':              _normalize_company_sec,
+    'APOLLO':           _normalize_company_apollo,
+    'ZOOMINFO':         _normalize_company_zoominfo,
+    'OPEN_MAP':         _normalize_company_osm,
+    'OSM':              _normalize_company_osm,
+    'REGISTRY_MERGED':  _normalize_company_registry_merged,
 }
 
 _PERSON_NORMALIZERS = {

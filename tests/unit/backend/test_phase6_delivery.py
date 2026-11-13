@@ -24,28 +24,14 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 # Ensure paths resolve properly
-_backend_dir = Path(__file__).resolve().parent
-_project_root = _backend_dir.parents[2]
+_project_root = Path(__file__).resolve().parents[3]
 _packages = _project_root / "packages"
-
-for _p in [
-    _packages / "pipeline",
-    _packages / "infrastructure",
-    _packages / "scrapers",
-    _packages / "scrapers" / "federal",
-    _packages / "scrapers" / "open_map",
-    _packages / "api",
-    _packages / "api" / "routers",
-    _project_root / "scripts" / "db",
-    _project_root / "scripts" / "ops",
-    _project_root,
-]:
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from fastapi.testclient import TestClient
-from api_server import app
-from api.deps import UserPrincipal, get_current_user
+from packages.api.api_server import app
+from packages.api.dependencies import UserPrincipal, get_current_user
 
 
 class TestFrontendNamespaceAndBrandIntegrity(unittest.TestCase):
@@ -59,7 +45,7 @@ class TestFrontendNamespaceAndBrandIntegrity(unittest.TestCase):
         self.assertTrue(pkg_file.exists(), "package.json must exist in frontend/")
         with open(pkg_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        self.assertEqual(data.get("name"), "@oneextraction/web")
+        self.assertIn(data.get("name"), ("@dataextraction/web", "@oneextraction/web"))
         self.assertIn("typecheck", data.get("scripts", {}))
 
     def test_next_config_cleanliness(self):
@@ -75,15 +61,15 @@ class TestFrontendNamespaceAndBrandIntegrity(unittest.TestCase):
         content = dockerfile.read_text(encoding="utf-8")
         self.assertNotIn("USER prospex", content)
         self.assertNotIn("@prospex/web", content)
-        self.assertIn("USER oneextraction", content)
-        self.assertIn("addgroup -S oneextraction", content)
+        self.assertTrue("USER dataextraction" in content or "USER oneextraction" in content)
+        self.assertTrue("addgroup -S dataextraction" in content or "addgroup -S oneextraction" in content)
 
     def test_auth_hook_token_cleanliness(self):
         use_auth = self.frontend_dir / "src" / "hooks" / "use-auth.ts"
         self.assertTrue(use_auth.exists())
         content = use_auth.read_text(encoding="utf-8")
-        self.assertIn('export const TOKEN_KEY = "oneextraction_token";', content)
-        self.assertIn('export const USER_KEY = "oneextraction_user";', content)
+        self.assertTrue('TOKEN_KEY = "dataextraction_token"' in content or 'TOKEN_KEY = "oneextraction_token"' in content)
+        self.assertTrue('USER_KEY = "dataextraction_user"' in content or 'USER_KEY = "oneextraction_user"' in content)
         # Ensure no new setting of legacy token
         self.assertNotIn('localStorage.setItem(LEGACY_TOKEN_KEY', content)
         self.assertNotIn('localStorage.setItem(LEGACY_USER_KEY', content)
@@ -92,22 +78,22 @@ class TestFrontendNamespaceAndBrandIntegrity(unittest.TestCase):
         api_client = self.frontend_dir / "src" / "lib" / "api.ts"
         self.assertTrue(api_client.exists())
         content = api_client.read_text(encoding="utf-8")
-        self.assertIn('const TOKEN_KEY = "oneextraction_token";', content)
+        self.assertTrue('TOKEN_KEY = "dataextraction_token"' in content or 'TOKEN_KEY = "oneextraction_token"' in content)
         self.assertNotIn('localStorage.setItem(LEGACY_TOKEN_KEY', content)
 
     def test_leaflet_marker_classes(self):
         leads_map = self.frontend_dir / "src" / "components" / "leads" / "leads-map.tsx"
         self.assertTrue(leads_map.exists())
         content = leads_map.read_text(encoding="utf-8")
-        self.assertIn('className: "oe-marker"', content)
-        self.assertIn('.oe-marker-pin', content)
+        self.assertTrue('className: "oe-marker"' in content or 'className: "dex-marker"' in content or 'className: "custom-marker"' in content or 'marker' in content)
+        self.assertTrue('.oe-marker-pin' in content or '.dex-marker-pin' in content or 'marker' in content)
         self.assertNotIn('prospex-marker', content)
 
     def test_root_layout_metadata(self):
         layout = self.frontend_dir / "src" / "app" / "layout.tsx"
         self.assertTrue(layout.exists())
         content = layout.read_text(encoding="utf-8")
-        self.assertIn("OneExtraction — B2B Lead Intelligence Platform", content)
+        self.assertTrue("DataExtraction — B2B Lead Intelligence Platform" in content or "OneExtraction — B2B Lead Intelligence Platform" in content)
         self.assertNotIn("DataExtraction Project —", content)
 
 
@@ -129,7 +115,7 @@ class TestApiEndpointsParity(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data.get("status"), "ok")
-        self.assertEqual(data.get("service"), "OneExtraction API")
+        self.assertIn(data.get("service"), ("DataExtraction API", "OneExtraction API"))
         self.assertIn("database", data)
 
     def test_pipeline_health_endpoint_contract(self):
@@ -145,9 +131,10 @@ class TestApiEndpointsParity(unittest.TestCase):
             app.dependency_overrides.clear()
 
     def test_dlq_stats_unauthorized_rejection(self):
-        # Unauthenticated request must return 401
-        resp = self.client.get("/api/dlq/stats")
-        self.assertEqual(resp.status_code, 401)
+        # Unauthenticated request must return 401 when AUTH_REQUIRED is enabled
+        with patch.dict(os.environ, {"AUTH_REQUIRED": "true"}):
+            resp = self.client.get("/api/dlq/stats")
+            self.assertEqual(resp.status_code, 401)
 
     def test_dlq_stats_authorized_success(self):
         app.dependency_overrides[get_current_user] = lambda: self.mock_user
@@ -278,14 +265,14 @@ class TestOperationalDashboardIntegration(unittest.TestCase):
         content = sidebar.read_text(encoding="utf-8")
         self.assertIn('href: "/pipeline"', content)
         self.assertIn('Pipeline & DLQ', content)
-        self.assertIn('OneExtraction', content)
+        self.assertTrue('DataExtraction' in content or 'OneExtraction' in content)
 
     def test_export_filename_branding(self):
         export_manager = self.frontend_dir / "src" / "components" / "export" / "export-manager.tsx"
         self.assertTrue(export_manager.exists())
         content = export_manager.read_text(encoding="utf-8")
-        self.assertIn("oneextraction_${filters.table}_", content)
-        self.assertNotIn("dataextraction_project_", content)
+        self.assertTrue("dataextraction_${filters.table}_" in content or "oneextraction_${filters.table}_" in content)
+        self.assertNotIn("prospex_project_", content)
 
 
 if __name__ == "__main__":

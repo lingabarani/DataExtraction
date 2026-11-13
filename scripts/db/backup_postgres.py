@@ -17,14 +17,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-# Add project root and botasaurus to sys.path
+# Add project root to sys.path so packages.* imports resolve
 _ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-_BOTA_DIR = _ROOT_DIR / "botasaurus"
-for p in [_ROOT_DIR, _BOTA_DIR]:
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
 
-from config_manager import config_manager
+try:
+    from packages.infrastructure.config_manager import config_manager
+except ImportError:
+    from config_manager import config_manager  # type: ignore
 
 logging.basicConfig(
     level=logging.INFO,

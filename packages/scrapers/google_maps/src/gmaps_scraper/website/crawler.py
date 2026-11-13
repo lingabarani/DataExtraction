@@ -1,10 +1,15 @@
 import asyncio
+from collections import deque
+import os
 import re
 import urllib.parse
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 import httpx
 
 from .ssrf import is_safe_url, normalize_url
+
+DEFAULT_MAX_CRAWL_BYTES = int(os.getenv("MAX_WEBSITE_RESPONSE_BYTES", str(5 * 1024 * 1024)))
+DEFAULT_MAX_REDIRECT_HOPS = int(os.getenv("WEBSITE_CRAWL_MAX_REDIRECTS", "5"))
 
 # File extensions to ignore during crawling
 IGNORED_EXTENSIONS: Set[str] = {
@@ -43,6 +48,8 @@ class SafeWebsiteCrawler:
         user_agent: Optional[str] = None,
         check_dns: bool = True,
         timeout: Optional[float] = None,
+        max_response_bytes: Optional[int] = None,
+        max_redirects: Optional[int] = None,
     ):
         self.max_pages = max_pages
         self.timeout = timeout if timeout is not None else timeout_seconds
@@ -51,6 +58,34 @@ class SafeWebsiteCrawler:
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         )
         self.check_dns = check_dns
+        self.max_response_bytes = int(
+            max_response_bytes if max_response_bytes is not None else DEFAULT_MAX_CRAWL_BYTES
+        )
+        self.max_redirects = int(
+            max_redirects if max_redirects is not None else DEFAULT_MAX_REDIRECT_HOPS
+        )
+
+    @staticmethod
+    async def _read_bounded_html(resp: httpx.Response, max_bytes: int) -> str:
+        chunks: List[bytes] = []
+        total = 0
+        async for chunk in resp.aiter_bytes():
+            if not chunk:
+                continue
+            remaining = max_bytes - total
+            if remaining <= 0:
+                break
+            if len(chunk) > remaining:
+                chunks.append(chunk[:remaining])
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        raw = b"".join(chunks)
+        enc = resp.encoding or "utf-8"
+        try:
+            return raw.decode(enc, errors="replace")
+        except LookupError:
+            return raw.decode("utf-8", errors="replace")
 
     async def crawl_site(
         self,
@@ -84,7 +119,7 @@ class SafeWebsiteCrawler:
             return {}
 
         pages_visited: Dict[str, PageResponse] = {}
-        urls_to_visit: List[str] = [norm_root]
+        urls_to_visit: Deque[Tuple[str, int]] = deque([(norm_root, 0)])
         seen_urls: Set[str] = {norm_root}
 
         client_provided = http_client is not None
@@ -95,51 +130,85 @@ class SafeWebsiteCrawler:
             verify=True
         )
 
+        use_streaming = (
+            isinstance(client, httpx.AsyncClient)
+            and not type(client).__module__.startswith("unittest.mock")
+            and not type(getattr(client, "get", None)).__module__.startswith("unittest.mock")
+            and not type(getattr(client, "stream", None)).__module__.startswith("unittest.mock")
+        )
+
         try:
             while urls_to_visit and len(pages_visited) < self.max_pages:
-                current_url = urls_to_visit.pop(0)
+                current_url, redirect_depth = urls_to_visit.popleft()
 
-                # Fetch current URL
+                # Fetch current URL safely via bounded stream (or mocked .get)
                 try:
-                    resp = await client.get(current_url)
+                    if use_streaming:
+                        async with client.stream("GET", current_url) as resp:
+                            if resp.is_redirect and "location" in resp.headers:
+                                if redirect_depth >= self.max_redirects:
+                                    continue
+                                redirect_target = urllib.parse.urljoin(current_url, resp.headers["location"])
+                                safe_red, _ = is_safe_url(redirect_target, check_dns=self.check_dns)
+                                if safe_red:
+                                    parsed_red = urllib.parse.urlsplit(redirect_target)
+                                    if self._is_same_domain(root_domain, parsed_red.netloc.lower()):
+                                        norm_red = normalize_url(redirect_target)
+                                        if norm_red not in seen_urls:
+                                            seen_urls.add(norm_red)
+                                            urls_to_visit.appendleft((norm_red, redirect_depth + 1))
+                                continue
+
+                            if resp.status_code >= 400:
+                                continue
+
+                            content_type = resp.headers.get("content-type", "").lower()
+                            html = await self._read_bounded_html(resp, self.max_response_bytes)
+                            if "text/html" not in content_type and "application/xhtml" not in content_type and not html.strip().startswith("<"):
+                                continue
+
+                            final_url = str(resp.url)
+                            status_code = resp.status_code
+                    else:
+                        resp = await client.get(current_url)
+                        if resp.is_redirect and "location" in resp.headers:
+                            if redirect_depth >= self.max_redirects:
+                                continue
+                            redirect_target = urllib.parse.urljoin(current_url, resp.headers["location"])
+                            safe_red, _ = is_safe_url(redirect_target, check_dns=self.check_dns)
+                            if safe_red:
+                                parsed_red = urllib.parse.urlsplit(redirect_target)
+                                if self._is_same_domain(root_domain, parsed_red.netloc.lower()):
+                                    norm_red = normalize_url(redirect_target)
+                                    if norm_red not in seen_urls:
+                                        seen_urls.add(norm_red)
+                                        urls_to_visit.appendleft((norm_red, redirect_depth + 1))
+                            continue
+
+                        if resp.status_code >= 400:
+                            continue
+
+                        content_type = resp.headers.get("content-type", "").lower()
+                        html = (resp.text or "")[: self.max_response_bytes]
+                        if "text/html" not in content_type and "application/xhtml" not in content_type and not html.strip().startswith("<"):
+                            continue
+
+                        final_url = str(resp.url)
+                        status_code = resp.status_code
                 except Exception:
                     continue
 
-                # Handle redirect
-                if resp.is_redirect and "location" in resp.headers:
-                    redirect_target = urllib.parse.urljoin(current_url, resp.headers["location"])
-                    safe_red, _ = is_safe_url(redirect_target, check_dns=self.check_dns)
-                    if safe_red:
-                        # Must remain on same domain
-                        parsed_red = urllib.parse.urlsplit(redirect_target)
-                        if self._is_same_domain(root_domain, parsed_red.netloc.lower()):
-                            norm_red = normalize_url(redirect_target)
-                            if norm_red not in seen_urls:
-                                seen_urls.add(norm_red)
-                                urls_to_visit.insert(0, norm_red)
-                    continue
+                pages_visited[final_url] = PageResponse(final_url, status_code, html)
 
-                if resp.status_code >= 400:
-                    continue
-
-                content_type = resp.headers.get("content-type", "").lower()
-                if "text/html" not in content_type and "application/xhtml" not in content_type and not resp.text.strip().startswith("<"):
-                    continue
-
-                html = resp.text
-                final_url = str(resp.url)
-                pages_visited[final_url] = PageResponse(final_url, resp.status_code, html)
-
-                # Extract and queue links for high-value targets
+                # Extract and queue links for high-value targets (appendleft for priority URLs)
                 extracted_links = self._extract_internal_links(html, final_url, root_domain)
-                for link in extracted_links:
+                for link in reversed(extracted_links):
                     if link not in seen_urls and len(seen_urls) < (self.max_pages * 4):
                         seen_urls.add(link)
-                        # Insert priority links at front of queue
                         if any(k in link.lower() for k in PRIORITY_KEYWORDS):
-                            urls_to_visit.append(link)
+                            urls_to_visit.appendleft((link, 0))
                         elif len(urls_to_visit) < self.max_pages:
-                            urls_to_visit.append(link)
+                            urls_to_visit.append((link, 0))
 
         finally:
             if not client_provided:

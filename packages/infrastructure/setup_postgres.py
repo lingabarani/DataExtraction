@@ -32,11 +32,23 @@ BATCH_SIZE  = 500
 
 # ─── Schema DDL ───────────────────────────────────────────────────────────────
 DROP_TABLES_SQL = """
-DROP TABLE IF EXISTS enrichment_results CASCADE;
-DROP TABLE IF EXISTS people            CASCADE;
-DROP TABLE IF EXISTS companies         CASCADE;
-DROP TABLE IF EXISTS processing_log    CASCADE;
-DROP TABLE IF EXISTS dead_letter_queue CASCADE;
+DO $$
+DECLARE
+    rel RECORD;
+BEGIN
+    FOR rel IN
+        SELECT table_name, table_type
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name IN ('enrichment_results', 'people', 'companies', 'processing_log', 'dead_letter_queue')
+    LOOP
+        IF rel.table_type = 'VIEW' THEN
+            EXECUTE format('DROP VIEW IF EXISTS public.%I CASCADE', rel.table_name);
+        ELSE
+            EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE', rel.table_name);
+        END IF;
+    END LOOP;
+END $$;
 """
 
 SCHEMA_SQL = """
@@ -82,23 +94,31 @@ CREATE TABLE IF NOT EXISTS companies (
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_companies_domain       ON companies(domain);
-CREATE INDEX IF NOT EXISTS idx_companies_state        ON companies(state_code);
-CREATE INDEX IF NOT EXISTS idx_companies_industry     ON companies(industry);
-CREATE INDEX IF NOT EXISTS idx_companies_naics        ON companies(naics_code);
-CREATE INDEX IF NOT EXISTS idx_companies_ein          ON companies(ein);
-CREATE INDEX IF NOT EXISTS idx_companies_rfc          ON companies(rfc);
-CREATE INDEX IF NOT EXISTS idx_companies_cik          ON companies(cik);
-CREATE INDEX IF NOT EXISTS idx_companies_npi          ON companies(npi);
-CREATE INDEX IF NOT EXISTS idx_companies_name         ON companies(name);
-CREATE INDEX IF NOT EXISTS idx_companies_norm_name    ON companies(normalized_name);
-CREATE INDEX IF NOT EXISTS idx_companies_name_trgm    ON companies USING gin (normalized_name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_companies_source_recs  ON companies USING gin (source_records);
+DO $$
+DECLARE ttype text;
+BEGIN
+  SELECT table_type INTO ttype FROM information_schema.tables
+  WHERE table_schema='public' AND table_name='companies';
+  IF ttype = 'BASE TABLE' THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_domain       ON companies(domain)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_state        ON companies(state_code)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_industry     ON companies(industry)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_naics        ON companies(naics_code)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_ein          ON companies(ein)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_rfc          ON companies(rfc)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_cik          ON companies(cik)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_npi          ON companies(npi)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_name         ON companies(name)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_norm_name    ON companies(normalized_name)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_name_trgm    ON companies USING gin (normalized_name gin_trgm_ops)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_source_recs  ON companies USING gin (source_records)';
+  END IF;
+END $$;
 
 -- ── people ───────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS people (
     id                  TEXT        PRIMARY KEY,
-    company_id          TEXT        REFERENCES companies(id) ON DELETE SET NULL,
+    company_id          TEXT,
     full_name           TEXT,
     first_name          TEXT,
     last_name           TEXT,
@@ -132,7 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_people_source_recs  ON people USING gin (source_r
 -- ── enrichment_results ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS enrichment_results (
     id                  TEXT        PRIMARY KEY,
-    company_id          TEXT        REFERENCES companies(id) ON DELETE SET NULL,
+    company_id          TEXT,
     email               TEXT,
     email_verified      BOOLEAN     DEFAULT FALSE,
     email_status        TEXT,
@@ -177,8 +197,16 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
     resolved_at     TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_dlq_source_status  ON dead_letter_queue(source_name, status);
-CREATE INDEX IF NOT EXISTS idx_dlq_status_created ON dead_letter_queue(status, created_at DESC);
+DO $$
+DECLARE ttype text;
+BEGIN
+  SELECT table_type INTO ttype FROM information_schema.tables
+  WHERE table_schema='public' AND table_name='dead_letter_queue';
+  IF ttype = 'BASE TABLE' THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_dlq_source_status  ON dead_letter_queue(source_name, status)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_dlq_status_created ON dead_letter_queue(status, created_at DESC)';
+  END IF;
+END $$;
 
 -- ── email_enrichment_jobs ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS email_enrichment_jobs (
@@ -207,7 +235,7 @@ CREATE INDEX IF NOT EXISTS idx_ee_jobs_created ON email_enrichment_jobs(created_
 CREATE TABLE IF NOT EXISTS email_enrichment_results (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     job_id                  UUID REFERENCES email_enrichment_jobs(id) ON DELETE SET NULL,
-    company_id              TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    company_id              TEXT NOT NULL,
     domain                  VARCHAR(255) NOT NULL,
     primary_email           VARCHAR(255),
     all_emails              JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -236,7 +264,7 @@ CREATE INDEX IF NOT EXISTS idx_ee_results_all_emails ON email_enrichment_results
 CREATE TABLE IF NOT EXISTS email_discovery_audit (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     job_id                  UUID REFERENCES email_enrichment_jobs(id) ON DELETE CASCADE,
-    company_id              TEXT REFERENCES companies(id) ON DELETE CASCADE,
+    company_id              TEXT,
     target_domain           VARCHAR(255) NOT NULL,
     probed_email            VARCHAR(255),
     probe_type              VARCHAR(40) NOT NULL,

@@ -12,6 +12,8 @@ Features:
 import json
 import logging
 import os
+import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -19,6 +21,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from packages.infrastructure.db_connector import get_connection, release_connection
 
 logger = logging.getLogger("OSMCheckpoint.Postgres")
+_LEGACY_JSON_LOCK = threading.RLock()
 
 
 class EnterpriseCheckpointManager:
@@ -336,6 +339,103 @@ class EnterpriseCheckpointManager:
         finally:
             release_connection(conn)
 
+    def reclaim_expired_leases(self, state_name: str, field_name: str) -> int:
+        """Resets expired IN_PROGRESS chunk leases back to PENDING so crashed workers recover cleanly."""
+        conn = get_connection()
+        if not conn:
+            return 0
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE staging_dataextraction.osm_chunks
+                    SET status = 'PENDING',
+                        worker_id = NULL,
+                        lease_expires_at = NULL,
+                        updated_at = NOW()
+                    WHERE state_name = %s
+                      AND field_name = %s
+                      AND status = 'IN_PROGRESS'
+                      AND lease_expires_at IS NOT NULL
+                      AND lease_expires_at < NOW();
+                    """,
+                    (state_name, field_name),
+                )
+                reclaimed = cur.rowcount or 0
+            conn.commit()
+            if reclaimed:
+                logger.info(
+                    "[CHECKPOINT] Reclaimed %d expired IN_PROGRESS chunk leases for %s/%s",
+                    reclaimed,
+                    state_name,
+                    field_name,
+                )
+            return reclaimed
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            release_connection(conn)
+
+    def claim_pending_chunks(
+        self,
+        state_name: str,
+        field_name: str,
+        worker_id: str,
+        limit: int = 10,
+        lease_minutes: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Atomically claims pending/expired chunks via FOR UPDATE SKIP LOCKED."""
+        conn = get_connection()
+        if not conn:
+            return []
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    WITH next_chunks AS (
+                        SELECT state_name, field_name, chunk_id
+                        FROM staging_dataextraction.osm_chunks
+                        WHERE state_name = %s
+                          AND field_name = %s
+                          AND (
+                              status = 'PENDING'
+                              OR (status = 'IN_PROGRESS' AND lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
+                          )
+                        ORDER BY depth ASC, chunk_id ASC
+                        LIMIT %s
+                        FOR UPDATE SKIP LOCKED
+                    )
+                    UPDATE staging_dataextraction.osm_chunks c
+                    SET status = 'IN_PROGRESS',
+                        worker_id = %s,
+                        lease_expires_at = NOW() + (%s || ' minutes')::INTERVAL,
+                        updated_at = NOW()
+                    FROM next_chunks nc
+                    WHERE c.state_name = nc.state_name
+                      AND c.field_name = nc.field_name
+                      AND c.chunk_id = nc.chunk_id
+                    RETURNING c.chunk_id, c.min_lat, c.min_lon, c.max_lat, c.max_lon, c.depth, c.parent_id;
+                    """,
+                    (state_name, field_name, int(limit), worker_id, str(int(lease_minutes))),
+                )
+                rows = cur.fetchall()
+            conn.commit()
+            return [
+                {
+                    "chunk_id": r[0],
+                    "bbox": (float(r[1]), float(r[2]), float(r[3]), float(r[4])),
+                    "depth": int(r[5] or 0),
+                    "parent_id": r[6],
+                }
+                for r in rows
+            ]
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            release_connection(conn)
+
     def get_failed_chunk_ids(self, state_name: str, field_name: str) -> List[str]:
         """Returns list of chunk_ids that are currently FAILED."""
         conn = get_connection()
@@ -498,16 +598,30 @@ class EnterpriseCheckpointManager:
             release_connection(conn)
 
     def export_to_legacy_json(self) -> None:
-        """Exports current PostgreSQL progress to backward-compatible osm_progress.json."""
+        """Atomically exports current PostgreSQL progress to backward-compatible osm_progress.json."""
         summary = self.get_summary()
-        try:
-            with open(self.legacy_json_path, "w", encoding="utf-8") as f:
-                json.dump(summary, f, indent=2, default=str)
-        except Exception as exc:
-            logger.warning("Failed to export legacy JSON: %s", exc)
+        with _LEGACY_JSON_LOCK:
+            tmp_path = None
+            try:
+                os.makedirs(self.progress_dir, exist_ok=True)
+                fd, tmp_path = tempfile.mkstemp(prefix="osm_progress_", suffix=".tmp", dir=self.progress_dir)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(summary, f, indent=2, default=str)
+                os.replace(tmp_path, self.legacy_json_path)
+            except Exception as exc:
+                logger.warning("Failed to export legacy JSON: %s", exc)
+                if tmp_path and os.path.exists(tmp_path):
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
     def sync_to_legacy_json(self) -> None:
         """Alias for export_to_legacy_json."""
+        self.export_to_legacy_json()
+
+    def sync_legacy_json(self) -> None:
+        """Backward-compatible alias for export_to_legacy_json."""
         self.export_to_legacy_json()
 
     def get_summary(self) -> Dict[str, Any]:

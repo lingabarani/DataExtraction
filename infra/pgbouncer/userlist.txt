@@ -1,3 +1,4 @@
-"postgres" "7903"
-"dex_user" "dex_pass"
-
+# This file is generated at container start by generate-userlist.sh
+# from POSTGRES_USER and POSTGRES_PASSWORD environment variables.
+# DO NOT commit real credentials here.
+# See generate-userlist.sh for the entrypoint that populates this file.

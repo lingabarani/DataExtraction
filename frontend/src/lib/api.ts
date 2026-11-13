@@ -4,12 +4,13 @@
  * and memory-safe streaming file downloads.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 const TOKEN_KEY = "dataextraction_token";
 const USER_KEY = "dataextraction_user";
 const LEGACY_TOKEN_KEYS = ["oneextraction_token", "prospex_token"];
 const LEGACY_USER_KEYS = ["oneextraction_user", "prospex_user"];
+const LEGACY_PLACEHOLDER_TOKEN = "dataextraction-admin-session-active";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -24,6 +25,10 @@ function getToken(): string | null {
         break;
       }
     }
+  }
+  if (token === LEGACY_PLACEHOLDER_TOKEN) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
   }
   return token;
 }
@@ -56,7 +61,7 @@ async function request<T>(path: string, options?: ApiRequestOptions): Promise<T>
     ...(options?.headers as Record<string, string>),
   };
 
-  const timeoutMs = options?.timeoutMs ?? 2500;
+  const timeoutMs = options?.timeoutMs ?? 15000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -70,10 +75,7 @@ async function request<T>(path: string, options?: ApiRequestOptions): Promise<T>
 
     if (res.status === 401) {
       clearAuth();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
-      }
-      throw new Error("Unauthorized. Please log in again.");
+      throw new Error("Unauthorized. Access denied (HTTP 401).");
     }
 
     if (!res.ok) {
@@ -130,10 +132,7 @@ export const api = {
 
     if (res.status === 401) {
       clearAuth();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      return;
+      throw new Error("Unauthorized. Download access denied (HTTP 401).");
     }
 
     if (!res.ok) {

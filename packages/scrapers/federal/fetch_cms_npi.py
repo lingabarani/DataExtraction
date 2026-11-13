@@ -27,16 +27,21 @@ from pathlib import Path
 import requests
 
 # ── project imports ────────────────────────────────────────────────────────────
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.config_manager import config_manager
+    from packages.infrastructure.db_connector import get_connection, release_connection, db_info
     from packages.domain.lead_builder import build_us_lead
-    from packages.domain.contact_validator import validate_contact, lead_score_from_contact
+    from packages.domain.contact_validator import validate_contact, lead_score_from_contact, validate_phone
     from packages.infrastructure.http_client import http_client
 except ImportError:
-    from db_connector import get_connection, db_info
+    from config_manager import config_manager
+    from db_connector import get_connection, release_connection, db_info
     from lead_builder import build_us_lead
-    from contact_validator import validate_contact, lead_score_from_contact
+    from contact_validator import validate_contact, lead_score_from_contact, validate_phone
     from http_client import http_client
 
 # ── constants ──────────────────────────────────────────────────────────────────
@@ -106,30 +111,38 @@ def download_npi_zip(output_dir: Path) -> Path:
         print(f"  [+] Using cached ZIP: {zip_path} ({zip_path.stat().st_size/1e6:.0f} MB)")
         return zip_path
 
+    timeout_sec = int(config_manager.get_registry_config().get("cms_download_timeout_seconds", 180))
     url = _get_latest_npi_url()
     print(f"  [*] Downloading NPI bulk file from:\n      {url}")
-    print(f"      This is ~900 MB — may take several minutes...")
+    print(f"      This is ~900 MB — may take several minutes (timeout={timeout_sec}s)...")
 
     try:
-        r = http_client.get(url, stream=True, timeout=60)
+        r = http_client.get(url, stream=True, timeout=timeout_sec)
         if r.status_code != 200:
             print(f"  [!] Primary URL failed ({r.status_code}), trying fallback...")
-            r = http_client.get(NPI_FALLBACK_URL, stream=True, timeout=60)
+            r = http_client.get(NPI_FALLBACK_URL, stream=True, timeout=timeout_sec)
+        r.raise_for_status()
 
         total = int(r.headers.get("content-length", 0))
         downloaded = 0
         with open(zip_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total:
-                    pct = downloaded / total * 100
-                    mb  = downloaded / 1e6
-                    print(f"\r  Downloading... {mb:.0f} MB / {total/1e6:.0f} MB ({pct:.0f}%)",
-                          end="", flush=True)
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        pct = downloaded / total * 100
+                        mb  = downloaded / 1e6
+                        print(f"\r  Downloading... {mb:.0f} MB / {total/1e6:.0f} MB ({pct:.0f}%)",
+                              end="", flush=True)
         print(f"\n  [+] Downloaded: {zip_path} ({downloaded/1e6:.0f} MB)")
         return zip_path
     except Exception as e:
+        if zip_path.exists():
+            try:
+                zip_path.unlink()
+            except Exception:
+                pass
         print(f"  [!] Download failed: {e}")
         raise
 
@@ -226,11 +239,13 @@ def _upsert(cur, record: dict):
     upsert_staging_record(cur, record, source="CMS_NPI")
 
 
-def run(limit: int = 0, dry_run: bool = False):
+def run(limit: int = 0, dry_run: bool = False, mode: str = "incremental"):
+    import json
     print(f"\n{'='*60}")
     print(f"  CMS NPI Healthcare Provider Bulk Ingest")
     print(f"{'='*60}")
     print(f"  DB      : {db_info()}")
+    print(f"  Mode    : {mode}")
     print(f"  Limit   : {limit:,} (0 = all)")
     print(f"  Dry run : {dry_run}")
     print(f"{'='*60}\n")
@@ -242,64 +257,78 @@ def run(limit: int = 0, dry_run: bool = False):
     cur  = conn.cursor() if conn else None
 
     inserted = errors = skipped = 0
+    db_count = 0
     start = datetime.now(timezone.utc)
 
-    print("\n  [*] Opening ZIP and streaming CSV...")
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        # Find the main NPI data file (largest CSV)
-        csv_names = [n for n in zf.namelist()
-                     if n.endswith(".csv") and "npidata_pfile" in n.lower()]
-        if not csv_names:
-            csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
-        if not csv_names:
-            print("  [!] No CSV found in ZIP")
-            return
+    try:
+        print("\n  [*] Opening ZIP and streaming CSV...")
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            # Find the main NPI data file (largest CSV)
+            csv_names = [n for n in zf.namelist()
+                         if n.endswith(".csv") and "npidata_pfile" in n.lower()]
+            if not csv_names:
+                csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
+            if not csv_names:
+                raise RuntimeError("No CSV found in CMS NPI ZIP archive")
 
-        csv_name = sorted(csv_names, key=lambda n: zf.getinfo(n).file_size, reverse=True)[0]
-        print(f"  [+] Reading: {csv_name}")
+            csv_name = sorted(csv_names, key=lambda n: zf.getinfo(n).file_size, reverse=True)[0]
+            print(f"  [+] Reading: {csv_name}")
 
-        with zf.open(csv_name) as raw:
-            text_stream = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
-            reader = csv.DictReader(text_stream)
+            with zf.open(csv_name) as raw:
+                text_stream = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
+                reader = csv.DictReader(text_stream)
 
-            for i, row in enumerate(reader):
-                if limit and i >= limit:
-                    break
+                for i, row in enumerate(reader):
+                    if limit and i >= limit:
+                        break
 
-                if i % 5000 == 0 and i > 0:
-                    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-                    rate = i / elapsed if elapsed > 0 else 0
-                    print(f"\r  Processed {i:,} | inserted {inserted:,} | "
-                          f"errors {errors} | {rate:.0f} rec/s", end="", flush=True)
+                    if i % 5000 == 0 and i > 0:
+                        elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+                        rate = i / elapsed if elapsed > 0 else 0
+                        print(f"\r  Processed {i:,} | inserted {inserted:,} | "
+                              f"errors {errors} | {rate:.0f} rec/s", end="", flush=True)
 
-                try:
-                    lead = _row_to_lead(row)
-                    if not lead:
-                        skipped += 1
-                        continue
+                    try:
+                        lead = _row_to_lead(row)
+                        if not lead:
+                            skipped += 1
+                            continue
 
-                    if not dry_run:
-                        _upsert(cur, lead)
-                        inserted += 1
-                        if inserted % BATCH_SIZE == 0:
-                            conn.commit()
-                    else:
-                        inserted += 1
-                        if i < 3:
-                            print(f"\n  [DRY] {lead.get('company_name')} | "
-                                  f"phone={lead.get('phone')} | state={lead.get('state_code')}")
-                except Exception as e:
-                    errors += 1
-                    if errors <= 5:
-                        print(f"\n  [ERR] row {i}: {e}")
-                    if not dry_run and conn:
-                        conn.rollback()
+                        if not dry_run:
+                            _upsert(cur, lead)
+                            inserted += 1
+                            if inserted % BATCH_SIZE == 0:
+                                conn.commit()
+                        else:
+                            inserted += 1
+                            if i < 3:
+                                print(f"\n  [DRY] {lead.get('company_name')} | "
+                                      f"phone={lead.get('phone')} | state={lead.get('state_code')}")
+                    except Exception as e:
+                        errors += 1
+                        if errors <= 5:
+                            print(f"\n  [ERR] row {i}: {e}")
+                        if not dry_run and conn:
+                            conn.rollback()
 
-    if not dry_run and conn:
-        conn.commit()
-        cur.execute("SELECT COUNT(*) FROM us_leads WHERE api_source='CMS_NPI'")
-        db_count = cur.fetchone()[0]
-        conn.close()
+        total_attempted = inserted + errors
+        threshold = float(config_manager.get_registry_config().get("error_threshold_pct", 25.0))
+        if total_attempted >= 20 and (errors / total_attempted * 100.0) > threshold:
+            raise RuntimeError(
+                f"CMS NPI error rate {(errors / total_attempted * 100.0):.1f}% exceeded threshold {threshold}%"
+            )
+
+        if not dry_run and conn:
+            conn.commit()
+            cur.execute("SELECT COUNT(*) FROM staging_dataextraction.staging_companies WHERE source='CMS_NPI'")
+            db_count = cur.fetchone()[0]
+        else:
+            db_count = inserted
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            release_connection(conn)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n\n  {'-'*58}")
@@ -308,13 +337,27 @@ def run(limit: int = 0, dry_run: bool = False):
     print(f"  Skipped  : {skipped:,} (no name)")
     print(f"  Errors   : {errors}")
     if not dry_run:
-        print(f"  DB total : {db_count:,} NPI records in us_leads")
+        print(f"  DB total : {db_count:,} NPI records in staging_companies")
     print(f"  {'-'*58}\n")
+    print(
+        "ACTIVITY_RESULT_JSON:" + json.dumps({
+            "status": "SUCCESS",
+            "source": "CMS_NPI",
+            "inserted_count": inserted,
+            "error_count": errors,
+            "skipped_count": skipped,
+            "db_total": db_count,
+            "dry_run": dry_run,
+        }),
+        flush=True,
+    )
+    return inserted
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode",    default="incremental", choices=["incremental", "full"])
     parser.add_argument("--limit",   type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    run(limit=args.limit, dry_run=args.dry_run)
+    run(limit=args.limit, dry_run=args.dry_run, mode=args.mode)

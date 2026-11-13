@@ -31,7 +31,6 @@ from packages.temporal.activities.email_enrichment_activities import (
 )
 from packages.temporal.workflows.w7_email_enrichment_workflow import (
     EmailEnrichmentWorkflow,
-    Agent7EmailEnrichmentWorkflow,
 )
 
 logging.basicConfig(
@@ -56,7 +55,6 @@ async def run_worker():
     ]
     workflows = [
         EmailEnrichmentWorkflow,
-        Agent7EmailEnrichmentWorkflow,
     ]
 
     worker = Worker(

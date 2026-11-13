@@ -368,8 +368,14 @@ def validate_phone(
     if target_region == "US" and len(digits) == 10:
         result["phone"] = f"+1{digits}"
         result["status"] = "NORMALIZED"
+    elif target_region == "US" and len(digits) == 11 and digits.startswith("1"):
+        result["phone"] = f"+{digits}"
+        result["status"] = "NORMALIZED"
     elif target_region == "MX" and len(digits) == 10:
         result["phone"] = f"+52{digits}"
+        result["status"] = "NORMALIZED"
+    elif target_region == "MX" and len(digits) == 12 and digits.startswith("52"):
+        result["phone"] = f"+{digits}"
         result["status"] = "NORMALIZED"
     else:
         result["status"] = "INVALID"

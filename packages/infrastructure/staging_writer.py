@@ -11,6 +11,7 @@ Zero writes target legacy public serving views.
 
 import json
 import logging
+import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2.extras
@@ -36,26 +37,31 @@ def upsert_staging_record(cur, record: Dict[str, Any], source: str = "FEDERAL_SC
         cur.execute(
             """
             INSERT INTO staging_dataextraction.staging_companies (
-                id, name, legal_name, website, domain, phone,
+                id, name, legal_name, website, domain, email, phone,
                 city, state, state_code, zip_code, country,
                 industry, naics_code, ein, cik, source,
                 data_quality_score, raw_payload, updated_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s::jsonb, NOW()
             )
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
+                website = COALESCE(EXCLUDED.website, staging_companies.website),
                 domain = COALESCE(EXCLUDED.domain, staging_companies.domain),
+                email = COALESCE(EXCLUDED.email, staging_companies.email),
                 phone = COALESCE(EXCLUDED.phone, staging_companies.phone),
                 city = COALESCE(EXCLUDED.city, staging_companies.city),
                 state = COALESCE(EXCLUDED.state, staging_companies.state),
+                state_code = COALESCE(EXCLUDED.state_code, staging_companies.state_code),
+                zip_code = COALESCE(EXCLUDED.zip_code, staging_companies.zip_code),
                 industry = COALESCE(EXCLUDED.industry, staging_companies.industry),
                 ein = COALESCE(EXCLUDED.ein, staging_companies.ein),
                 cik = COALESCE(EXCLUDED.cik, staging_companies.cik),
-                raw_payload = EXCLUDED.raw_payload,
+                data_quality_score = GREATEST(COALESCE(EXCLUDED.data_quality_score, 0), COALESCE(staging_companies.data_quality_score, 0)),
+                raw_payload = COALESCE(staging_companies.raw_payload, '{}'::jsonb) || EXCLUDED.raw_payload,
                 updated_at = NOW();
             """,
             (
@@ -64,6 +70,7 @@ def upsert_staging_record(cur, record: Dict[str, Any], source: str = "FEDERAL_SC
                 record.get("legal_name") or company_name,
                 record.get("website") or (f"https://{domain}" if domain else None),
                 domain,
+                record.get("company_email") or record.get("email"),
                 record.get("phone"),
                 record.get("city"),
                 record.get("state"),
@@ -164,6 +171,7 @@ def bulk_upsert_staging_records(
                 r.get("legal_name") or company_name,
                 r.get("website") or (f"https://{domain}" if domain else None),
                 domain,
+                r.get("company_email") or r.get("email"),
                 r.get("phone"),
                 r.get("city"),
                 r.get("state"),
@@ -209,28 +217,33 @@ def bulk_upsert_staging_records(
     if company_rows:
         company_sql = """
             INSERT INTO staging_dataextraction.staging_companies (
-                id, name, legal_name, website, domain, phone,
+                id, name, legal_name, website, domain, email, phone,
                 city, state, state_code, zip_code, country,
                 industry, naics_code, ein, cik, source,
                 data_quality_score, raw_payload, updated_at
             ) VALUES %s
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
+                website = COALESCE(EXCLUDED.website, staging_companies.website),
                 domain = COALESCE(EXCLUDED.domain, staging_companies.domain),
+                email = COALESCE(EXCLUDED.email, staging_companies.email),
                 phone = COALESCE(EXCLUDED.phone, staging_companies.phone),
                 city = COALESCE(EXCLUDED.city, staging_companies.city),
                 state = COALESCE(EXCLUDED.state, staging_companies.state),
+                state_code = COALESCE(EXCLUDED.state_code, staging_companies.state_code),
+                zip_code = COALESCE(EXCLUDED.zip_code, staging_companies.zip_code),
                 industry = COALESCE(EXCLUDED.industry, staging_companies.industry),
                 ein = COALESCE(EXCLUDED.ein, staging_companies.ein),
                 cik = COALESCE(EXCLUDED.cik, staging_companies.cik),
-                raw_payload = EXCLUDED.raw_payload,
+                data_quality_score = GREATEST(COALESCE(EXCLUDED.data_quality_score, 0), COALESCE(staging_companies.data_quality_score, 0)),
+                raw_payload = COALESCE(staging_companies.raw_payload, '{}'::jsonb) || EXCLUDED.raw_payload,
                 updated_at = NOW();
         """
         psycopg2.extras.execute_values(
             cur,
             company_sql,
             company_rows,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, NOW())",
             page_size=len(company_rows),
         )
 
@@ -459,5 +472,171 @@ def bulk_upsert_working_records(
         )
 
     return len(org_rows), len(email_rows), len(person_rows)
+
+
+def upsert_master_locations(cur, locations: List[Dict[str, Any]]) -> int:
+    """
+    Idempotently persists physical geospatial locations into `master_dataextraction.locations`
+    using a deterministic UUIDv5 `location_id` derived from canonical source identifiers.
+    Prevents duplicate rows across google_place_id, osm_place_id, and coordinates.
+    """
+    if not locations:
+        return 0
+
+    rows = []
+    seen_ids = set()
+    seen_gpids = set()
+    seen_opids = set()
+    for loc in locations:
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
+        if lat is None or lon is None:
+            continue
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+        except (TypeError, ValueError):
+            continue
+
+        google_pid = loc.get("google_place_id")
+        osm_pid_raw = loc.get("osm_place_id")
+        osm_pid: Optional[int] = None
+        if osm_pid_raw is not None:
+            try:
+                osm_pid = int(osm_pid_raw)
+            except (TypeError, ValueError):
+                osm_pid = None
+
+        gpid_clean = str(google_pid)[:255] if google_pid else None
+        if gpid_clean and gpid_clean in seen_gpids:
+            continue
+        if osm_pid is not None and osm_pid in seen_opids:
+            continue
+
+        # Canonical identity ordering guarantees the same place always resolves to one location_id
+        source_key = (
+            (f"gmaps:{gpid_clean}" if gpid_clean else "")
+            or (f"osm:{osm_pid}" if osm_pid is not None else "")
+            or str(loc.get("location_key") or "")
+            or f"coord:{lat_f:.6f},{lon_f:.6f}:{(loc.get('name') or '').strip().lower()}"
+        )
+        loc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, source_key))
+        if loc_id in seen_ids:
+            continue
+        seen_ids.add(loc_id)
+        if gpid_clean:
+            seen_gpids.add(gpid_clean)
+        if osm_pid is not None:
+            seen_opids.add(osm_pid)
+
+        city = loc.get("city")
+        state = loc.get("state")
+        state_code = loc.get("state_code")
+        postal_code = loc.get("postal_code") or loc.get("zip_code")
+        country_name = loc.get("country") or "United States"
+        cc_raw = str(loc.get("country_code") or ("MX" if "mexico" in str(country_name).lower() else "US")).strip().upper()
+        country_code = cc_raw[:2] if len(cc_raw) >= 2 else "US"
+
+        fallback_addr = ", ".join(
+            str(p) for p in [loc.get("name"), city, state_code or state, postal_code, country_code] if p
+        ) or f"{lat_f:.6f}, {lon_f:.6f}"
+        raw_address = str(loc.get("raw_address") or loc.get("address") or fallback_addr)
+        formatted_address = str(loc.get("formatted_address") or raw_address)
+
+        rows.append((
+            loc_id,
+            raw_address,
+            formatted_address,
+            loc.get("street_number"),
+            loc.get("route") or loc.get("street_address"),
+            city,
+            state,
+            loc.get("county"),
+            str(postal_code)[:20] if postal_code else None,
+            country_code,
+            lat_f,
+            lon_f,
+            loc.get("geocoding_precision") or "ROOFTOP",
+            osm_pid,
+            gpid_clean,
+            city,
+            state,
+            str(state_code)[:10] if state_code else None,
+            country_name,
+        ))
+
+    if not rows:
+        return 0
+
+    sql = """
+        INSERT INTO master_dataextraction.locations (
+            location_id, raw_address, formatted_address, street_number, route,
+            locality, administrative_area_level_1, administrative_area_level_2,
+            postal_code, country_code, latitude, longitude, geocoding_precision,
+            osm_place_id, google_place_id, city, state, state_code, country
+        ) VALUES %s
+        ON CONFLICT (location_id) DO UPDATE SET
+            formatted_address = COALESCE(EXCLUDED.formatted_address, master_dataextraction.locations.formatted_address),
+            postal_code = COALESCE(EXCLUDED.postal_code, master_dataextraction.locations.postal_code),
+            latitude = EXCLUDED.latitude,
+            longitude = EXCLUDED.longitude,
+            geocoding_precision = COALESCE(EXCLUDED.geocoding_precision, master_dataextraction.locations.geocoding_precision),
+            city = COALESCE(EXCLUDED.city, master_dataextraction.locations.city),
+            state = COALESCE(EXCLUDED.state, master_dataextraction.locations.state),
+            state_code = COALESCE(EXCLUDED.state_code, master_dataextraction.locations.state_code);
+    """
+    psycopg2.extras.execute_values(
+        cur,
+        sql,
+        rows,
+        template="(%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        page_size=min(250, len(rows)),
+    )
+    return len(rows)
+
+
+def link_organization_locations(
+    cur,
+    company_location_pairs: List[tuple],
+    source_system: str = "GOOGLE_MAPS",
+) -> int:
+    """
+    Idempotently links `staging_companies.id` records to deterministic `location_id` rows
+    in `master_dataextraction.organization_locations`.
+    `company_location_pairs`: sequence of `(source_company_id, location_key)`.
+    """
+    if not company_location_pairs or not hasattr(cur, "mogrify"):
+        return 0
+
+    seen_pairs = set()
+    rows = []
+    for company_id, loc_key in company_location_pairs:
+        if not company_id or not loc_key:
+            continue
+        loc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, str(loc_key)))
+        pair_key = (str(company_id), loc_id)
+        if pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
+        rows.append((str(company_id), loc_id, source_system))
+
+    if not rows:
+        return 0
+
+    sql = """
+        INSERT INTO master_dataextraction.organization_locations (
+            source_company_id, location_id, source_system, is_primary, confidence
+        ) VALUES %s
+        ON CONFLICT (source_company_id, location_id) DO UPDATE SET
+            updated_at = NOW();
+    """
+    psycopg2.extras.execute_values(
+        cur,
+        sql,
+        rows,
+        template="(%s, %s::uuid, %s, TRUE, 1.0)",
+        page_size=min(250, len(rows)),
+    )
+    return len(rows)
 
 

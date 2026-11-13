@@ -193,9 +193,10 @@ class Deduplicator:
     and aggregates multi-source provenance.
     """
 
-    def __init__(self, conn, run_id: Optional[str] = None):
+    def __init__(self, conn, run_id: Optional[str] = None, table: str = "staging_dataextraction.staging_companies"):
         self.conn = conn
         self.run_id = run_id or str(uuid.uuid4())[:8]
+        self._table = table
         # In-memory candidate lookup caches: key -> canonical_id
         self._company_cache: Dict[str, str] = {}
         self._people_cache: Dict[str, str] = {}
@@ -517,7 +518,7 @@ class Deduplicator:
         if not clauses:
             return
 
-        sql = f"SELECT id, domain, ein, cik FROM companies WHERE {' OR '.join(clauses)}"
+        sql = f"SELECT id, domain, ein, cik FROM {self._table} WHERE {' OR '.join(clauses)}"
         try:
             cur = self.conn.cursor()
             cur.execute(sql, params)
@@ -547,12 +548,12 @@ class Deduplicator:
             if field == 'normalized_name+state_code':
                 name, state = value.split('|', 1)
                 cur.execute(
-                    "SELECT * FROM companies WHERE normalized_name=%s AND state_code=%s LIMIT 1",
+                    f"SELECT * FROM {self._table} WHERE normalized_name=%s AND state_code=%s LIMIT 1",
                     (name, state)
                 )
             else:
                 cur.execute(
-                    f"SELECT * FROM companies WHERE \"{field}\"=%s AND \"{field}\" IS NOT NULL LIMIT 1",
+                    f"SELECT * FROM {self._table} WHERE \"{field}\"=%s AND \"{field}\" IS NOT NULL LIMIT 1",
                     (value,)
                 )
             row = cur.fetchone()
@@ -572,38 +573,39 @@ class Deduplicator:
         """
         Fuzzy company name resolution via pg_trgm similarity or SequenceMatcher.
         Threshold: >= threshold similarity.
+        Uses the '%' operator to leverage idx_stg_comp_norm_name_trgm index for millisecond performance.
         """
         if not self.conn or not normalized_name:
             return None
         cur = self._get_dict_cursor()
 
-        # 1. Attempt PostgreSQL pg_trgm similarity search if enabled
+        # 1. Attempt PostgreSQL pg_trgm similarity search using GIN trigram index if enabled
         try:
             if state_code:
                 st = str(state_code)[:2].upper()
                 cur.execute(
-                    """
+                    f"""
                     SELECT *, similarity(normalized_name, %s) AS _similarity
-                    FROM companies
-                    WHERE state_code = %s AND similarity(normalized_name, %s) >= %s
+                    FROM {self._table}
+                    WHERE (state_code = %s OR state = %s) AND normalized_name % %s
                     ORDER BY _similarity DESC
                     LIMIT 1
                     """,
-                    (normalized_name, st, normalized_name, threshold)
+                    (normalized_name, st, st, normalized_name)
                 )
             else:
                 cur.execute(
-                    """
+                    f"""
                     SELECT *, similarity(normalized_name, %s) AS _similarity
-                    FROM companies
-                    WHERE similarity(normalized_name, %s) >= %s
+                    FROM {self._table}
+                    WHERE normalized_name % %s
                     ORDER BY _similarity DESC
                     LIMIT 1
                     """,
-                    (normalized_name, normalized_name, threshold)
+                    (normalized_name, normalized_name)
                 )
             row = cur.fetchone()
-            if row:
+            if row and float(row.get('_similarity', 0)) >= threshold:
                 return dict(row)
         except Exception:
             # Fall back to in-memory comparison if pg_trgm extension is not installed
@@ -616,7 +618,7 @@ class Deduplicator:
         try:
             if state_code:
                 cur.execute(
-                    "SELECT id, name, normalized_name, state_code FROM companies WHERE state_code = %s LIMIT 100",
+                    f"SELECT id, name, normalized_name, state_code FROM {self._table} WHERE state_code = %s LIMIT 100",
                     (str(state_code)[:2].upper(),)
                 )
                 rows = cur.fetchall()
@@ -662,7 +664,7 @@ class Deduplicator:
             return {}
         cur = self._get_dict_cursor()
         try:
-            cur.execute("SELECT * FROM companies WHERE id=%s LIMIT 1", (company_id,))
+            cur.execute(f"SELECT * FROM {self._table} WHERE id=%s LIMIT 1", (company_id,))
             row = cur.fetchone()
             return dict(row) if row else {}
         except Exception:
@@ -765,7 +767,7 @@ class Deduplicator:
             return None
         cur = self._get_dict_cursor()
         try:
-            cur.execute("SELECT * FROM companies WHERE normalized_name=%s LIMIT 1", (normalized_name,))
+            cur.execute(f"SELECT * FROM {self._table} WHERE normalized_name=%s LIMIT 1", (normalized_name,))
             row = cur.fetchone()
             return dict(row) if row else None
         except Exception:

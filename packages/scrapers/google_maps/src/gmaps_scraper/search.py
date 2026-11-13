@@ -3,9 +3,19 @@ from typing import Any, Dict, List, Optional, Tuple
 from .models import PlaceStub
 from .parser_state import strip_google_xssi_prefix, extract_app_initialization_state
 
-def build_search_pb(lat: float, lng: float, span_meters: int = 1000, num_results: int = 20) -> str:
+def build_search_pb(
+    lat: float,
+    lng: float,
+    span_meters: int = 1000,
+    num_results: int = 20,
+    offset: int = 0,
+) -> str:
     """Constructs the Google Maps search Protocol Buffer parameter for a tile query."""
-    return f"!4m8!1m3!1d{span_meters}!2d{lng}!3d{lat}!3m2!1i1024!2i768!4f13.1!7i{num_results}!10b1"
+    pb = f"!4m8!1m3!1d{span_meters}!2d{lng}!3d{lat}!3m2!1i1024!2i768!4f13.1!7i{num_results}"
+    if offset > 0:
+        pb += f"!8i{int(offset)}"
+    pb += "!10b1"
+    return pb
 
 def parse_search_rpc_response(raw_text: str) -> List[PlaceStub]:
     """Parses place stubs from the search RPC response according to FIELD_MAP.md."""

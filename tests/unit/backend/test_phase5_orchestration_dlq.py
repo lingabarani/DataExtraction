@@ -26,31 +26,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
 # Ensure imports work in DataExtraction monorepo
-_backend_dir = Path(__file__).resolve().parent
-_project_root = _backend_dir.parents[2]
-_packages = _project_root / "packages"
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
-for _p in [
-    _packages / "pipeline",
-    _packages / "infrastructure",
-    _packages / "scrapers",
-    _packages / "scrapers" / "federal",
-    _packages / "scrapers" / "open_map",
-    _packages / "api",
-    _packages / "api" / "routers",
-    _project_root / "scripts" / "db",
-    _project_root / "scripts" / "ops",
-    _project_root,
-]:
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
-
-from pipeline_orchestrator import (
+from packages.pipeline.pipeline_orchestrator import (
     PipelineOrchestrator,
     PipelineReport,
     SourceResult,
 )
-from dead_letter_queue import (
+from packages.infrastructure.dead_letter_queue import (
     enqueue_dead_letter,
     get_dead_letter_records,
     get_dead_letter_stats,
@@ -58,7 +43,7 @@ from dead_letter_queue import (
     discard_dead_letter,
     drain_fallback_to_db,
 )
-from structured_logger import (
+from packages.infrastructure.structured_logger import (
     JsonLogFormatter,
     StandardLogFormatter,
     BoundLogger,
@@ -86,7 +71,7 @@ class TestPipelineOrchestrator(unittest.TestCase):
         with patch.object(orch, "_load_source_module", create=True):
             mock_mod = MagicMock()
             mock_mod.run.return_value = {"fetched": 100, "merged": 95, "skipped": 5}
-            with patch("pipeline_orchestrator._load_source_module", return_value=mock_mod):
+            with patch("packages.pipeline.pipeline_orchestrator._load_source_module", return_value=mock_mod):
                 res = orch.execute_source("sec", limit=0, dry_run=False)
                 self.assertEqual(res.status, "DONE")
                 self.assertEqual(res.records_fetched, 100)
@@ -98,8 +83,8 @@ class TestPipelineOrchestrator(unittest.TestCase):
         mock_mod = MagicMock()
         mock_mod.run.return_value = {"fetched": 10, "merged": 8, "skipped": 2}
 
-        with patch("pipeline_orchestrator._load_source_module", return_value=mock_mod), \
-             patch("pipeline_orchestrator.log_data_source") as mock_log:
+        with patch("packages.pipeline.pipeline_orchestrator._load_source_module", return_value=mock_mod), \
+             patch("packages.pipeline.pipeline_orchestrator.log_data_source") as mock_log:
             res = orch.execute_source("fdic")
             self.assertEqual(res.status, "DONE")
             # dry_run flag must be passed to module run
@@ -117,10 +102,10 @@ class TestPipelineOrchestrator(unittest.TestCase):
             mod.run.return_value = {"fetched": 50, "merged": 45, "skipped": 5}
             return mod
 
-        with patch("pipeline_orchestrator._load_source_module", side_effect=side_effect), \
-             patch("pipeline_orchestrator.get_connection"), \
-             patch("pipeline_orchestrator.release_connection"), \
-             patch("pipeline_orchestrator.enqueue_dead_letter", return_value=42) as mock_dlq:
+        with patch("packages.pipeline.pipeline_orchestrator._load_source_module", side_effect=side_effect), \
+             patch("packages.pipeline.pipeline_orchestrator.get_connection"), \
+             patch("packages.pipeline.pipeline_orchestrator.release_connection"), \
+             patch("packages.pipeline.pipeline_orchestrator.enqueue_dead_letter", return_value=42) as mock_dlq:
 
             report = orch.run(sources=["fdic", "sec", "usaspending"])
 
@@ -351,15 +336,23 @@ class TestApiRouteSecurity(unittest.TestCase):
     """Verifies that DLQ and pipeline routes require valid JWT tokens."""
 
     def test_unauthorized_access_raises_401(self):
-        from api.deps import get_current_user
+        import os
+        from packages.api.dependencies import get_current_user
+        from packages.infrastructure.config_manager import config_manager, ConfigurationError
         from fastapi import HTTPException
 
         mock_request = MagicMock()
-        # No credentials provided
-        with self.assertRaises(HTTPException) as ctx:
-            get_current_user(request=mock_request, auth_header=None, query_token=None)
-        self.assertEqual(ctx.exception.status_code, 401)
-        self.assertIn("Authentication required", ctx.exception.detail)
+        # With AUTH_REQUIRED=true (default/strict mode), unauthenticated access raises 401
+        with patch.dict(os.environ, {"AUTH_REQUIRED": "true"}):
+            with self.assertRaises(HTTPException) as ctx:
+                get_current_user(request=mock_request, auth_header=None, query_token=None)
+            self.assertEqual(ctx.exception.status_code, 401)
+            self.assertIn("Authentication required", ctx.exception.detail)
+
+        # Production guard: AUTH_REQUIRED=false must be rejected in production
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "AUTH_REQUIRED": "false"}):
+            with self.assertRaises(ConfigurationError):
+                config_manager.is_auth_required()
 
 
 if __name__ == "__main__":

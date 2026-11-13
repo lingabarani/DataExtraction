@@ -16,17 +16,29 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from packages.api.dependencies import get_current_user, require_admin, UserPrincipal
-from packages.domain.email_enricher import email_enrichment_engine
-from packages.infrastructure.email_enrichment_repository import email_enrichment_repo
 from packages.infrastructure.structured_logger import get_structured_logger
-from packages.scrapers.web.email_crawler import AsyncEmailWebCrawler
 from packages.temporal.client import get_temporal_client
 from packages.temporal.config import QUEUE_EMAIL_ENRICHMENT
-try:
-    from packages.temporal.workflows.w7_email_enrichment_workflow import EmailEnrichmentWorkflow
-except ImportError:
-    class EmailEnrichmentWorkflow:  # type: ignore
-        run = "EmailEnrichmentWorkflow"
+
+_EMAIL_WORKFLOW_CACHE = None
+
+
+def _get_email_enrichment_workflow():
+    global _EMAIL_WORKFLOW_CACHE
+    if _EMAIL_WORKFLOW_CACHE is None:
+        try:
+            from packages.temporal.workflows.w7_email_enrichment_workflow import EmailEnrichmentWorkflow
+            _EMAIL_WORKFLOW_CACHE = EmailEnrichmentWorkflow
+        except ImportError:
+            class _FallbackEmailWorkflow:
+                run = "EmailEnrichmentWorkflow"
+            _EMAIL_WORKFLOW_CACHE = _FallbackEmailWorkflow
+    return _EMAIL_WORKFLOW_CACHE
+
+
+def _get_email_enrichment_repo():
+    from packages.infrastructure.email_enrichment_repository import email_enrichment_repo
+    return email_enrichment_repo
 
 logger = get_structured_logger("api.enrichment_router")
 
@@ -88,7 +100,7 @@ async def trigger_email_enrichment_job(
     try:
         client = await get_temporal_client()
         handle = await client.start_workflow(
-            EmailEnrichmentWorkflow.run,
+            _get_email_enrichment_workflow().run,
             args=[config],
             id=wf_id,
             task_queue=QUEUE_EMAIL_ENRICHMENT,
@@ -118,7 +130,7 @@ async def get_email_enrichment_job(
     current_user: UserPrincipal = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Retrieves real-time execution status and progress for a specific enrichment job."""
-    job = email_enrichment_repo.get_job_by_id(job_id)
+    job = _get_email_enrichment_repo().get_job_by_id(job_id)
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -135,7 +147,7 @@ async def list_email_enrichment_jobs(
     current_user: UserPrincipal = Depends(get_current_user),
 ) -> List[Dict[str, Any]]:
     """Lists recent enrichment jobs with pagination and status filtering."""
-    return email_enrichment_repo.get_recent_jobs(
+    return _get_email_enrichment_repo().get_recent_jobs(
         limit=limit,
         offset=offset,
         status_filter=status_filter,
@@ -149,7 +161,7 @@ async def get_email_discovery_audit(
     current_user: UserPrincipal = Depends(get_current_user),
 ) -> List[Dict[str, Any]]:
     """Retrieves full crawl and SMTP handshake audit traces for a specific organization."""
-    return email_enrichment_repo.get_audit_for_company(company_id=company_id, limit=limit)
+    return _get_email_enrichment_repo().get_audit_for_company(company_id=company_id, limit=limit)
 
 
 @router.get("/email/results/{company_id}")
@@ -158,7 +170,7 @@ async def get_email_enrichment_result(
     current_user: UserPrincipal = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Retrieves latest consolidated email enrichment result for a company."""
-    result = email_enrichment_repo.get_enrichment_result_by_company_id(company_id=company_id)
+    result = _get_email_enrichment_repo().get_enrichment_result_by_company_id(company_id=company_id)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -181,6 +193,9 @@ async def probe_single_domain(
     url = payload.website_url or f"https://{domain}"
 
     try:
+        from packages.scrapers.web.email_crawler import AsyncEmailWebCrawler
+        from packages.domain.email_enricher import email_enrichment_engine
+
         crawler = AsyncEmailWebCrawler()
         crawl_results = await crawler.crawl_site(url)
 

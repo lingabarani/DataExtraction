@@ -29,9 +29,13 @@ from packages.infrastructure.opensearch_cdc_sync import opensearch_client
 
 DB_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 DB_PORT = int(os.getenv("POSTGRES_PORT", 5432))
-DB_USER = os.getenv("POSTGRES_USER", "postgres")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "7903")
+DB_USER = os.getenv("POSTGRES_USER", "dex_user")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
 DB_NAME = os.getenv("POSTGRES_DB", "dataextraction")
+
+if not DB_PASSWORD:
+    print("[ERROR] POSTGRES_PASSWORD environment variable is not set. Set it in .env or export it.")
+    sys.exit(1)
 
 
 def main():

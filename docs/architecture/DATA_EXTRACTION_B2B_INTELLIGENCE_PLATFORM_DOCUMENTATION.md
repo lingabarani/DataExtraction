@@ -906,7 +906,7 @@ The test harness provides 100% test coverage across all pipeline layers:
    - Master Production Blueprint (`docs/architecture/ENTERPRISE_SOLUTION_ARCHITECTURE.md`).
    - Master Project Specification (`docs/architecture/DATA_EXTRACTION_B2B_INTELLIGENCE_PLATFORM_DOCUMENTATION.md`).
 3. **API & Database Deliverables**:
-   - Interactive Swagger API Documentation (`http://localhost:3001/api/docs`).
+   - Interactive Swagger API Documentation (`http://localhost:8000/api/docs`).
    - Production SQL Migration scripts (`packages/infrastructure/migrations/`).
 4. **Operations & Runbooks**:
    - PowerShell CLI Manager (`manage.ps1`).

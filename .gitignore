@@ -76,6 +76,11 @@ temporal-data/
 # ── Build artifacts ───────────────────────────────────────────────────────────
 *.whl
 *.tar.gz
+*.exe
+bin/
+~$*
+test_render.png
+scratch/
 
 # ── Test & E2E Artifacts ──────────────────────────────────────────────────────
 playwright-report/

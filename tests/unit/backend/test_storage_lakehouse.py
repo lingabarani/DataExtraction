@@ -14,7 +14,12 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
-import pyarrow.parquet as pq
+try:
+    import pyarrow.parquet as pq
+    PYARROW_AVAILABLE = True
+except ImportError:
+    pq = None
+    PYARROW_AVAILABLE = False
 
 from packages.infrastructure.storage_lakehouse import (
     LakehouseObservationClient,
@@ -22,6 +27,7 @@ from packages.infrastructure.storage_lakehouse import (
 )
 
 
+@unittest.skipUnless(PYARROW_AVAILABLE, "pyarrow not installed in environment")
 class TestLakehouseObservationClient(unittest.TestCase):
 
     def setUp(self):

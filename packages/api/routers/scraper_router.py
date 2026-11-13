@@ -18,8 +18,15 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from api.deps import UserPrincipal, get_current_user
-from db_connector import get_connection, release_connection
+try:
+    from packages.api.dependencies import UserPrincipal, get_current_user
+except ImportError:
+    from packages.api.routers.deps import UserPrincipal, get_current_user  # type: ignore
+
+try:
+    from packages.infrastructure.db_connector import get_connection, release_connection
+except ImportError:
+    from db_connector import get_connection, release_connection  # type: ignore
 
 logger = logging.getLogger("oneextraction.scraper")
 

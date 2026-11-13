@@ -16,14 +16,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-_BOTA_DIR = Path(__file__).resolve().parent
-if str(_BOTA_DIR) not in sys.path:
-    sys.path.insert(0, str(_BOTA_DIR))
+# Resolve packages root for proper package imports
+_HERE = Path(__file__).resolve().parent
+_PACKAGES_ROOT = _HERE.parent.parent
+for _p in [_HERE, _PACKAGES_ROOT]:
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
-from config_manager import config_manager
-from db_connector import get_connection, release_connection, log_data_source, db_info
-from dead_letter_queue import enqueue_dead_letter
-from structured_logger import get_structured_logger
+try:
+    from packages.infrastructure.config_manager import config_manager
+    from packages.infrastructure.db_connector import get_connection, release_connection, log_data_source, db_info
+    from packages.infrastructure.dead_letter_queue import enqueue_dead_letter
+    from packages.infrastructure.structured_logger import get_structured_logger
+except ImportError:
+    from config_manager import config_manager  # type: ignore
+    from db_connector import get_connection, release_connection, log_data_source, db_info  # type: ignore
+    from dead_letter_queue import enqueue_dead_letter  # type: ignore
+    from structured_logger import get_structured_logger  # type: ignore
 
 logger = get_structured_logger("dataextraction.orchestrator")
 

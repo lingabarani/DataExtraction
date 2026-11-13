@@ -12,7 +12,9 @@ Enterprise API Gateway for Distributed Agent Sagas & Pipeline Telemetry:
 import asyncio
 import json
 import logging
+import os
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -21,19 +23,34 @@ from pydantic import BaseModel, Field
 from packages.api.dependencies import get_current_user, require_admin, UserPrincipal
 from packages.temporal.client import get_temporal_client, is_temporal_healthy, reset_temporal_client
 from packages.temporal.config import get_task_queues, QUEUE_REGISTRY
-try:
-    from packages.temporal.workflows.master_orchestrator import MasterOrchestrator
-except ImportError:
-    class MasterOrchestrator:  # type: ignore
-        run = "MasterOrchestrator"
-        get_status = "get_status"
-        pause = "pause"
-        resume = "resume"
-        cancel_phase = "cancel_phase"
+_MASTER_ORCHESTRATOR_CACHE = None
+
+
+def _get_master_orchestrator():
+    """Lazily import MasterOrchestrator to avoid 2-3s Temporal SDK load at API startup/reload."""
+    global _MASTER_ORCHESTRATOR_CACHE
+    if _MASTER_ORCHESTRATOR_CACHE is None:
+        try:
+            from packages.temporal.workflows.master_orchestrator import MasterOrchestrator
+            _MASTER_ORCHESTRATOR_CACHE = MasterOrchestrator
+        except ImportError:
+            class _FallbackMasterOrchestrator:
+                run = "MasterOrchestrator"
+                get_status = "get_status"
+                pause = "pause"
+                resume = "resume"
+                cancel_phase = "cancel_phase"
+            _MASTER_ORCHESTRATOR_CACHE = _FallbackMasterOrchestrator
+    return _MASTER_ORCHESTRATOR_CACHE
 
 logger = logging.getLogger("dataextraction.orchestration.router")
 
 router = APIRouter(prefix="/api/orchestration", tags=["Orchestration"])
+
+
+def now_ts() -> str:
+    """Returns ISO 8601 UTC timestamp string cleanly parsed by frontend Date objects."""
+    return datetime.now(timezone.utc).isoformat()
 
 # In-memory registry for local/testing direct saga execution tracking
 _ACTIVE_SAGAS: Dict[str, Dict[str, Any]] = {}
@@ -62,28 +79,177 @@ PHASE_ALIASES = {
     "POST_MASTER_OUTBOUND": "SEARCH_SYNC",
 }
 
+STAGE_METADATA: Dict[str, Dict[str, Any]] = {
+    "REGISTRY_INGESTION": {
+        "name": "Registry Harvester",
+        "agent": "Agent 1 (Registry Harvester)",
+        "agent_num": 1,
+        "queue": "registry-ingestion-queue",
+        "progress_pct": 15,
+        "metric_key": "organizations_processed",
+    },
+    "GEOSPATIAL_STANDARDIZATION": {
+        "name": "Geospatial & Domain Harvester",
+        "agent": "Agent 2 (Geospatial & Domain)",
+        "agent_num": 2,
+        "queue": "geospatial-domain-queue",
+        "progress_pct": 30,
+        "metric_key": "spatial_standardized",
+    },
+    "IDENTITY_RESOLUTION": {
+        "name": "Identity Resolution & Splink",
+        "agent": "Agent 3 (Identity Resolution)",
+        "agent_num": 3,
+        "queue": "identity-clustering-queue",
+        "progress_pct": 45,
+        "metric_key": "clusters_resolved",
+    },
+    "EMAIL_ENRICHMENT": {
+        "name": "5-Tier Email Verification",
+        "agent": "Agent 7 (Email Discovery & Verification)",
+        "agent_num": 7,
+        "queue": "email-enrichment-queue",
+        "progress_pct": 60,
+        "metric_key": "emails_verified",
+    },
+    "EXECUTIVE_DISCOVERY": {
+        "name": "Executive & Career Discovery",
+        "agent": "Agent 4 (Executive Discovery)",
+        "agent_num": 4,
+        "queue": "executive-contact-queue",
+        "progress_pct": 75,
+        "metric_key": "executives_identified",
+    },
+    "GOVERNANCE_CERTIFICATION": {
+        "name": "Governance & Bayesian Quality",
+        "agent": "Agent 5 (Governance & Bayesian Quality)",
+        "agent_num": 5,
+        "queue": "governance-quality-queue",
+        "progress_pct": 85,
+        "metric_key": "quality_score",
+    },
+    "PROMOTION_GATE": {
+        "name": "Promotion Gate",
+        "agent": "Promotion Gate (Master Vault)",
+        "agent_num": 5,
+        "queue": "governance-quality-queue",
+        "progress_pct": 95,
+        "metric_key": "master_records",
+    },
+    "POST_MASTER_OUTBOUND": {
+        "name": "CDC, Search & OneReach",
+        "agent": "Agent 6 (Persistence, CDC & OneReach)",
+        "agent_num": 6,
+        "queue": "search-persistence-queue",
+        "progress_pct": 100,
+        "metric_key": "search_documents_projected",
+    },
+    "COMPLETED": {
+        "name": "Master Saga Completed",
+        "agent": "SAGA MONITOR",
+        "agent_num": 0,
+        "queue": "nominal",
+        "progress_pct": 100,
+        "metric_key": "master_records",
+    },
+}
+
+
+def _normalize_saga_status_for_ui(status_payload: Dict[str, Any]) -> Dict[str, Any]:
+    phase = str(status_payload.get("phase", "REGISTRY_INGESTION")).upper()
+    meta = STAGE_METADATA.get(phase, STAGE_METADATA["REGISTRY_INGESTION"])
+    status_val = str(status_payload.get("status", "RUNNING")).upper()
+    metrics = dict(status_payload.get("metrics") or {})
+    results = dict(status_payload.get("results") or {})
+    logs = list(status_payload.get("logs") or [])
+
+    metric_val = metrics.get(meta["metric_key"], 0)
+    records_processed = metric_val if isinstance(metric_val, int) else 0
+
+    stages_dict = {}
+    phase_order = list(STAGE_METADATA.keys())
+    current_idx = phase_order.index(phase) if phase in phase_order else 0
+
+    for idx, (p_key, p_meta) in enumerate(STAGE_METADATA.items()):
+        if p_key == "COMPLETED":
+            continue
+        stage_res = results.get(p_key) or results.get(p_key.lower()) or {}
+        explicit_status = str(stage_res.get("status", "")).upper()
+        if explicit_status in ("COMPLETED", "FAILED", "SKIPPED", "RUNNING", "PAUSED", "COMPLETED_WITH_ERRORS"):
+            st = "COMPLETED" if explicit_status == "COMPLETED_WITH_ERRORS" else explicit_status
+        elif status_val == "COMPLETED" or idx < current_idx:
+            st = "COMPLETED"
+        elif idx == current_idx and status_val == "RUNNING":
+            st = "RUNNING"
+        elif idx == current_idx and status_val == "PAUSED":
+            st = "PAUSED"
+        elif status_val == "FAILED" and idx == current_idx:
+            st = "FAILED"
+        else:
+            st = "PENDING"
+
+        p_metric = metrics.get(p_meta["metric_key"], 0)
+        stage_dur = stage_res.get("duration_seconds") or stage_res.get("duration") or 0.0
+        if not stage_dur and st == "RUNNING":
+            try:
+                stage_dur = round(time.time() - float(status_payload.get("started_at", time.time())), 1)
+            except Exception:
+                stage_dur = 0.0
+
+        stages_dict[p_key] = {
+            "id": p_key,
+            "name": p_meta["name"],
+            "agent_num": p_meta["agent_num"],
+            "status": st,
+            "duration_seconds": max(float(stage_dur), 0.0),
+            "records_in": p_metric,
+            "records_out": p_metric,
+        }
+
+    progress_pct = 100 if status_val == "COMPLETED" else meta["progress_pct"]
+
+    return {
+        **status_payload,
+        "workflow_id": status_payload.get("workflow_id", ""),
+        "run_id": status_payload.get("run_id", ""),
+        "status": status_val,
+        "current_stage": phase,
+        "current_agent": meta["agent"],
+        "current_queue": meta["queue"],
+        "progress_pct": progress_pct,
+        "records_processed": records_processed,
+        "records_waiting": 0,
+        "failures_count": 1 if status_val == "FAILED" else 0,
+        "retries_count": 0,
+        "stages": stages_dict,
+        "log": logs[-1] if logs else None,
+        "logs": logs,
+        "metrics": metrics,
+        "results": results,
+    }
+
 
 def _get_live_database_metrics() -> Dict[str, int]:
     """
     Queries live real counts from PostgreSQL across all MDM layers.
-    Falls back to last-known certified baseline (from actual DB population)
-    only when the database port is unreachable — never uses synthetic values.
+    Defaults to 0 when tables are empty or database is unreachable —
+    never injects synthetic non-zero mock values.
     """
     counts = {
-        "staging_companies": 200147,
-        "master_orgs": 210838,
-        "geo_localized": 10691,
-        "clusters_resolved": 52661,
-        "master_persons": 64759,
-        "career_edges": 79601,
-        "verified_emails": 57160,
-        "search_projections": 210838,
+        "staging_companies": 0,
+        "master_orgs": 0,
+        "geo_localized": 0,
+        "clusters_resolved": 0,
+        "master_persons": 0,
+        "career_edges": 0,
+        "verified_emails": 0,
+        "search_projections": 0,
         # Real count from onereach_delivery_log; 0 until actually delivered
         "onereach_delivered": 0,
         # Working-layer counts for queue telemetry
-        "working_orgs": 52661,
-        "working_emails": 57160,
-        "working_persons": 64759,
+        "working_orgs": 0,
+        "working_emails": 0,
+        "working_persons": 0,
     }
     conn = None
     try:
@@ -107,7 +273,10 @@ def _get_live_database_metrics() -> Dict[str, int]:
                 except Exception:
                     pass
                 try:
-                    cur.execute("SELECT count(*) FROM master_dataextraction.organizations WHERE logo_url IS NOT NULL;")
+                    cur.execute(
+                        "SELECT count(*) FROM staging_dataextraction.staging_companies "
+                        "WHERE source IN ('GOOGLE_MAPS', 'OPENSTREETMAP');"
+                    )
                     counts["geo_localized"] = cur.fetchone()[0]
                 except Exception:
                     pass
@@ -176,7 +345,7 @@ async def _run_direct_saga(wf_id: str, config: Dict[str, Any]) -> None:
     _SAGA_LOCKS[wf_id] = resume_event
 
     def now_ts() -> str:
-        return datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3]
+        return datetime.now(timezone.utc).isoformat()
 
     initial_logs = [
         {
@@ -406,12 +575,17 @@ async def get_orchestrator_health(
 ) -> Dict[str, Any]:
     """Exposes cluster health and active orchestrator engine mode."""
     temporal_online = await is_temporal_healthy(timeout_seconds=1.5)
+    engine_name = "TEMPORAL_DURABLE" if temporal_online else "DIRECT_ASYNC_DEV"
+    cluster_status = "ONLINE" if temporal_online else "OFFLINE"
     return {
         "status": "ONLINE" if temporal_online else "DEGRADED_LOCAL",
         "temporal_connected": temporal_online,
-        "default_engine": "TEMPORAL_DURABLE" if temporal_online else "DIRECT_ASYNC_DEV",
+        "temporal_cluster_status": cluster_status,
+        "default_engine": engine_name,
+        "orchestration_engine": engine_name,
         "active_sagas_count": len(_ACTIVE_SAGAS),
         "task_queues": get_task_queues(),
+        "timestamp": now_ts(),
     }
 
 
@@ -433,11 +607,28 @@ async def start_master_saga(
     merged_config.setdefault("sources", active_sources)
     merged_config.setdefault("execution_mode", payload.execution_mode)
 
+    try:
+        from packages.infrastructure.config_manager import config_manager
+        reg_cfg = config_manager.get_registry_config()
+        merged_config.setdefault(
+            "registry_defaults",
+            {
+                "sources": reg_cfg.get("enabled_sources", []),
+                "sec_default_mode": reg_cfg.get("sec_default_mode", "tickers"),
+                "fdic_default_source": reg_cfg.get("fdic_default_source", "both"),
+            },
+        )
+        geo_cfg = config_manager.get_geospatial_config()
+        merged_config.setdefault("geospatial_defaults", geo_cfg)
+    except Exception as cfg_exc:
+        logger.debug("Using workflow built-in registry/geospatial defaults: %s", cfg_exc)
+
     # Attempt Temporal cluster first
     try:
         client = await get_temporal_client(timeout_seconds=2.0)
+        master_orch = _get_master_orchestrator()
         handle = await client.start_workflow(
-            MasterOrchestrator.run,
+            master_orch.run,
             args=[merged_config],
             id=wf_id,
             task_queue=QUEUE_REGISTRY,
@@ -452,17 +643,18 @@ async def start_master_saga(
             "config": merged_config,
         }
     except Exception as exc:
-        logger.info("Temporal cluster offline (%s); launching Direct Async Agent Saga: %s", exc, wf_id)
+        logger.error("Temporal durable cluster unavailable on port 7233: %s", exc)
         reset_temporal_client()
-        asyncio.create_task(_run_direct_saga(wf_id, merged_config))
-        return {
-            "status": "ACCEPTED",
-            "workflow_id": wf_id,
-            "run_id": f"direct-{wf_id}",
-            "engine": "DIRECT_ASYNC_DEV",
-            "message": "Master 7-Agent saga execution initiated in Direct Mode",
-            "config": merged_config,
-        }
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "TEMPORAL_CLUSTER_UNAVAILABLE",
+                "message": "Temporal durable cluster is offline or unreachable on port 7233. Workflow start rejected to prevent unverified mock simulation.",
+                "hint": "Start the Temporal cluster via 'temporal server start-dev' or 'docker compose -f infra/docker-compose.temporal.yml up -d' and verify worker daemons are polling queues.",
+                "target_host": os.getenv("TEMPORAL_HOST", "localhost:7233"),
+                "exception": str(exc),
+            },
+        )
 
 
 @router.get("/header/status")
@@ -638,6 +830,28 @@ async def get_orchestration_queues_status(
     }
 
 
+@router.get("/active/status")
+async def get_active_saga_status(
+    current_user: UserPrincipal = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Retrieves the most recent active or completed saga normalized for the frontend command center."""
+    if _ACTIVE_SAGAS:
+        active_sagas = [s for s in _ACTIVE_SAGAS.values() if s.get("status") in ("RUNNING", "PAUSED")]
+        target = active_sagas[-1] if active_sagas else list(_ACTIVE_SAGAS.values())[-1]
+        return _normalize_saga_status_for_ui(target)
+
+    return {
+        "workflow_id": None,
+        "status": "IDLE",
+        "current_stage": "STANDBY",
+        "current_agent": "Standby Engine",
+        "progress_pct": 0,
+        "records_processed": 0,
+        "stages": {},
+        "logs": [],
+    }
+
+
 @router.get("/{workflow_id}/status")
 async def get_saga_status(
     workflow_id: str,
@@ -646,14 +860,14 @@ async def get_saga_status(
     """Inspect real-time saga progress, active phase, and completed metrics."""
     # Check active local runner first
     if workflow_id in _ACTIVE_SAGAS:
-        return {"workflow_id": workflow_id, "status": _ACTIVE_SAGAS[workflow_id]}
+        return _normalize_saga_status_for_ui(_ACTIVE_SAGAS[workflow_id])
 
     # Attempt Temporal query
     try:
         client = await get_temporal_client(timeout_seconds=2.0)
         handle = client.get_workflow_handle(workflow_id)
-        saga_status = await handle.query(MasterOrchestrator.get_status)
-        return {"workflow_id": workflow_id, "status": saga_status}
+        saga_status = await handle.query(_get_master_orchestrator().get_status)
+        return _normalize_saga_status_for_ui(saga_status)
     except Exception as exc:
         # Return standard 404 so frontend gracefully renders Standby state
         raise HTTPException(
@@ -692,19 +906,20 @@ async def stream_saga_status(
                 try:
                     client = await get_temporal_client(timeout_seconds=2.0)
                     handle = client.get_workflow_handle(workflow_id)
-                    current_status = await handle.query(MasterOrchestrator.get_status)
+                    current_status = await handle.query(_get_master_orchestrator().get_status)
                 except Exception as exc:
                     logger.debug("Saga query in SSE stream: %s", exc)
 
             if current_status:
-                status_str = json.dumps(current_status, default=str)
+                normalized = _normalize_saga_status_for_ui(current_status)
+                status_str = json.dumps(normalized, default=str)
                 # Emit update if state changed or heartbeat ping
                 if status_str != last_status_str or ping_ticks >= 7:
                     last_status_str = status_str
                     ping_ticks = 0
                     yield f"event: telemetry\ndata: {status_str}\n\n"
 
-                state_val = str(current_status.get("status", "")).upper()
+                state_val = str(normalized.get("status", "")).upper()
                 if state_val in ("COMPLETED", "FAILED", "CANCELLED"):
                     yield f"event: done\ndata: {json.dumps({'workflow_id': workflow_id, 'final_status': state_val})}\n\n"
                     break
@@ -755,7 +970,7 @@ async def signal_saga(
             if lock:
                 lock.set()
             saga["logs"].append({
-                "timestamp": time.strftime("%H:%M:%S"),
+                "timestamp": now_ts(),
                 "agent": "SAGA MONITOR",
                 "message": f"Operator triggered RETRY for phase: {target}",
                 "type": "info",
@@ -767,7 +982,7 @@ async def signal_saga(
             if lock:
                 lock.set()
             saga["logs"].append({
-                "timestamp": time.strftime("%H:%M:%S"),
+                "timestamp": now_ts(),
                 "agent": "SAGA MONITOR",
                 "message": "Operator triggered full saga RESTART from Phase 1 (Registry Harvester).",
                 "type": "info",
@@ -785,7 +1000,7 @@ async def signal_saga(
             if lock:
                 lock.set()
             saga["logs"].append({
-                "timestamp": time.strftime("%H:%M:%S"),
+                "timestamp": now_ts(),
                 "agent": "EMERGENCY CONTROLLER",
                 "message": "CRITICAL: Operator initiated EMERGENCY HALT. Aborting all in-flight activities and isolating state.",
                 "type": "error",
@@ -797,12 +1012,13 @@ async def signal_saga(
         client = await get_temporal_client(timeout_seconds=2.0)
         handle = client.get_workflow_handle(workflow_id)
 
+        master_orch = _get_master_orchestrator()
         if sig == "pause":
-            await handle.signal(MasterOrchestrator.pause)
+            await handle.signal(master_orch.pause)
         elif sig == "resume":
-            await handle.signal(MasterOrchestrator.resume)
+            await handle.signal(master_orch.resume)
         elif sig in ("cancel_phase", "stop_workflow", "stop"):
-            await handle.signal(MasterOrchestrator.cancel_phase, payload.phase or "ALL")
+            await handle.signal(master_orch.cancel_phase, payload.phase or "ALL")
         elif sig in ("retry_phase", "restart_workflow", "emergency_halt"):
             # Signal via custom signal name
             await handle.signal(sig, payload.phase or "ALL")

@@ -32,7 +32,7 @@ class EmailEnrichmentRepository:
         job_id = str(uuid.uuid4())
         meta_json = json.dumps(metadata or {})
         query = """
-            INSERT INTO email_enrichment_jobs (
+            INSERT INTO staging_dataextraction.email_enrichment_jobs (
                 id, job_type, status, target_table, batch_size, max_concurrency,
                 execution_metadata, started_at
             ) VALUES (
@@ -53,7 +53,7 @@ class EmailEnrichmentRepository:
     ) -> None:
         """Atomically increments job progress counters and updates keyset checkpoint."""
         query = """
-            UPDATE email_enrichment_jobs
+            UPDATE staging_dataextraction.email_enrichment_jobs
             SET processed_records = processed_records + %s,
                 successful_discoveries = successful_discoveries + %s,
                 failed_records = failed_records + %s,
@@ -67,7 +67,7 @@ class EmailEnrichmentRepository:
         """Marks a job as COMPLETED or FAILED."""
         status = "FAILED" if error_message else "COMPLETED"
         query = """
-            UPDATE email_enrichment_jobs
+            UPDATE staging_dataextraction.email_enrichment_jobs
             SET status = %s,
                 error_message = %s,
                 completed_at = NOW()
@@ -148,9 +148,9 @@ class EmailEnrichmentRepository:
 
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 1. Upsert into email_enrichment_results (if table exists)
+                # 1. Upsert into staging_dataextraction.email_enrichment_results
                 upsert_query = """
-                    INSERT INTO email_enrichment_results (
+                    INSERT INTO staging_dataextraction.email_enrichment_results (
                         job_id, company_id, domain, primary_email, all_emails,
                         discovery_source, deliverability_status, confidence_score,
                         is_catchall, tech_stack, cms_detected, ssl_valid,
@@ -160,7 +160,7 @@ class EmailEnrichmentRepository:
                     )
                     ON CONFLICT (company_id) DO UPDATE SET
                         job_id = EXCLUDED.job_id,
-                        primary_email = COALESCE(NULLIF(EXCLUDED.primary_email, ''), email_enrichment_results.primary_email),
+                        primary_email = COALESCE(NULLIF(EXCLUDED.primary_email, ''), staging_dataextraction.email_enrichment_results.primary_email),
                         all_emails = EXCLUDED.all_emails,
                         discovery_source = EXCLUDED.discovery_source,
                         deliverability_status = EXCLUDED.deliverability_status,
@@ -171,7 +171,7 @@ class EmailEnrichmentRepository:
                         ssl_valid = EXCLUDED.ssl_valid,
                         site_speed_ms = EXCLUDED.site_speed_ms,
                         http_status_code = EXCLUDED.http_status_code,
-                        enrichment_attempts = email_enrichment_results.enrichment_attempts + 1,
+                        enrichment_attempts = staging_dataextraction.email_enrichment_results.enrichment_attempts + 1,
                         updated_at = NOW()
                 """
                 try:
@@ -205,6 +205,7 @@ class EmailEnrichmentRepository:
                     score_for_em = int(confidence_score) if clean_em == (primary_email or "").lower() else 50
 
                     try:
+                        cur.execute("SAVEPOINT sp_work_em;")
                         cur.execute(
                             """
                             INSERT INTO staging_dataextraction.working_emails (
@@ -224,11 +225,14 @@ class EmailEnrichmentRepository:
                                 discovery_source,
                             )
                         )
+                        cur.execute("RELEASE SAVEPOINT sp_work_em;")
                     except Exception as email_err:
+                        cur.execute("ROLLBACK TO SAVEPOINT sp_work_em;")
                         logger.debug("Working emails insert notice: %s", email_err)
 
                 # 3. Sprint 2: Update staging_dataextraction.working_organizations
                 try:
+                    cur.execute("SAVEPOINT sp_work_org;")
                     cur.execute(
                         """
                         UPDATE staging_dataextraction.working_organizations
@@ -238,7 +242,9 @@ class EmailEnrichmentRepository:
                         """,
                         (company_id,)
                     )
+                    cur.execute("RELEASE SAVEPOINT sp_work_org;")
                 except Exception as org_err:
+                    cur.execute("ROLLBACK TO SAVEPOINT sp_work_org;")
                     logger.debug("Working organizations update notice: %s", org_err)
 
                 # 4. Legacy compatibility update on companies view/table if it exists
@@ -278,7 +284,7 @@ class EmailEnrichmentRepository:
     ) -> None:
         """Appends a single low-level audit trace for an HTTP or SMTP probe."""
         query = """
-            INSERT INTO email_discovery_audit (
+            INSERT INTO staging_dataextraction.email_discovery_audit (
                 job_id, company_id, target_domain, probed_email, probe_type,
                 mx_host, smtp_code, smtp_response, duration_ms, is_success,
                 error_trace, created_at
@@ -303,7 +309,7 @@ class EmailEnrichmentRepository:
             SELECT id, job_type, status, target_table, batch_size, max_concurrency,
                    total_records, processed_records, successful_discoveries, failed_records,
                    last_processed_id, started_at, completed_at, error_message, execution_metadata
-            FROM email_enrichment_jobs
+            FROM staging_dataextraction.email_enrichment_jobs
             WHERE id = %s
         """
         rows = execute_query(query, (job_id,))
@@ -336,7 +342,7 @@ class EmailEnrichmentRepository:
                 SELECT id, job_type, status, target_table, batch_size,
                        processed_records, successful_discoveries, failed_records,
                        started_at, completed_at, error_message
-                FROM email_enrichment_jobs
+                FROM staging_dataextraction.email_enrichment_jobs
                 WHERE status = %s
                 ORDER BY started_at DESC
                 LIMIT %s OFFSET %s
@@ -347,7 +353,7 @@ class EmailEnrichmentRepository:
                 SELECT id, job_type, status, target_table, batch_size,
                        processed_records, successful_discoveries, failed_records,
                        started_at, completed_at, error_message
-                FROM email_enrichment_jobs
+                FROM staging_dataextraction.email_enrichment_jobs
                 ORDER BY started_at DESC
                 LIMIT %s OFFSET %s
             """
@@ -377,7 +383,7 @@ class EmailEnrichmentRepository:
             SELECT id, job_id, company_id, target_domain, probed_email, probe_type,
                    mx_host, smtp_code, smtp_response, duration_ms, is_success,
                    error_trace, created_at
-            FROM email_discovery_audit
+            FROM staging_dataextraction.email_discovery_audit
             WHERE company_id = %s
             ORDER BY created_at DESC
             LIMIT %s
@@ -410,7 +416,7 @@ class EmailEnrichmentRepository:
                    discovery_source, deliverability_status, confidence_score,
                    is_catchall, tech_stack, cms_detected, ssl_valid,
                    site_speed_ms, http_status_code, updated_at
-            FROM email_enrichment_results
+            FROM staging_dataextraction.email_enrichment_results
             WHERE company_id = %s
         """
         rows = execute_query(query, (company_id,))

@@ -69,9 +69,13 @@ class Agent3IdentityWorkflow:
 
     @workflow.query
     def get_status(self) -> Dict[str, Any]:
+        try:
+            wf_id = workflow.info().workflow_id
+        except Exception:
+            wf_id = "test-env"
         return {
             "agent": "Agent 3 - Identity Resolution & Deduplication",
-            "workflow_id": workflow.info().workflow_id,
+            "workflow_id": wf_id,
             "status": self._status,
             "step": self._step,
             "paused": self._paused,
@@ -197,10 +201,35 @@ class Agent3IdentityWorkflow:
             self._results["unmerges_executed"] = unmerge_results
             self._unmerge_requests.clear()
 
-        self._step = "COMPLETED"
-        self._status = "COMPLETED"
+        # ── Final Outcome Computation ──────────────────────────────────────────
+        dedup_info = self._results.get("deduplication", {})
+        norm_info = self._results.get("normalization", {})
+        pop_info = self._results.get("populate_working_layer", {})
+
+        clusters_count = (
+            dedup_info.get("clusters_resolved")
+            or dedup_info.get("merged")
+            or dedup_info.get("splink_matches")
+            or len(self._results.get("cluster_membership", []))
+            or 0
+        )
+
+        step_statuses = [
+            v.get("status") for v in self._results.values() if isinstance(v, dict) and "status" in v
+        ]
+        if step_statuses and all(s == "FAILED" for s in step_statuses):
+            self._status = "FAILED"
+            self._step = "FAILED"
+        else:
+            self._status = "COMPLETED"
+            self._step = "COMPLETED"
+
         return {
             "status": self._status,
+            "clusters_resolved": clusters_count,
+            "records_normalized": norm_info.get("normalized", 0),
+            "records_deduped": dedup_info.get("merged", 0) + dedup_info.get("splink_matches", 0),
+            "organizations_staged": pop_info.get("populated", 0),
             "results": self._results,
         }
 

@@ -51,46 +51,18 @@ def _get_config_val(key: str, default: Any) -> Any:
 # Canonical Master Vault Baseline Configuration
 def _get_enterprise_baseline_stats() -> Dict[str, Any]:
     return {
-        "us_total": int(_get_config_val("DEFAULT_US_GOLDEN_COUNT", 210450)),
-        "mx_total": int(_get_config_val("DEFAULT_MX_GOLDEN_COUNT", 50208)),
-        "us_with_phone": int(_get_config_val("DEFAULT_US_PHONE_COUNT", 198240)),
-        "us_with_email": int(_get_config_val("DEFAULT_US_EMAIL_COUNT", 185196)),
-        "us_verified_email": int(_get_config_val("DEFAULT_US_VERIFIED_EMAIL_COUNT", 168360)),
-        "mx_with_phone": int(_get_config_val("DEFAULT_MX_PHONE_COUNT", 42676)),
-        "mx_with_email": int(_get_config_val("DEFAULT_MX_EMAIL_COUNT", 38158)),
-        "mx_verified_email": int(_get_config_val("DEFAULT_MX_VERIFIED_EMAIL_COUNT", 32635)),
-        "by_source": [
-            {"source": "SEC_EDGAR", "count": 68420, "avg_score": 96.4},
-            {"source": "CMS_NPI", "count": 52180, "avg_score": 98.1},
-            {"source": "FDIC", "count": 34920, "avg_score": 99.2},
-            {"source": "SAM_GOV", "count": 28140, "avg_score": 95.0},
-            {"source": "OPENSTREETMAP", "count": 15640, "avg_score": 91.8},
-            {"source": "GOOGLE_MAPS", "count": 11150, "avg_score": 92.5},
-        ],
-        "by_industry": [
-            {"industry": "Healthcare & Life Sciences", "count": 52180},
-            {"industry": "Financial Services & Banking", "count": 44520},
-            {"industry": "Professional & Business Services", "count": 38910},
-            {"industry": "Manufacturing & Industrial", "count": 31450},
-            {"industry": "Technology, Cloud & Software", "count": 24190},
-            {"industry": "Construction & Real Estate", "count": 19200},
-        ],
-        "by_seniority": [
-            {"seniority": "C-Level Executive", "count": 64759},
-            {"seniority": "Vice President", "count": 48210},
-            {"seniority": "Director", "count": 89450},
-            {"seniority": "Senior Manager", "count": 72180},
-            {"seniority": "Staff Specialist", "count": 65501},
-        ],
-        "by_state": [
-            {"state_code": "CA", "count": 38420},
-            {"state_code": "TX", "count": 28910},
-            {"state_code": "NY", "count": 24560},
-            {"state_code": "FL", "count": 21340},
-            {"state_code": "IL", "count": 16820},
-            {"state_code": "PA", "count": 13940},
-            {"state_code": "OH", "count": 11250},
-        ],
+        "us_total": int(_get_config_val("DEFAULT_US_GOLDEN_COUNT", 0)),
+        "mx_total": int(_get_config_val("DEFAULT_MX_GOLDEN_COUNT", 0)),
+        "us_with_phone": int(_get_config_val("DEFAULT_US_PHONE_COUNT", 0)),
+        "us_with_email": int(_get_config_val("DEFAULT_US_EMAIL_COUNT", 0)),
+        "us_verified_email": int(_get_config_val("DEFAULT_US_VERIFIED_EMAIL_COUNT", 0)),
+        "mx_with_phone": int(_get_config_val("DEFAULT_MX_PHONE_COUNT", 0)),
+        "mx_with_email": int(_get_config_val("DEFAULT_MX_EMAIL_COUNT", 0)),
+        "mx_verified_email": int(_get_config_val("DEFAULT_MX_VERIFIED_EMAIL_COUNT", 0)),
+        "by_source": [],
+        "by_industry": [],
+        "by_seniority": [],
+        "by_state": [],
     }
 
 

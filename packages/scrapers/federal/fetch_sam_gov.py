@@ -22,17 +22,20 @@ from pathlib import Path
 
 import requests
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.db_connector import get_connection, release_connection, db_info
     from packages.domain.contact_validator import validate_contact, lead_score_from_contact
-    from packages.infrastructure.config_manager import get_secret
+    from packages.infrastructure.config_manager import config_manager, get_secret
     from packages.infrastructure.http_client import get_http_client
     from packages.domain.geo_validator import format_postal_code
 except ImportError:
-    from db_connector import get_connection, db_info
+    from db_connector import get_connection, release_connection, db_info
     from contact_validator import validate_contact, lead_score_from_contact
-    from config_manager import get_secret
+    from config_manager import config_manager, get_secret
     from http_client import get_http_client
     from geo_validator import format_postal_code
 
@@ -61,9 +64,9 @@ def _upsert(cur, record: dict):
     upsert_staging_record(cur, record, source="SAM_GOV")
 
 
-def _fetch_entities(naics: str, page_token: str = None) -> dict:
+def _fetch_entities(naics: str, page_token: str = None, api_key: str = "") -> dict:
     params = {
-        "api_key":             SAM_API_KEY,
+        "api_key":             api_key or SAM_API_KEY,
         "samRegistered":       "Yes",
         "primaryNaics":        naics,
         "registrationStatus":  "A",
@@ -73,23 +76,19 @@ def _fetch_entities(naics: str, page_token: str = None) -> dict:
     if page_token:
         params["page"] = page_token
 
-    try:
-        client = get_http_client()
-        r = client.get(SAM_BASE, params=params,
-                       headers={"Accept": "application/json"},
-                       timeout=30)
-        if r.status_code == 200:
-            return r.json()
-        elif r.status_code == 401:
-            print(f"\n  [!] SAM.gov 401 UNAUTHORIZED — key not active yet")
-        elif r.status_code == 429:
-            print(f"\n  [!] SAM.gov rate limited — backing off...")
-        else:
-            print(f"\n  [!] SAM.gov HTTP {r.status_code}: {r.text[:100]}")
-    except requests.exceptions.Timeout:
-        print(f"\n  [!] SAM.gov timeout — server slow...")
-    except Exception as e:
-        print(f"\n  [!] SAM.gov error: {e}")
+    client = get_http_client()
+    r = client.get(SAM_BASE, params=params,
+                   headers={"Accept": "application/json"},
+                   timeout=30)
+    if r.status_code == 200:
+        return r.json()
+    if r.status_code in (401, 403):
+        raise RuntimeError(f"SAM.gov {r.status_code} UNAUTHORIZED/FORBIDDEN: check SAM_GOV_API_KEY")
+    if r.status_code == 429:
+        print(f"\n  [!] SAM.gov rate limited — backing off...")
+        time.sleep(2.0)
+        return {}
+    print(f"\n  [!] SAM.gov HTTP {r.status_code}: {r.text[:150]}")
     return {}
 
 
@@ -203,18 +202,31 @@ def _make_lead(entity: dict) -> dict | None:
     }
 
 
-def run(limit: int = 0, dry_run: bool = False):
+def run(limit: int = 0, dry_run: bool = False, mode: str = "incremental"):
+    sam_api_key = SAM_API_KEY or get_secret("SAM_GOV_API_KEY", "")
     print(f"\n{'='*60}")
     print(f"  SAM.gov Federal Contractor Scraper")
     print(f"{'='*60}")
     print(f"  DB      : {db_info()}")
-    print(f"  Key     : {SAM_API_KEY[:20]}..." if SAM_API_KEY else "  Key     : NOT SET")
+    print(f"  Mode    : {mode}")
+    print(f"  Key     : {sam_api_key[:20]}..." if sam_api_key else "  Key     : NOT SET")
     print(f"  Limit   : {limit or 'unlimited'}")
     print(f"  Dry run : {dry_run}")
     print(f"{'='*60}\n")
 
-    if not SAM_API_KEY:
+    if not sam_api_key:
         print("  [!] SAM_GOV_API_KEY not set in .env — skipping")
+        print(
+            "ACTIVITY_RESULT_JSON:" + json.dumps({
+                "status": "SKIPPED_UNCONFIGURED",
+                "source": "SAM_GOV",
+                "inserted_count": 0,
+                "error_count": 0,
+                "reason": "SAM_GOV_API_KEY not configured",
+                "dry_run": dry_run,
+            }),
+            flush=True,
+        )
         return 0
 
     conn = get_connection() if not dry_run else None
@@ -223,82 +235,112 @@ def run(limit: int = 0, dry_run: bool = False):
     inserted = errors = 0
     seen     = set()
     start    = datetime.now(timezone.utc)
+    db_count = 0
 
-    for naics in NAICS_TARGETS:
-        if limit and inserted >= limit:
-            break
-
-        page_token = None
-        page_num   = 0
-
-        while True:
+    try:
+        for naics in NAICS_TARGETS:
             if limit and inserted >= limit:
                 break
 
-            data     = _fetch_entities(naics, page_token)
-            entities = data.get("entityData", [])
-            if not entities:
-                break
+            page_token = None
+            page_num   = 0
 
-            for entity in entities:
+            while True:
                 if limit and inserted >= limit:
                     break
-                reg = entity.get("registration", {}) or {}
-                uei = reg.get("ueiSAM","")
-                if uei in seen: continue
-                seen.add(uei)
 
-                lead = _make_lead(entity)
-                if not lead: continue
+                data     = _fetch_entities(naics, page_token, api_key=sam_api_key)
+                entities = data.get("entityData", [])
+                if not entities:
+                    break
 
-                try:
-                    if not dry_run:
-                        _upsert(cur, lead)
-                    inserted += 1
-                    if dry_run and inserted <= 3:
-                        print(f"  [DRY SAM] {lead['company_name']} | "
-                              f"email={lead.get('email')} | phone={lead.get('phone')}")
-                except Exception as e:
-                    errors += 1
-                    if conn: conn.rollback()
+                for entity in entities:
+                    if limit and inserted >= limit:
+                        break
+                    reg = entity.get("registration", {}) or {}
+                    uei = reg.get("ueiSAM","")
+                    if uei in seen:
+                        continue
+                    seen.add(uei)
 
-            if not dry_run and inserted % BATCH_COMMIT == 0:
-                conn.commit()
-                elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-                rate = inserted / elapsed if elapsed else 0
-                print(f"\r  SAM naics={naics} | inserted={inserted:,} | "
-                      f"{rate:.0f}/s", end="", flush=True)
+                    lead = _make_lead(entity)
+                    if not lead:
+                        continue
 
-            # Pagination
-            links = data.get("links", {})
-            next_url = links.get("nextPage")
-            if not next_url or page_num >= 50:
-                break
-            page_num  += 1
-            page_token = page_num
-            time.sleep(0.3)
+                    try:
+                        if not dry_run:
+                            _upsert(cur, lead)
+                        inserted += 1
+                        if dry_run and inserted <= 3:
+                            print(f"  [DRY SAM] {lead['company_name']} | "
+                                  f"email={lead.get('email')} | phone={lead.get('phone')}")
+                    except Exception as e:
+                        errors += 1
+                        if errors <= 5:
+                            print(f"\n  [ERR SAM] {lead.get('company_name')}: {e}")
+                        if conn:
+                            conn.rollback()
 
-    if not dry_run and conn:
-        conn.commit()
-        cur.execute("SELECT COUNT(*) FROM us_leads WHERE api_source='SAM_GOV'")
-        db_count = cur.fetchone()[0]
-        conn.close()
-    else:
-        db_count = inserted
+                if not dry_run and inserted % BATCH_COMMIT == 0 and inserted > 0:
+                    conn.commit()
+                    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+                    rate = inserted / elapsed if elapsed else 0
+                    print(f"\r  SAM naics={naics} | inserted={inserted:,} | "
+                          f"{rate:.0f}/s", end="", flush=True)
+
+                # Pagination
+                links = data.get("links", {})
+                next_url = links.get("nextPage")
+                if not next_url or page_num >= 50:
+                    break
+                page_num  += 1
+                page_token = page_num
+                time.sleep(0.3)
+
+        total_attempted = inserted + errors
+        threshold = float(config_manager.get_registry_config().get("error_threshold_pct", 25.0))
+        if total_attempted >= 20 and (errors / total_attempted * 100.0) > threshold:
+            raise RuntimeError(
+                f"SAM.gov error rate {(errors / total_attempted * 100.0):.1f}% exceeded threshold {threshold}%"
+            )
+
+        if not dry_run and conn:
+            conn.commit()
+            cur.execute("SELECT COUNT(*) FROM staging_dataextraction.staging_companies WHERE source='SAM_GOV'")
+            db_count = cur.fetchone()[0]
+        else:
+            db_count = inserted
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            release_connection(conn)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n\n  {'─'*58}")
     print(f"  SAM.gov complete in {elapsed:.0f}s")
     print(f"  Inserted : {inserted:,}")
     print(f"  Errors   : {errors}")
-    print(f"  DB total : {db_count:,} SAM.gov records in us_leads")
+    print(f"  DB total : {db_count:,} SAM.gov records in staging_companies")
     print(f"  {'─'*58}\n")
+    print(
+        "ACTIVITY_RESULT_JSON:" + json.dumps({
+            "status": "SUCCESS",
+            "source": "SAM_GOV",
+            "inserted_count": inserted,
+            "error_count": errors,
+            "db_total": db_count,
+            "dry_run": dry_run,
+        }),
+        flush=True,
+    )
     return inserted
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode",    default="incremental", choices=["incremental", "full"])
     parser.add_argument("--limit",   type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    run(limit=args.limit, dry_run=args.dry_run)
+    run(limit=args.limit, dry_run=args.dry_run, mode=args.mode)

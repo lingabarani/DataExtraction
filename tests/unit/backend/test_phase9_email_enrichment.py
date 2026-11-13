@@ -379,7 +379,7 @@ class TestRepositoryAndConfig(unittest.TestCase):
 
     def test_config_manager_email_enrichment_defaults(self):
         cfg = config_manager.get_email_enrichment_config()
-        self.assertEqual(cfg["rate_limit_per_second"], 50.0)
+        self.assertEqual(cfg["rate_limit_per_second"], 20.0)
         self.assertEqual(cfg["per_host_limit"], 2)
         self.assertEqual(cfg["total_timeout"], 10.0)
         self.assertEqual(cfg["max_body_size"], 5 * 1024 * 1024)
@@ -494,7 +494,9 @@ class TestEmailEnrichmentActivities(unittest.IsolatedAsyncioTestCase):
         batch = await fetch_pending_enrichment_batch_activity(last_id=None, limit=50)
         self.assertEqual(len(batch), 1)
         self.assertEqual(batch[0]["id"], "comp-1")
-        mock_repo.get_pending_canonical_companies.assert_called_once_with(last_id=None, limit=50)
+        mock_repo.get_pending_canonical_companies.assert_called_once_with(
+            last_id=None, limit=50, target_table="staging_dataextraction.working_organizations"
+        )
 
     @patch("packages.temporal.activities.email_enrichment_activities.activity")
     @patch("packages.temporal.activities.email_enrichment_activities.email_enrichment_repo")

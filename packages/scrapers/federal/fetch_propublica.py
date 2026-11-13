@@ -23,14 +23,19 @@ from pathlib import Path
 
 import requests
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.config_manager import config_manager
+    from packages.infrastructure.db_connector import get_connection, release_connection, db_info
     from packages.domain.contact_validator import validate_contact, lead_score_from_contact
     from packages.infrastructure.http_client import get_http_client
     from packages.domain.tax_validator import validate_ein
 except ImportError:
-    from db_connector import get_connection, db_info
+    from config_manager import config_manager
+    from db_connector import get_connection, release_connection, db_info
     from contact_validator import validate_contact, lead_score_from_contact
     from http_client import get_http_client
     from tax_validator import validate_ein
@@ -165,11 +170,12 @@ def _make_lead(org: dict, officer: dict = None) -> dict | None:
     }
 
 
-def run(states: list = None, limit: int = 0, dry_run: bool = False):
+def run(states: list = None, limit: int = 0, dry_run: bool = False, mode: str = "incremental"):
     print(f"\n{'='*60}")
     print(f"  ProPublica 990 Nonprofit Scraper")
     print(f"{'='*60}")
     print(f"  DB       : {db_info()}")
+    print(f"  Mode     : {mode}")
     print(f"  States   : {states or 'ALL'}")
     print(f"  Limit    : {limit or 'unlimited'}")
     print(f"  Dry run  : {dry_run}")
@@ -178,104 +184,146 @@ def run(states: list = None, limit: int = 0, dry_run: bool = False):
     conn = get_connection() if not dry_run else None
     cur  = conn.cursor() if conn else None
 
-    inserted = errors = seen_eins = 0
+    inserted = errors = 0
     seen = set()
     start = datetime.now(timezone.utc)
-
     target_states = states or US_STATES
+    db_count = 0
 
-    for state in target_states:
-        for term in SEARCH_TERMS:
-            if limit and inserted >= limit:
+    try:
+        stop_early = False
+        for state in target_states:
+            if stop_early:
                 break
-            page = 0
-            while True:
+            for term in SEARCH_TERMS:
                 if limit and inserted >= limit:
+                    stop_early = True
                     break
-                data = _search_orgs(term, state, page)
-                orgs = data.get("organizations", [])
-                if not orgs:
-                    break
-
-                for org in orgs:
+                page = 0
+                while True:
                     if limit and inserted >= limit:
+                        stop_early = True
                         break
-                    ein = str(org.get("ein", ""))
-                    if ein in seen:
-                        continue
-                    seen.add(ein)
+                    data = _search_orgs(term, state, page)
+                    orgs = data.get("organizations", [])
+                    if not orgs:
+                        break
 
-                    # Get org detail for officers
-                    detail   = _get_org_detail(ein)
-                    org_info = detail.get("organization", org)
-                    filings  = detail.get("filings_with_data", [])
-                    officers = []
-                    if filings:
-                        latest = filings[0]
-                        officers = latest.get("officers", [])
+                    for org in orgs:
+                        if limit and inserted >= limit:
+                            stop_early = True
+                            break
+                        ein = str(org.get("ein", ""))
+                        if ein in seen:
+                            continue
+                        seen.add(ein)
 
-                    if officers:
-                        for officer in officers[:3]:  # top 3 officers
-                            lead = _make_lead(org_info, officer)
+                        # Get org detail for officers
+                        detail   = _get_org_detail(ein)
+                        org_info = detail.get("organization", org)
+                        filings  = detail.get("filings_with_data", [])
+                        officers = []
+                        if filings:
+                            latest = filings[0]
+                            officers = latest.get("officers", [])
+
+                        if officers:
+                            for officer in officers[:3]:  # top 3 officers
+                                if limit and inserted >= limit:
+                                    stop_early = True
+                                    break
+                                lead = _make_lead(org_info, officer)
+                                if lead:
+                                    try:
+                                        if not dry_run:
+                                            _upsert(cur, lead)
+                                        inserted += 1
+                                        if dry_run and inserted <= 2:
+                                            print(f"  [DRY] {lead['company_name']} | "
+                                                  f"{lead['full_name']} | {lead['title']}")
+                                    except Exception as e:
+                                        errors += 1
+                                        if errors <= 5:
+                                            print(f"\n  [ERR PROPUBLICA] {lead.get('company_name')}: {e}")
+                                        if conn:
+                                            conn.rollback()
+                        else:
+                            lead = _make_lead(org_info)
                             if lead:
                                 try:
                                     if not dry_run:
                                         _upsert(cur, lead)
                                     inserted += 1
-                                    if dry_run and inserted <= 2:
-                                        print(f"  [DRY] {lead['company_name']} | "
-                                              f"{lead['full_name']} | {lead['title']}")
                                 except Exception as e:
                                     errors += 1
-                                    if conn: conn.rollback()
-                    else:
-                        lead = _make_lead(org_info)
-                        if lead:
-                            try:
-                                if not dry_run:
-                                    _upsert(cur, lead)
-                                inserted += 1
-                            except Exception:
-                                errors += 1
-                                if conn: conn.rollback()
+                                    if errors <= 5:
+                                        print(f"\n  [ERR PROPUBLICA] {lead.get('company_name')}: {e}")
+                                    if conn:
+                                        conn.rollback()
 
-                    if not dry_run and inserted % BATCH_COMMIT == 0:
-                        conn.commit()
-                        elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-                        rate = inserted / elapsed if elapsed > 0 else 0
-                        print(f"\r  {state} | {term} | inserted={inserted:,} | "
-                              f"{rate:.0f}/s", end="", flush=True)
+                        if not dry_run and inserted % BATCH_COMMIT == 0 and inserted > 0:
+                            conn.commit()
+                            elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+                            rate = inserted / elapsed if elapsed > 0 else 0
+                            print(f"\r  {state} | {term} | inserted={inserted:,} | "
+                                  f"{rate:.0f}/s", end="", flush=True)
 
-                    time.sleep(0.05)  # be polite to ProPublica API
+                        time.sleep(0.05)  # be polite to ProPublica API
 
-                page += 1
-                total_pages = data.get("num_pages", 1)
-                if page >= min(total_pages, 5):  # max 5 pages per term/state
-                    break
-                time.sleep(0.1)
+                    if stop_early:
+                        break
+                    page += 1
+                    total_pages = data.get("num_pages", 1)
+                    if page >= min(total_pages, 5):  # max 5 pages per term/state
+                        break
+                    time.sleep(0.1)
 
-    if not dry_run and conn:
-        conn.commit()
-        cur.execute("SELECT COUNT(*) FROM us_leads WHERE api_source='PROPUBLICA_990'")
-        db_count = cur.fetchone()[0]
-        conn.close()
-    else:
-        db_count = inserted
+        total_attempted = inserted + errors
+        threshold = float(config_manager.get_registry_config().get("error_threshold_pct", 25.0))
+        if total_attempted >= 20 and (errors / total_attempted * 100.0) > threshold:
+            raise RuntimeError(
+                f"ProPublica error rate {(errors / total_attempted * 100.0):.1f}% exceeded threshold {threshold}%"
+            )
+
+        if not dry_run and conn:
+            conn.commit()
+            cur.execute("SELECT COUNT(*) FROM staging_dataextraction.staging_companies WHERE source='PROPUBLICA'")
+            db_count = cur.fetchone()[0]
+        else:
+            db_count = inserted
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            release_connection(conn)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n\n  {'─'*58}")
     print(f"  ProPublica complete in {elapsed:.0f}s")
     print(f"  Inserted : {inserted:,}")
     print(f"  Errors   : {errors}")
-    print(f"  DB total : {db_count:,} ProPublica records in us_leads")
+    print(f"  DB total : {db_count:,} ProPublica records in staging_companies")
     print(f"  {'─'*58}\n")
+    print(
+        "ACTIVITY_RESULT_JSON:" + json.dumps({
+            "status": "SUCCESS",
+            "source": "PROPUBLICA",
+            "inserted_count": inserted,
+            "error_count": errors,
+            "db_total": db_count,
+            "dry_run": dry_run,
+        }),
+        flush=True,
+    )
+    return inserted
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--state",   default=None, help="Single state code e.g. CA")
+    parser.add_argument("--mode",    default="incremental", choices=["incremental", "full"])
     parser.add_argument("--limit",   type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     states = [args.state.upper()] if args.state else None
-    run(states=states, limit=args.limit, dry_run=args.dry_run)
+    run(states=states, limit=args.limit, dry_run=args.dry_run, mode=args.mode)

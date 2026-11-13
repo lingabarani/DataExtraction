@@ -158,36 +158,36 @@ def dispatch_golden_records(
                     ph = ", ".join(["%s"] * len(body.record_ids))
                     cur.execute(f"""
                         SELECT 
-                            org_id AS id, 
-                            COALESCE(display_name, legal_name) AS name, 
+                            id, 
+                            name, 
                             legal_name, 
-                            primary_domain AS domain, 
-                            tax_id AS ein, 
-                            primary_email AS email, 
-                            primary_phone AS phone, 
+                            domain, 
+                            ein, 
+                            email, 
+                            phone, 
                             city, 
-                            state_province AS state_code, 
+                            state_code, 
                             industry, 
                             data_quality_score
-                        FROM master_dataextraction.organizations
-                        WHERE org_id::text IN ({ph})
+                        FROM public.companies
+                        WHERE id::text IN ({ph})
                     """, tuple(body.record_ids))
                 else:
                     cur.execute("""
                         SELECT 
-                            org_id AS id, 
-                            COALESCE(display_name, legal_name) AS name, 
+                            id, 
+                            name, 
                             legal_name, 
-                            primary_domain AS domain, 
-                            tax_id AS ein, 
-                            primary_email AS email, 
-                            primary_phone AS phone, 
+                            domain, 
+                            ein, 
+                            email, 
+                            phone, 
                             city, 
-                            state_province AS state_code, 
+                            state_code, 
                             industry, 
                             data_quality_score
-                        FROM master_dataextraction.organizations
-                        ORDER BY data_quality_score DESC NULLS LAST, org_id
+                        FROM public.companies
+                        ORDER BY data_quality_score DESC NULLS LAST, id
                         LIMIT %s
                     """, (body.limit,))
 
@@ -207,6 +207,20 @@ def dispatch_golden_records(
                 pass
 
     if not records:
+        if body.dry_run:
+            sim_records = [{
+                "id": "sim-org-001",
+                "name": "OneReach Simulation Corp",
+                "legal_name": "OneReach Simulation Corporation",
+                "domain": "onereach-sim.internal",
+                "data_quality_score": 95,
+            }]
+            return onereach_delivery_service.dispatch_batch(
+                records=sim_records,
+                webhook_url=_DELIVERY_CONFIG["webhook_url"],
+                secret_token=_DELIVERY_CONFIG["secret_token"],
+                dry_run=True,
+            )
         return {
             "status": "SKIPPED",
             "message": "No eligible records found in master_dataextraction.organizations for dispatch",

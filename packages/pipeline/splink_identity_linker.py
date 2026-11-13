@@ -19,16 +19,18 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+_SPLINK_IMPORT_ERROR: Optional[ImportError] = None
 try:
     from splink import Linker, SettingsCreator, block_on
     import splink.comparison_library as cl
     from splink.internals.duckdb.database_api import DuckDBAPI
-except ImportError:
-    Linker = object  # type: ignore
-    SettingsCreator = object  # type: ignore
-    block_on = object  # type: ignore
-    cl = object  # type: ignore
-    DuckDBAPI = object  # type: ignore
+except ImportError as _imp_err:
+    _SPLINK_IMPORT_ERROR = _imp_err
+    Linker = None  # type: ignore
+    SettingsCreator = None  # type: ignore
+    block_on = None  # type: ignore
+    cl = None  # type: ignore
+    DuckDBAPI = None  # type: ignore
 
 from packages.pipeline.normalizer import clean_legal_suffixes
 
@@ -42,7 +44,18 @@ class SplinkIdentityLinker:
 
     def __init__(self, probability_two_random_records_match: float = 0.05):
         self.prob_two_match = probability_two_random_records_match
-        self.db_api = DuckDBAPI()
+        self._db_api = None
+
+    @property
+    def db_api(self):
+        if _SPLINK_IMPORT_ERROR is not None or DuckDBAPI is None:
+            raise RuntimeError(
+                "Splink and DuckDB dependencies are not installed. "
+                "Install them via 'pip install -r requirements.txt'."
+            ) from _SPLINK_IMPORT_ERROR
+        if self._db_api is None:
+            self._db_api = DuckDBAPI()
+        return self._db_api
 
     def _prepare_dataframe(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
         """
@@ -88,10 +101,11 @@ class SplinkIdentityLinker:
                 cl.ExactMatch("postal_code"),
             ],
             blocking_rules_to_generate_predictions=[
-                block_on("state"),
-                block_on("domain"),
+                "l.state = r.state AND l.name = r.name",
+                "l.domain = r.domain AND l.domain IS NOT NULL",
+                "l.postal_code = r.postal_code AND substr(l.name, 1, 3) = substr(r.name, 1, 3)",
             ],
-            probability_two_random_records_match=self.prob_two_match,
+            probability_two_random_records_match=0.001,
         )
 
         linker = Linker(splink_df, settings)

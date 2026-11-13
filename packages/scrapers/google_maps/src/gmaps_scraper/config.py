@@ -18,7 +18,10 @@ class ScraperConfig(BaseSettings):
     max_retries: int = 5                   # Raised: more retries before giving up
     backoff_base: float = 1.5
     tile_base_zoom: int = 15
-    tile_max_depth: int = 3
+    tile_max_depth: int = 5
+    tile_min_span_deg: float = 0.005
+    max_tiles_per_region: int = 5000
+    max_pages_per_tile: int = 3
     tile_overlap_pct: int = 10
     max_reviews_per_place: int = 100
     download_photos: bool = True
@@ -92,5 +95,9 @@ def load_config(user_config_path: Optional[str] = None) -> ScraperConfig:
             loaded_user = yaml.safe_load(f)
             if loaded_user:
                 data.update(loaded_user)
+
+    env_proxies = os.getenv("GMAPS_PROXIES", "").strip()
+    if env_proxies and not data.get("proxies"):
+        data["proxies"] = [p.strip() for p in env_proxies.split(",") if p.strip()]
 
     return ScraperConfig(**data)

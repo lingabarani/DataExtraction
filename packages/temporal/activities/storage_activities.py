@@ -94,9 +94,13 @@ async def resolve_dlq_record_activity(record_id: str, status: str, notes: str = 
             try:
                 rec_int_id = int(record_id)
                 updated = discard_dead_letter(conn, rec_int_id, reason=notes or f"Marked {status}")
+                if updated:
+                    conn.commit()
             except (ValueError, TypeError):
                 updated = False
     except Exception as e:
+        if conn:
+            conn.rollback()
         activity.logger.warning("DLQ resolve notice: %s", e)
     finally:
         if conn:
@@ -217,7 +221,8 @@ async def check_gmp_budget_activity(_: dict = None) -> dict:
 async def persist_raw_observation_activity(payload: dict) -> dict:
     """
     Persists an uncompressed raw extraction payload to MinIO/S3 Parquet partition
-    and tracks metadata pointer in `kg_observation.observation_metadata`.
+    (or `kg_observation.pending_lakehouse_uploads` outbox if MinIO is unreachable)
+    and commits metadata pointer in `kg_observation.observation_metadata`.
     """
     activity.logger.info(
         "Persisting raw observation for source=%s record_id=%s",
@@ -229,6 +234,8 @@ async def persist_raw_observation_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for persist_raw_observation")
         res = kg_ingestion_bridge.persist_raw_observation(
             conn=conn,
             source_name=payload.get("source_name", "scraper"),
@@ -237,7 +244,38 @@ async def persist_raw_observation_activity(payload: dict) -> dict:
             extracted_summary=payload.get("extracted_summary", {}),
             observed_entity_type=payload.get("entity_type", "organization"),
         )
+        conn.commit()
         return res
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            release_connection(conn)
+
+
+@activity.defn(name="replay_lakehouse_outbox")
+async def replay_lakehouse_outbox_activity(limit: int = 100) -> dict:
+    """
+    Replays pending Lakehouse observation uploads from PostgreSQL outbox into MinIO/S3.
+    """
+    from kg_ingestion_bridge import kg_ingestion_bridge  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
+
+    conn = None
+    try:
+        conn = get_connection()
+        if not conn:
+            return {"claimed": 0, "uploaded": 0, "failed": 0, "status": "NO_DB_CONNECTION"}
+        stats = kg_ingestion_bridge.replay_pending_lakehouse_uploads(conn=conn, limit=int(limit or 100))
+        conn.commit()
+        return {**stats, "status": "SUCCESS"}
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        logger.warning("Lakehouse outbox replay notice: %s", exc)
+        return {"claimed": 0, "uploaded": 0, "failed": 0, "status": "FAILED", "error": str(exc)}
     finally:
         if conn:
             release_connection(conn)
@@ -259,6 +297,8 @@ async def ingest_working_organization_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_working_organization")
         org_id = kg_ingestion_bridge.ingest_working_organization(
             conn=conn,
             org_data=payload.get("org_data", payload),
@@ -266,7 +306,12 @@ async def ingest_working_organization_activity(payload: dict) -> dict:
             canonical_cluster_id=payload.get("canonical_cluster_id"),
             identity_confidence=float(payload.get("identity_confidence", 1.0)),
         )
+        conn.commit()
         return {"org_id": org_id, "status": "staged_in_working_organizations"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -289,13 +334,20 @@ async def ingest_working_person_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_working_person")
         person_id = kg_ingestion_bridge.ingest_working_person(
             conn=conn,
             person_data=payload.get("person_data", payload),
             org_id=str(payload.get("org_id", "")),
             confidence_score=float(payload.get("confidence_score", 0.85)),
         )
+        conn.commit()
         return {"person_id": person_id, "status": "staged_in_working_persons"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -314,12 +366,19 @@ async def ingest_working_email_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_working_email")
         email_id = kg_ingestion_bridge.ingest_working_email(
             conn=conn,
             email_data=payload.get("email_data", payload),
             org_id=str(payload.get("org_id", "")),
         )
+        conn.commit()
         return {"working_email_id": email_id, "status": "staged_in_working_emails"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -357,6 +416,109 @@ async def complete_executive_enrichment_activity(org_id: str) -> dict:
     return {"org_id": org_id, "status": "COMPLETED"}
 
 
+@activity.defn(name="discover_executives")
+async def discover_executives_activity(batch_size: int = 1000) -> dict:
+    """
+    Agent 4: Autonomous C-Suite and Executive Leadership Discovery.
+    Queries staging_dataextraction.working_organizations where executive_enrichment_status = 'PENDING',
+    extracts/infers decision makers (CEO, CTO, CFO, VPs) via USPersonEnrichmentEngine,
+    and ingests them into staging_dataextraction.working_persons.
+    """
+    activity.logger.info("Executing executive discovery for pending working organizations (batch=%d)", batch_size)
+    if activity.in_activity():
+        activity.heartbeat("Discovering executive decision makers")
+
+    import json
+    from packages.scrapers.us_enrichment.models.company import USCanonicalCompany  # type: ignore
+    from packages.scrapers.us_enrichment.pipeline.person_enrichment import us_person_enrichment_engine  # type: ignore
+    from packages.infrastructure.kg_ingestion_bridge import kg_ingestion_bridge  # type: ignore
+    from db_connector import get_connection, release_connection  # type: ignore
+
+    conn = None
+    discovered_count = 0
+    enriched_orgs = 0
+
+    try:
+        conn = get_connection()
+        if conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT org_id, legal_name, display_name, primary_domain, website,
+                           industry, phones
+                    FROM staging_dataextraction.working_organizations
+                    WHERE executive_enrichment_status = 'PENDING'
+                    ORDER BY created_at ASC
+                    LIMIT %s
+                    FOR UPDATE SKIP LOCKED;
+                """, (batch_size,))
+                rows = cur.fetchall()
+
+                for row in rows:
+                    org_id, legal_name, display_name, domain, website, industry, phones = row
+                    phone_val = None
+                    if isinstance(phones, list) and phones:
+                        phone_val = phones[0]
+                    elif isinstance(phones, str) and phones.startswith("["):
+                        try:
+                            p_list = json.loads(phones)
+                            if p_list:
+                                phone_val = p_list[0]
+                        except Exception:
+                            phone_val = None
+
+                    comp = USCanonicalCompany(
+                        company_id=org_id,
+                        legal_name=legal_name or display_name or "Commercial Entity",
+                        domain=domain,
+                        website=website,
+                        industry=industry,
+                        phone=phone_val,
+                    )
+
+                    dms = us_person_enrichment_engine.extract_and_enrich_decision_makers(comp)
+                    for dm in dms:
+                        dm_dict = dm.to_dict()
+                        p_data = {
+                            "person_id": dm_dict.get("person_id"),
+                            "full_name": dm_dict.get("full_name"),
+                            "first_name": dm_dict.get("first_name"),
+                            "last_name": dm_dict.get("last_name"),
+                            "title": dm_dict.get("title"),
+                            "seniority": dm_dict.get("seniority_level"),
+                            "department": dm_dict.get("department"),
+                            "primary_email": dm_dict.get("work_email"),
+                            "primary_phone": dm_dict.get("direct_phone") or phone_val,
+                            "linkedin_url": None,
+                            "confidence_score": float(dm_dict.get("email_confidence_score", 70)) / 100.0,
+                        }
+                        kg_ingestion_bridge.ingest_working_person(conn, p_data, org_id)
+                        discovered_count += 1
+
+                    cur.execute("""
+                        UPDATE staging_dataextraction.working_organizations
+                        SET executive_enrichment_status = 'COMPLETED', updated_at = NOW()
+                        WHERE org_id = %s;
+                    """, (org_id,))
+                    enriched_orgs += 1
+
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                activity.logger.warning("Executive discovery query notice: %s", e)
+            finally:
+                cur.close()
+    finally:
+        if conn:
+            release_connection(conn)
+
+    return {
+        "status": "COMPLETED",
+        "executives_discovered": discovered_count,
+        "organizations_enriched": enriched_orgs,
+    }
+
+
 @activity.defn(name="ingest_kg_organization")
 async def ingest_kg_organization_activity(payload: dict) -> dict:
     """
@@ -369,6 +531,8 @@ async def ingest_kg_organization_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_kg_organization")
         org_id = kg_ingestion_bridge.ingest_organization(
             conn=conn,
             org_data=payload.get("org_data", {}),
@@ -376,7 +540,12 @@ async def ingest_kg_organization_activity(payload: dict) -> dict:
             observation_id=payload.get("observation_id"),
             authority_weight=float(payload.get("authority_weight", 0.8)),
         )
+        conn.commit()
         return {"org_id": org_id, "status": "ingested"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -394,6 +563,8 @@ async def ingest_kg_person_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_kg_person")
         person_id = kg_ingestion_bridge.ingest_person_and_employment(
             conn=conn,
             person_data=payload.get("person_data", {}),
@@ -401,7 +572,12 @@ async def ingest_kg_person_activity(payload: dict) -> dict:
             source_name=payload.get("source_name", "pipeline"),
             observation_id=payload.get("observation_id"),
         )
+        conn.commit()
         return {"person_id": person_id, "status": "ingested"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -419,6 +595,8 @@ async def ingest_kg_hierarchy_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_kg_hierarchy")
         h_id = kg_ingestion_bridge.ingest_corporate_hierarchy(
             conn=conn,
             parent_org_id=payload.get("parent_org_id"),
@@ -428,7 +606,12 @@ async def ingest_kg_hierarchy_activity(payload: dict) -> dict:
             direct_parent=payload.get("direct_parent", True),
             confidence_score=float(payload.get("confidence_score", 0.95)),
         )
+        conn.commit()
         return {"hierarchy_id": h_id, "status": "ingested"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -446,6 +629,8 @@ async def ingest_kg_technology_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_kg_technology")
         tech_id = kg_ingestion_bridge.ingest_org_technology(
             conn=conn,
             org_id=payload.get("org_id"),
@@ -454,7 +639,12 @@ async def ingest_kg_technology_activity(payload: dict) -> dict:
             detection_method=payload.get("detection_method", "signature"),
             confidence_score=float(payload.get("confidence_score", 0.90)),
         )
+        conn.commit()
         return {"tech_id": tech_id, "status": "ingested"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -472,6 +662,8 @@ async def resolve_cluster_membership_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for resolve_cluster_membership")
         res = graph_identity_resolver.resolve_cluster_membership(
             conn=conn,
             entity_type=payload.get("entity_type", "organization"),
@@ -482,7 +674,12 @@ async def resolve_cluster_membership_activity(payload: dict) -> dict:
             match_probability=float(payload.get("match_probability", 1.0)),
             match_features=payload.get("match_features"),
         )
+        conn.commit()
         return res
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -500,13 +697,20 @@ async def unmerge_cluster_member_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for unmerge_cluster_member")
         res = graph_identity_resolver.unmerge_member(
             conn=conn,
             member_id=payload.get("member_id"),
             reason=payload.get("reason", "Operator review"),
             operator=payload.get("operator", "OPERATOR_DISPUTE_REVIEW"),
         )
+        conn.commit()
         return res
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -524,8 +728,15 @@ async def maintain_kg_partitions_activity() -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for maintain_kg_partitions")
         res = partition_manager.run_all(conn)
+        conn.commit()
         return res
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -543,8 +754,15 @@ async def sync_opensearch_cdc_activity(batch_limit: int = 1000) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for sync_opensearch_cdc")
         res = opensearch_client.sync_companies_cdc(conn, batch_limit=batch_limit)
+        conn.commit()
         return res
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)
@@ -638,6 +856,8 @@ async def ingest_kg_employment_activity(payload: dict) -> dict:
     conn = None
     try:
         conn = get_connection()
+        if not conn:
+            raise RuntimeError("PostgreSQL connection unavailable for ingest_kg_employment")
         person_id = kg_ingestion_bridge.ingest_person_and_employment(
             conn=conn,
             person_data=payload.get("person_data", {
@@ -650,7 +870,12 @@ async def ingest_kg_employment_activity(payload: dict) -> dict:
             source_name=payload.get("source_name", "pipeline"),
             observation_id=payload.get("observation_id"),
         )
+        conn.commit()
         return {"person_id": person_id, "status": "ingested"}
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             release_connection(conn)

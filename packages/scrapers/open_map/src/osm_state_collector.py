@@ -19,9 +19,11 @@ import logging
 import os
 import shutil
 import sys
+import tempfile
+import threading
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from src.config import OverpassConfig, default_config
 from src.checkpoint import EnterpriseCheckpointManager
@@ -144,8 +146,85 @@ STATE_BOUNDING_BOXES: Dict[str, Tuple[float, float, float, float]] = {
     "Washington": (45.54, -124.76, 49.00, -116.92),
     "West Virginia": (37.20, -82.64, 40.64, -77.72),
     "Wisconsin": (42.49, -92.89, 47.08, -86.81),
-    "Wyoming": (40.99, -111.06, 45.01, -104.05)
+    "Wyoming": (40.99, -111.06, 45.01, -104.05),
 }
+
+# ==============================================================================
+# 32 MEXICAN FEDERAL ENTITIES (INEGI ISO 3166-2:MX 3-LETTER CODES + BBOXES)
+# ==============================================================================
+MEXICO_ENTITIES: List[Tuple[str, str]] = [
+    ("Aguascalientes", "AGU"),
+    ("Baja California", "BCN"),
+    ("Baja California Sur", "BCS"),
+    ("Campeche", "CAM"),
+    ("Chiapas", "CHP"),
+    ("Chihuahua", "CHH"),
+    ("Ciudad de Mexico", "CMX"),
+    ("Coahuila", "COA"),
+    ("Colima", "COL"),
+    ("Durango", "DUR"),
+    ("Guanajuato", "GUA"),
+    ("Guerrero", "GRO"),
+    ("Hidalgo", "HID"),
+    ("Jalisco", "JAL"),
+    ("Estado de Mexico", "MEX"),
+    ("Michoacan", "MIC"),
+    ("Morelos", "MOR"),
+    ("Nayarit", "NAY"),
+    ("Nuevo Leon", "NLE"),
+    ("Oaxaca", "OAX"),
+    ("Puebla", "PUE"),
+    ("Queretaro", "QUE"),
+    ("Quintana Roo", "ROO"),
+    ("San Luis Potosi", "SLP"),
+    ("Sinaloa", "SIN"),
+    ("Sonora", "SON"),
+    ("Tabasco", "TAB"),
+    ("Tamaulipas", "TAM"),
+    ("Tlaxcala", "TLA"),
+    ("Veracruz", "VER"),
+    ("Yucatan", "YUC"),
+    ("Zacatecas", "ZAC"),
+]
+
+# Mexico Entity Bounding Boxes: (min_lat, min_lon, max_lat, max_lon)
+MX_BOUNDING_BOXES: Dict[str, Tuple[float, float, float, float]] = {
+    "Aguascalientes": (21.6364, -102.8698, 22.4507, -101.8344),
+    "Baja California": (28.0000, -117.2982, 32.7187, -112.7844),
+    "Baja California Sur": (22.8711, -115.3524, 28.0000, -109.4184),
+    "Campeche": (17.8094, -92.4697, 20.8524, -89.1558),
+    "Chiapas": (14.5321, -94.1378, 17.9868, -90.3708),
+    "Chihuahua": (25.5583, -109.0754, 31.7844, -103.3056),
+    "Ciudad de Mexico": (19.0482, -99.3649, 19.5927, -98.9403),
+    "Coahuila": (24.5422, -103.9697, 29.8797, -99.8433),
+    "Colima": (18.6833, -104.4556, 19.5208, -103.4842),
+    "Durango": (22.3486, -107.2147, 26.8431, -102.4742),
+    "Guanajuato": (19.9228, -102.0997, 21.8389, -99.6767),
+    "Guerrero": (16.3153, -102.1894, 18.8872, -98.0058),
+    "Hidalgo": (19.5997, -99.8583, 21.4014, -97.9844),
+    "Jalisco": (18.9250, -105.7003, 22.7503, -101.5161),
+    "Estado de Mexico": (18.3606, -100.6111, 20.2878, -98.5978),
+    "Michoacan": (17.9153, -103.7378, 20.3956, -100.0631),
+    "Morelos": (18.3375, -99.5036, 19.1350, -98.6319),
+    "Nayarit": (20.6047, -105.7725, 23.0856, -103.7222),
+    "Nuevo Leon": (23.1611, -101.2056, 27.8189, -98.4356),
+    "Oaxaca": (15.6567, -98.5539, 18.6575, -93.8697),
+    "Puebla": (17.8683, -99.0717, 20.8358, -96.7264),
+    "Queretaro": (20.0153, -100.6033, 21.6703, -99.0436),
+    "Quintana Roo": (17.8164, -89.2972, 21.6083, -86.7119),
+    "San Luis Potosi": (21.1611, -102.2961, 24.4864, -98.3319),
+    "Sinaloa": (22.4939, -109.4456, 27.0422, -105.3942),
+    "Sonora": (26.2944, -115.0569, 32.4975, -108.4239),
+    "Tabasco": (17.2508, -94.1306, 18.6508, -90.9858),
+    "Tamaulipas": (22.2039, -100.1417, 27.6781, -97.1444),
+    "Tlaxcala": (19.0975, -98.7058, 19.7369, -97.6322),
+    "Veracruz": (17.1358, -98.6731, 22.4703, -93.5978),
+    "Yucatan": (19.6644, -90.4994, 21.6289, -87.5342),
+    "Zacatecas": (21.1558, -104.3686, 25.1278, -100.7303),
+}
+
+STATE_BOUNDING_BOXES.update(MX_BOUNDING_BOXES)
+ALL_STATES_AND_ENTITIES: List[Tuple[str, str]] = list(US_STATES) + list(MEXICO_ENTITIES)
 
 # ==============================================================================
 # TAXONOMY & FIELD MAPPING (SECTIONS 4, 5, 25)
@@ -252,10 +331,13 @@ def slugify(text: str) -> str:
     return "".join(c if c.isalnum() else "_" for c in text.strip().lower()).strip("_")
 
 
+_PROGRESS_IO_LOCK = threading.RLock()
+
+
 class OSMStateCollector:
     """
-    Controller for sequential state-by-state, field-by-field, chunk-by-chunk
-    OSM business and POI data collection.
+    Controller for state-by-state, field-by-field, chunk-by-chunk
+    OSM business and POI data collection across US and Mexico regions.
     """
 
     def __init__(
@@ -263,7 +345,8 @@ class OSMStateCollector:
         workspace_dir: Optional[str] = None,
         chunk_size_deg: Optional[float] = None,
         endpoint_url: Optional[str] = None,
-        config: Optional[OverpassConfig] = None
+        config: Optional[OverpassConfig] = None,
+        progress_filename: Optional[str] = None,
     ):
         if workspace_dir is None:
             self.workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -286,7 +369,7 @@ class OSMStateCollector:
         for d in [self.raw_base_dir, self.processed_base_dir, self.export_base_dir, self.progress_dir, self.logs_dir]:
             os.makedirs(d, exist_ok=True)
 
-        # Enterprise ACID Checkpoint Manager (SQLite WAL mode + JSON sync)
+        # Enterprise ACID Checkpoint Manager (PostgreSQL WAL mode + JSON sync)
         self.checkpoint_manager = EnterpriseCheckpointManager(self.workspace_dir)
 
         # Adaptive Quadtree Spatial Subdivision Engine
@@ -295,7 +378,8 @@ class OSMStateCollector:
             min_chunk_deg=self.config.min_chunk_deg
         )
 
-        self.progress_file = os.path.join(self.progress_dir, "osm_progress.json")
+        p_name = progress_filename or "osm_progress.json"
+        self.progress_file = os.path.join(self.progress_dir, os.path.basename(p_name))
         self._backup_progress()
         self.progress_data: Dict[str, Any] = self._load_progress()
         self._reconcile_existing_progress()
@@ -310,39 +394,49 @@ class OSMStateCollector:
         return f"{h:02d}:{m:02d}:{s:02d}"
 
     def _backup_progress(self) -> None:
-        """Backs up progress file before any modification."""
-        if not os.path.exists(self.progress_file):
-            return
-        try:
-            bak_path = f"{self.progress_file}.bak"
-            shutil.copyfile(self.progress_file, bak_path)
-            date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-            hist_backup = os.path.join(self.progress_dir, f"osm_progress_backup_{date_str}.json")
-            if not os.path.exists(hist_backup):
-                shutil.copyfile(self.progress_file, hist_backup)
-        except Exception as e:
-            logger.warning(f"Could not backup progress file: {e}")
+        """Thread-safely backs up progress file before modification."""
+        with _PROGRESS_IO_LOCK:
+            if not os.path.exists(self.progress_file):
+                return
+            try:
+                bak_path = f"{self.progress_file}.bak"
+                shutil.copyfile(self.progress_file, bak_path)
+                date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+                hist_backup = os.path.join(self.progress_dir, f"osm_progress_backup_{date_str}.json")
+                if not os.path.exists(hist_backup):
+                    shutil.copyfile(self.progress_file, hist_backup)
+            except Exception as e:
+                logger.warning(f"Could not backup progress file: {e}")
 
     def _load_progress(self) -> Dict[str, Any]:
-        """Loads persistent progress tracker JSON."""
-        if os.path.exists(self.progress_file):
-            try:
-                with open(self.progress_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning(f"Failed to load existing progress file {self.progress_file}: {e}")
-        return {}
+        """Thread-safely loads persistent progress tracker JSON."""
+        with _PROGRESS_IO_LOCK:
+            if os.path.exists(self.progress_file):
+                try:
+                    with open(self.progress_file, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                except Exception as e:
+                    logger.warning(f"Failed to load existing progress file {self.progress_file}: {e}")
+            return {}
 
     def _save_progress(self) -> None:
-        """Saves current state and chunk progress atomically."""
-        self._backup_progress()
-        tmp_file = f"{self.progress_file}.tmp"
-        try:
-            with open(tmp_file, "w", encoding="utf-8") as f:
-                json.dump(self.progress_data, f, indent=2)
-            os.replace(tmp_file, self.progress_file)
-        except Exception as e:
-            logger.error(f"Failed to save progress file {self.progress_file}: {e}")
+        """Thread-safely saves current state and chunk progress via atomic temp file + os.replace."""
+        with _PROGRESS_IO_LOCK:
+            self._backup_progress()
+            tmp_file = None
+            try:
+                os.makedirs(self.progress_dir, exist_ok=True)
+                fd, tmp_file = tempfile.mkstemp(prefix="osm_prog_", suffix=".tmp", dir=self.progress_dir)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(self.progress_data, f, indent=2)
+                os.replace(tmp_file, self.progress_file)
+            except Exception as e:
+                logger.error(f"Failed to save progress file {self.progress_file}: {e}")
+                if tmp_file and os.path.exists(tmp_file):
+                    try:
+                        os.unlink(tmp_file)
+                    except OSError:
+                        pass
 
     def _reconcile_existing_progress(self) -> None:
         """
@@ -630,6 +724,9 @@ out center tags;"""
         total_fields: int = 13,
         session_start_ts: float = 0.0,
         chunks_done_session: int = 0,
+        batch_callback: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
+        stream_only: bool = False,
+        field_seen_keys: Optional[Set[str]] = None,
     ) -> Tuple[str, int]:
         """
         Process a single geographic chunk with live console logging,
@@ -693,13 +790,19 @@ out center tags;"""
                 )
                 chunk_records.append(rec)
                 dedupe_key = f"{rec['osm_type']}_{rec['osm_id']}"
-                field_records_map[dedupe_key] = rec
+                if field_seen_keys is not None:
+                    field_seen_keys.add(dedupe_key)
+                if not stream_only:
+                    field_records_map[dedupe_key] = rec
 
             os.makedirs(chunk_dir_proc, exist_ok=True)
             with open(proc_chunk_path, "w", encoding="utf-8") as f:
                 json.dump(chunk_records, f, indent=2)
 
-            # Mark completed in SQLite ACID checkpoint manager
+            if batch_callback is not None and chunk_records:
+                batch_callback(chunk_records)
+
+            # Mark completed in PostgreSQL ACID checkpoint manager
             self.checkpoint_manager.mark_chunk_completed(
                 state_name=state_name,
                 field_name=field_name,
@@ -714,9 +817,10 @@ out center tags;"""
             if "failed_chunk_ids" in field_progress and cid in field_progress["failed_chunk_ids"]:
                 field_progress["failed_chunk_ids"].remove(cid)
 
+            total_unique_field = len(field_seen_keys) if field_seen_keys is not None else len(field_records_map)
             field_progress["completed_chunk_ids"] = sorted(completed_chunk_ids)
             field_progress["chunks_completed"] = min(len(completed_chunk_ids), total_chunks)
-            field_progress["records_collected"] = len(field_records_map)
+            field_progress["records_collected"] = total_unique_field
             self._save_progress()
 
             completed_cnt = len(completed_chunk_ids)
@@ -798,6 +902,9 @@ out center tags;"""
                         total_fields=total_fields,
                         session_start_ts=session_start_ts,
                         chunks_done_session=chunks_done_session,
+                        batch_callback=batch_callback,
+                        stream_only=stream_only,
+                        field_seen_keys=field_seen_keys,
                     )
                     if sub_status != "completed" and sub_status != "skipped":
                         all_sub_success = False
@@ -873,9 +980,16 @@ out center tags;"""
         retry_affected: bool = False,
         state_idx: int = 1,
         total_states: int = 50,
+        max_chunks_per_field: Optional[int] = None,
+        max_records: Optional[int] = None,
+        heartbeat_cb: Optional[Any] = None,
+        batch_callback: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
+        stream_only: bool = False,
     ) -> Dict[str, Any]:
         """
-        Collects ALL data for a state, field-by-field, chunk-by-chunk.
+        Collects ALL data for a state/region, field-by-field, chunk-by-chunk
+        (or bounded subset when `max_chunks_per_field` / `max_records` is supplied).
+        Supports incremental `batch_callback` persistence and low-RAM `stream_only` mode.
         """
         state_slug = slugify(state_name)
         state_logger = self._setup_state_logger(state_name)
@@ -896,8 +1010,14 @@ out center tags;"""
         fields_to_run = [f for f in FIELDS_TAXONOMY if not target_fields or f["field"] in target_fields]
         state_total_records = 0
         state_fields_summary: Dict[str, int] = {}
+        state_collected_records: Dict[str, Dict[str, Any]] = {}
+        state_seen_keys: Set[str] = set()
 
         for field_idx, field_meta in enumerate(fields_to_run, 1):
+            seen_so_far = len(state_seen_keys) if stream_only else len(state_collected_records)
+            if max_records is not None and max_records > 0 and seen_so_far >= max_records:
+                break
+
             field_name = field_meta["field"]
             cat_group = field_meta["category_group"]
             query_template = field_meta["query_template"]
@@ -919,6 +1039,18 @@ out center tags;"""
                 records_count = field_progress.get("records_collected", 0)
                 state_total_records += records_count
                 state_fields_summary[field_name] = records_count
+                canonical_export = os.path.join(self.export_base_dir, state_slug, f"{field_name}.json")
+                if os.path.exists(canonical_export):
+                    try:
+                        with open(canonical_export, "r", encoding="utf-8") as ef:
+                            existing_recs = json.load(ef) or []
+                            for rec in existing_recs:
+                                dk = f"{rec.get('osm_type')}_{rec.get('osm_id')}"
+                                state_collected_records[dk] = rec
+                                if max_records is not None and max_records > 0 and len(state_collected_records) >= max_records:
+                                    break
+                    except Exception:
+                        pass
                 print(f"[OK] {field_name} already COMPLETED in previous run ({records_count} records). Skipping.", flush=True)
                 state_logger.info(f"Field {field_name} already completed with {records_count} records. Skipping.")
                 continue
@@ -929,7 +1061,7 @@ out center tags;"""
             for d in [raw_field_dir, proc_field_dir, export_state_dir]:
                 os.makedirs(d, exist_ok=True)
 
-            # Initialize field in Enterprise ACID Checkpoint Manager
+            # Initialize field in Enterprise ACID Checkpoint Manager and reclaim expired leases
             self.checkpoint_manager.init_field(
                 state_name=state_name,
                 state_code=state_code,
@@ -938,6 +1070,10 @@ out center tags;"""
                 total_chunks=total_chunks,
                 chunks_info=chunks
             )
+            try:
+                self.checkpoint_manager.reclaim_expired_leases(state_name, field_name)
+            except Exception:
+                pass
             # Reconcile disk state against SQLite DB
             self.checkpoint_manager.reconcile_disk_state(
                 state_name=state_name,
@@ -964,6 +1100,7 @@ out center tags;"""
                 )
 
             field_records_map: Dict[str, Dict[str, Any]] = {}
+            field_seen_keys: Set[str] = set()
             # Pre-load existing records from valid completed chunks for deduplication
             for cid in completed_chunk_ids:
                 artifact = field_progress.get("chunk_artifacts", {}).get(cid, {})
@@ -975,7 +1112,9 @@ out center tags;"""
                             c_records = json.load(f)
                             for rec in c_records:
                                 dedupe_key = f"{rec['osm_type']}_{rec['osm_id']}"
-                                field_records_map[dedupe_key] = rec
+                                field_seen_keys.add(dedupe_key)
+                                if not stream_only:
+                                    field_records_map[dedupe_key] = rec
                     except Exception as e:
                         state_logger.warning(f"Could not load pre-existing chunk {proc_chunk_path}: {e}")
 
@@ -1024,10 +1163,23 @@ out center tags;"""
             else:
                 chunks_to_process = [c for c in chunks if c["chunk_id"] not in completed_chunk_ids]
 
+            # Start from dense/mid-state chunks when bounded so small chunks don't hit empty ocean corners first
+            if max_chunks_per_field is not None and max_chunks_per_field > 0 and len(chunks_to_process) > max_chunks_per_field:
+                mid = max(0, (len(chunks_to_process) // 2) - (max_chunks_per_field // 2))
+                chunks_to_process = chunks_to_process[mid:mid + max_chunks_per_field]
+
             for chunk_info in chunks_to_process:
                 cid = chunk_info["chunk_id"]
                 if cid in completed_chunk_ids:
                     continue
+                current_total = len(state_seen_keys) + len(field_seen_keys) if stream_only else len(state_collected_records) + len(field_records_map)
+                if max_records is not None and max_records > 0 and current_total >= max_records:
+                    break
+                if heartbeat_cb:
+                    try:
+                        heartbeat_cb(f"OSM {state_code}/{field_name}: querying chunk {cid}")
+                    except Exception:
+                        pass
 
                 counters: Dict[str, int] = {}
                 status, records_returned = self._process_single_chunk(
@@ -1054,52 +1206,65 @@ out center tags;"""
                     total_fields=len(fields_to_run),
                     session_start_ts=field_start_ts,
                     chunks_done_session=chunks_done_this_field,
+                    batch_callback=batch_callback,
+                    stream_only=stream_only,
+                    field_seen_keys=field_seen_keys,
                 )
                 if status == "completed":
                     chunks_done_this_field += 1
 
-            # Export aggregated deduplicated records
+            state_seen_keys.update(field_seen_keys)
             all_field_records = list(field_records_map.values())
-            canonical_json_path = os.path.join(export_state_dir, f"{field_name}.json")
-            canonical_csv_path = os.path.join(export_state_dir, f"{field_name}.csv")
+            field_record_count = len(field_seen_keys) if stream_only else len(all_field_records)
+            for rec in all_field_records:
+                dk = f"{rec.get('osm_type')}_{rec.get('osm_id')}"
+                state_collected_records[dk] = rec
+                if max_records is not None and max_records > 0 and len(state_collected_records) >= max_records:
+                    break
+            if not stream_only:
+                canonical_json_path = os.path.join(export_state_dir, f"{field_name}.json")
+                canonical_csv_path = os.path.join(export_state_dir, f"{field_name}.csv")
 
-            export_json_path = self._collision_safe_path(export_state_dir, f"{field_name}.json")
-            export_csv_path = self._collision_safe_path(export_state_dir, f"{field_name}.csv")
+                export_json_path = self._collision_safe_path(export_state_dir, f"{field_name}.json")
+                export_csv_path = self._collision_safe_path(export_state_dir, f"{field_name}.csv")
 
-            with open(export_json_path, "w", encoding="utf-8") as f:
-                json.dump(all_field_records, f, indent=2)
+                with open(export_json_path, "w", encoding="utf-8") as f:
+                    json.dump(all_field_records, f, indent=2)
 
-            with open(export_csv_path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=CSV_EXPORT_FIELDS, extrasaction="ignore")
-                writer.writeheader()
-                for r in all_field_records:
-                    writer.writerow(r)
+                with open(export_csv_path, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=CSV_EXPORT_FIELDS, extrasaction="ignore")
+                    writer.writeheader()
+                    for r in all_field_records:
+                        writer.writerow(r)
 
-            # Reconcile safely if this was a recovery run
-            if export_json_path != canonical_json_path:
-                try:
-                    with open(canonical_json_path, "r", encoding="utf-8") as f_prev:
-                        prev_data = json.load(f_prev)
-                    prev_count = len(prev_data) if isinstance(prev_data, list) else 0
-                except Exception:
-                    prev_count = 0
+                # Reconcile safely if this was a recovery run
+                if export_json_path != canonical_json_path:
+                    try:
+                        with open(canonical_json_path, "r", encoding="utf-8") as f_prev:
+                            prev_data = json.load(f_prev)
+                        prev_count = len(prev_data) if isinstance(prev_data, list) else 0
+                    except Exception:
+                        prev_count = 0
 
-                # If previous canonical export had 0 records and new recovery has records:
-                if prev_count == 0 and len(all_field_records) > 0:
-                    orig_bak_json = os.path.join(export_state_dir, f"{field_name}.orig.json")
-                    orig_bak_csv = os.path.join(export_state_dir, f"{field_name}.orig.csv")
-                    if os.path.exists(canonical_json_path) and not os.path.exists(orig_bak_json):
-                        shutil.copyfile(canonical_json_path, orig_bak_json)
-                    if os.path.exists(canonical_csv_path) and not os.path.exists(orig_bak_csv):
-                        shutil.copyfile(canonical_csv_path, orig_bak_csv)
+                    # If previous canonical export had 0 records and new recovery has records:
+                    if prev_count == 0 and len(all_field_records) > 0:
+                        orig_bak_json = os.path.join(export_state_dir, f"{field_name}.orig.json")
+                        orig_bak_csv = os.path.join(export_state_dir, f"{field_name}.orig.csv")
+                        if os.path.exists(canonical_json_path) and not os.path.exists(orig_bak_json):
+                            shutil.copyfile(canonical_json_path, orig_bak_json)
+                        if os.path.exists(canonical_csv_path) and not os.path.exists(orig_bak_csv):
+                            shutil.copyfile(canonical_csv_path, orig_bak_csv)
 
-                    shutil.copyfile(export_json_path, canonical_json_path)
-                    shutil.copyfile(export_csv_path, canonical_csv_path)
-                    print(
-                        f"[RECONCILE] Safely updated canonical {field_name}.json with {len(all_field_records)} recovered records "
-                        f"(original preserved at {orig_bak_json}, separate output at {export_json_path})",
-                        flush=True
-                    )
+                        shutil.copyfile(export_json_path, canonical_json_path)
+                        shutil.copyfile(export_csv_path, canonical_csv_path)
+                        print(
+                            f"[RECONCILE] Safely updated canonical {field_name}.json with {len(all_field_records)} recovered records "
+                            f"(original preserved at {orig_bak_json}, separate output at {export_json_path})",
+                            flush=True
+                        )
+            else:
+                export_json_path = "streamed_to_postgres"
+                export_csv_path = "streamed_to_postgres"
 
             # Check field completion
             clean_failed_list = [c for c in field_progress.get("failed_chunk_ids", []) if c not in completed_chunk_ids]
@@ -1112,21 +1277,22 @@ out center tags;"""
             if all_chunks_done and failed_chunk_count == 0:
                 field_progress["status"] = "completed"
                 field_progress["completed_at"] = datetime.now(timezone.utc).isoformat()
-                field_progress["records_collected"] = len(all_field_records)
+                field_progress["records_collected"] = field_record_count
                 field_progress["chunks_completed"] = len(completed_chunk_ids)
                 self._save_progress()
 
-                state_total_records += len(all_field_records)
-                state_fields_summary[field_name] = len(all_field_records)
-                state_logger.info(f"Field {field_name} COMPLETED with {len(all_field_records)} deduplicated records.")
+                state_total_records += field_record_count
+                state_fields_summary[field_name] = field_record_count
+                state_logger.info(f"Field {field_name} COMPLETED with {field_record_count} deduplicated records.")
             else:
                 field_progress["status"] = "in_progress"
                 field_progress["completed_at"] = None
-                field_progress["records_collected"] = len(all_field_records)
+                field_progress["records_collected"] = field_record_count
                 field_progress["chunks_completed"] = len(completed_chunk_ids)
                 self._save_progress()
 
-                state_fields_summary[field_name] = len(all_field_records)
+                state_total_records += field_record_count
+                state_fields_summary[field_name] = field_record_count
                 state_logger.warning(f"Field {field_name} remains incomplete: {failed_chunk_count} failed, {len(completed_chunk_ids)}/{total_chunks} chunks done.")
 
             # Print field summary immediately upon field finish
@@ -1138,7 +1304,7 @@ out center tags;"""
             print(f"  Successful chunks : {len(completed_chunk_ids)}", flush=True)
             print(f"  Failed chunks     : {failed_chunk_count}", flush=True)
             print(f"  Pending chunks    : {max(0, total_chunks - len(completed_chunk_ids))}", flush=True)
-            print(f"  Records collected : {len(all_field_records)} (deduplicated)", flush=True)
+            print(f"  Records collected : {field_record_count} (deduplicated)", flush=True)
             print(f"  Export JSON       : {export_json_path}", flush=True)
             print(f"  Export CSV        : {export_csv_path}", flush=True)
             print(f"  Elapsed time      : {field_elapsed}s", flush=True)
@@ -1149,12 +1315,19 @@ out center tags;"""
             for f in fields_to_run
         )
 
+        records_list = list(state_collected_records.values())
+        if max_records is not None and max_records > 0:
+            records_list = records_list[:max_records]
+
+        eff_total_records = len(state_seen_keys) if stream_only else (len(records_list) if max_records else state_total_records)
+
         state_summary: Dict[str, Any] = {
             "state": state_name,
             "state_code": state_code,
             "status": "completed" if all_fields_completed else "in_progress",
             "fields": state_fields_summary,
-            "total_records": state_total_records,
+            "total_records": eff_total_records,
+            "collected_records": records_list,
             "chunks_total": total_chunks,
             "completed_at": datetime.now(timezone.utc).isoformat() if all_fields_completed else None
         }

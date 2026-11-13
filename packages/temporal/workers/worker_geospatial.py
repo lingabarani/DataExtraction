@@ -22,6 +22,8 @@ for p in [str(REPO_ROOT), str(REPO_ROOT / "packages"), str(REPO_ROOT / "packages
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from packages.infrastructure.metrics import start_worker_metrics_server
+from packages.infrastructure.structured_logger import get_structured_logger
 from packages.temporal.client import get_temporal_client
 from packages.temporal.config import QUEUE_GEOSPATIAL, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.gmaps_activities import (
@@ -39,6 +41,7 @@ from packages.temporal.activities.pipeline_activities import validate_geo_activi
 from packages.temporal.activities.storage_activities import (
     ingest_kg_observation_activity,
     check_gmp_budget_activity,
+    replay_lakehouse_outbox_activity,
     storage_query_activity,
 )
 from packages.temporal.workflows.w2_geospatial_workflow import Agent2GeospatialWorkflow
@@ -49,13 +52,15 @@ logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
 )
-logger = logging.getLogger("dataextraction.worker.geospatial")
+logger = get_structured_logger("dataextraction.worker.geospatial").bind(source="worker_geospatial")
 
 TASK_QUEUE = QUEUE_GEOSPATIAL
 MAX_ACTIVITIES = WORKER_MAX_ACTIVITIES.get(QUEUE_GEOSPATIAL, 10)
+METRICS_PORT = int(os.getenv("GEOSPATIAL_METRICS_PORT", "9102"))
 
 
 async def run_worker():
+    start_worker_metrics_server(METRICS_PORT)
     client = await get_temporal_client()
     logger.info("Starting Worker 2 (Geospatial & Domain Intelligence) on queue: %s", TASK_QUEUE)
 
@@ -70,6 +75,7 @@ async def run_worker():
         validate_geo_activity,
         ingest_kg_observation_activity,
         check_gmp_budget_activity,
+        replay_lakehouse_outbox_activity,
         storage_query_activity,
     ]
     workflows = [

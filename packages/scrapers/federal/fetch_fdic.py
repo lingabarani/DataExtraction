@@ -28,14 +28,19 @@ from pathlib import Path
 
 import requests
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.config_manager import config_manager
+    from packages.infrastructure.db_connector import get_connection, release_connection, db_info
     from packages.domain.contact_validator import validate_contact, lead_score_from_contact
     from packages.infrastructure.http_client import get_http_client
     from packages.domain.geo_validator import format_postal_code
 except ImportError:
-    from db_connector import get_connection, db_info
+    from config_manager import config_manager
+    from db_connector import get_connection, release_connection, db_info
     from contact_validator import validate_contact, lead_score_from_contact
     from http_client import get_http_client
     from geo_validator import format_postal_code
@@ -53,25 +58,31 @@ def _upsert(cur, record: dict):
 
 # ── FDIC ──────────────────────────────────────────────────────────────────────
 
-def fetch_fdic(conn, cur, dry_run: bool) -> int:
+def fetch_fdic(conn, cur, dry_run: bool, limit: int = 0, stats: dict | None = None) -> int:
     print("  [*] Fetching FDIC bank data...")
     inserted = 0
+    errors   = 0
     offset   = 0
-    limit    = 1000
+    page_size = min(1000, limit) if limit and limit > 0 else 1000
     client   = get_http_client()
 
     while True:
+        if limit and inserted >= limit:
+            break
+        batch_req = min(page_size, limit - inserted) if limit else page_size
         r = client.get(f"{FDIC_API}/institutions", params={
             "fields": "NAME,STNAME,CITY,ZIP,STALP,PHONE,ACTIVE,CERT,"
                       "ASSET,NAMEHCR,CHRTAGNT,CEO",
             "filters": "ACTIVE:1",
-            "limit":   limit,
+            "limit":   batch_req,
             "offset":  offset,
             "sort_by": "ASSET",
             "sort_order": "DESC",
         }, timeout=20)
 
         if r.status_code != 200:
+            if offset == 0:
+                raise RuntimeError(f"FDIC API HTTP {r.status_code}: {r.text[:200]}")
             break
 
         data  = r.json()
@@ -80,6 +91,8 @@ def fetch_fdic(conn, cur, dry_run: bool) -> int:
             break
 
         for b in banks:
+            if limit and inserted >= limit:
+                break
             d    = b.get("data", b)
             name = d.get("NAME") or d.get("name")
             if not name:
@@ -171,28 +184,34 @@ def fetch_fdic(conn, cur, dry_run: bool) -> int:
                 if dry_run and inserted <= 2:
                     print(f"  [DRY FDIC] {name} | CEO={ceo} | phone={phone}")
             except Exception as e:
-                if conn: conn.rollback()
+                errors += 1
+                if errors <= 5:
+                    print(f"\n  [ERR FDIC] {name}: {e}")
+                if conn:
+                    conn.rollback()
 
-        if not dry_run and inserted % BATCH_COMMIT == 0:
+        if not dry_run and inserted % BATCH_COMMIT == 0 and inserted > 0:
             conn.commit()
             print(f"\r  FDIC: {inserted:,} banks inserted", end="", flush=True)
 
         meta     = data.get("meta", {})
         total    = meta.get("total", 0)
-        offset  += limit
-        if offset >= total:
+        offset  += batch_req
+        if offset >= total or (limit and inserted >= limit):
             break
         time.sleep(0.1)
 
-    if not dry_run:
+    if not dry_run and conn:
         conn.commit()
-    print(f"\n  [+] FDIC: {inserted:,} banks")
+    if stats is not None:
+        stats["errors"] = stats.get("errors", 0) + errors
+    print(f"\n  [+] FDIC: {inserted:,} banks (errors={errors})")
     return inserted
 
 
 # ── NCUA ──────────────────────────────────────────────────────────────────────
 
-def fetch_ncua(conn, cur, dry_run: bool) -> int:
+def fetch_ncua(conn, cur, dry_run: bool, limit: int = 0, stats: dict | None = None) -> int:
     print("\n  [*] Fetching NCUA credit union data...")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = OUTPUT_DIR / "ncua_call_report.zip"
@@ -210,6 +229,7 @@ def fetch_ncua(conn, cur, dry_run: bool) -> int:
             return 0
 
     inserted = 0
+    errors = 0
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             csv_files = [n for n in zf.namelist()
@@ -226,6 +246,8 @@ def fetch_ncua(conn, cur, dry_run: bool) -> int:
                 stream = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
                 reader = csv.DictReader(stream)
                 for row in reader:
+                    if limit and inserted >= limit:
+                        break
                     name  = row.get("CU_NAME") or row.get("CREDIT_UNION_NAME")
                     if not name: continue
                     cu_id = row.get("CU_NUMBER") or row.get("CHARTER_NUMBER", "")
@@ -303,28 +325,37 @@ def fetch_ncua(conn, cur, dry_run: bool) -> int:
                         inserted += 1
                         if dry_run and inserted <= 2:
                             print(f"  [DRY NCUA] {name} | CEO={ceo} | phone={phone}")
-                    except Exception:
-                        if conn: conn.rollback()
+                    except Exception as e:
+                        errors += 1
+                        if errors <= 5:
+                            print(f"\n  [ERR NCUA] {name}: {e}")
+                        if conn:
+                            conn.rollback()
 
-                    if not dry_run and inserted % BATCH_COMMIT == 0:
+                    if not dry_run and inserted % BATCH_COMMIT == 0 and inserted > 0:
                         conn.commit()
                         print(f"\r  NCUA: {inserted:,} credit unions", end="", flush=True)
 
     except Exception as e:
+        errors += 1
         print(f"  [!] NCUA error: {e}")
 
     if not dry_run and conn:
         conn.commit()
-    print(f"\n  [+] NCUA: {inserted:,} credit unions")
+    if stats is not None:
+        stats["errors"] = stats.get("errors", 0) + errors
+    print(f"\n  [+] NCUA: {inserted:,} credit unions (errors={errors})")
     return inserted
 
 
-def run(source: str = "both", dry_run: bool = False):
+def run(source: str = "both", limit: int = 0, dry_run: bool = False, mode: str = "incremental"):
     print(f"\n{'='*60}")
     print(f"  FDIC Banks + NCUA Credit Unions Scraper")
     print(f"{'='*60}")
     print(f"  DB      : {db_info()}")
     print(f"  Source  : {source}")
+    print(f"  Mode    : {mode}")
+    print(f"  Limit   : {limit or 'unlimited'}")
     print(f"  Dry run : {dry_run}")
     print(f"{'='*60}\n")
 
@@ -333,31 +364,65 @@ def run(source: str = "both", dry_run: bool = False):
     cur  = conn.cursor() if conn else None
 
     total = 0
+    db_count = 0
+    stats = {"errors": 0}
     start = datetime.now(timezone.utc)
 
-    if source in ("both", "fdic"):
-        total += fetch_fdic(conn, cur, dry_run)
-    if source in ("both", "ncua"):
-        total += fetch_ncua(conn, cur, dry_run)
+    try:
+        if source in ("both", "fdic"):
+            total += fetch_fdic(conn, cur, dry_run, limit=limit, stats=stats)
+        if source in ("both", "ncua"):
+            remaining = (limit - total) if limit and limit > 0 else 0
+            if not limit or remaining > 0:
+                total += fetch_ncua(conn, cur, dry_run, limit=remaining, stats=stats)
 
-    if not dry_run and conn:
-        cur.execute("SELECT COUNT(*) FROM us_leads WHERE api_source IN ('FDIC','NCUA')")
-        db_count = cur.fetchone()[0]
-        conn.close()
-    else:
-        db_count = total
+        errors = stats.get("errors", 0)
+        total_attempted = total + errors
+        threshold = float(config_manager.get_registry_config().get("error_threshold_pct", 25.0))
+        if total_attempted >= 20 and (errors / total_attempted * 100.0) > threshold:
+            raise RuntimeError(
+                f"FDIC+NCUA error rate {(errors / total_attempted * 100.0):.1f}% exceeded threshold {threshold}%"
+            )
+
+        if not dry_run and conn:
+            cur.execute(
+                "SELECT COUNT(*) FROM staging_dataextraction.staging_companies WHERE source IN ('FDIC','FDIC_BANKS','NCUA')"
+            )
+            db_count = cur.fetchone()[0]
+        else:
+            db_count = total
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            release_connection(conn)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n  {'─'*58}")
     print(f"  FDIC+NCUA complete in {elapsed:.0f}s")
     print(f"  Total inserted : {total:,}")
-    print(f"  DB total       : {db_count:,} bank/CU records in us_leads")
+    print(f"  Errors         : {stats.get('errors', 0)}")
+    print(f"  DB total       : {db_count:,} bank/CU records in staging_companies")
     print(f"  {'─'*58}\n")
+    print(
+        "ACTIVITY_RESULT_JSON:" + json.dumps({
+            "status": "SUCCESS",
+            "source": "FDIC",
+            "inserted_count": total,
+            "error_count": stats.get("errors", 0),
+            "db_total": db_count,
+            "dry_run": dry_run,
+        }),
+        flush=True,
+    )
+    return total
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source",  default="both", choices=["both","fdic","ncua"])
+    parser.add_argument("--source",  default="both", choices=["both", "fdic", "ncua"])
+    parser.add_argument("--mode",    default="incremental", choices=["incremental", "full"])
+    parser.add_argument("--limit",   type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    run(source=args.source, dry_run=args.dry_run)
+    run(source=args.source, limit=args.limit, dry_run=args.dry_run, mode=args.mode)

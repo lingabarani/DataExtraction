@@ -21,14 +21,19 @@ from pathlib import Path
 
 import requests
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from packages.infrastructure.db_connector import get_connection, db_info
+    from packages.infrastructure.config_manager import config_manager
+    from packages.infrastructure.db_connector import get_connection, release_connection, db_info
     from packages.domain.contact_validator import validate_contact, lead_score_from_contact
     from packages.infrastructure.http_client import get_http_client
     from packages.domain.geo_validator import format_postal_code
 except ImportError:
-    from db_connector import get_connection, db_info
+    from config_manager import config_manager
+    from db_connector import get_connection, release_connection, db_info
     from contact_validator import validate_contact, lead_score_from_contact
     from http_client import get_http_client
     from geo_validator import format_postal_code
@@ -65,13 +70,24 @@ def _upsert(cur, record: dict):
     upsert_staging_record(cur, record, source="USASPENDING")
 
 
-def _fetch_recipients(naics_prefix: str, page: int = 1) -> dict:
+def _fetch_recipients(naics_prefix: str, page: int = 1, fiscal_year: int | None = None) -> dict:
     """Fetch award recipients for a NAICS prefix."""
+    today = datetime.now(timezone.utc).date()
+    if fiscal_year:
+        fy = int(fiscal_year)
+        start_date = f"{fy - 1}-10-01"
+        end_date = min(today, datetime(fy, 9, 30, tzinfo=timezone.utc).date()).strftime("%Y-%m-%d")
+        if start_date > end_date:
+            start_date = f"{today.year - 2}-01-01"
+    else:
+        start_date = f"{today.year - 2}-01-01"
+        end_date = today.strftime("%Y-%m-%d")
+
     payload = {
         "filters": {
             "award_type_codes": AWARD_TYPES,
             "naics_codes": {"require": [naics_prefix]},
-            "time_period": [{"start_date": "2023-01-01", "end_date": "2025-12-31"}],
+            "time_period": [{"start_date": start_date, "end_date": end_date}],
         },
         "fields": [
             "Recipient Name", "recipient_id",
@@ -95,8 +111,9 @@ def _fetch_recipients(naics_prefix: str, page: int = 1) -> dict:
         )
         if r.status_code == 200:
             return r.json()
+        print(f"\n  [!] USASpending HTTP {r.status_code} (naics={naics_prefix}, page={page}): {r.text[:150]}")
     except Exception as e:
-        print(f"\n  [ERR] {e}")
+        print(f"\n  [ERR] USASpending request failed: {e}")
     return {}
 
 
@@ -178,11 +195,14 @@ def _make_lead(award: dict) -> dict | None:
     }
 
 
-def run(limit: int = 0, dry_run: bool = False):
+def run(limit: int = 0, dry_run: bool = False, mode: str = "incremental", fiscal_year: int | None = None):
     print(f"\n{'='*60}")
     print(f"  USASpending.gov Federal Contractors Scraper")
     print(f"{'='*60}")
     print(f"  DB      : {db_info()}")
+    print(f"  Mode    : {mode}")
+    if fiscal_year:
+        print(f"  FY      : {fiscal_year}")
     print(f"  Limit   : {limit or 'unlimited'}")
     print(f"  Dry run : {dry_run}")
     print(f"{'='*60}\n")
@@ -193,77 +213,106 @@ def run(limit: int = 0, dry_run: bool = False):
     inserted = errors = 0
     seen     = set()
     start    = datetime.now(timezone.utc)
+    db_count = 0
 
-    for naics in NAICS_SECTORS:
-        if limit and inserted >= limit:
-            break
-        page = 1
-        while True:
+    try:
+        for naics in NAICS_SECTORS:
             if limit and inserted >= limit:
                 break
-
-            data   = _fetch_recipients(naics, page)
-            awards = data.get("results", [])
-            if not awards:
-                break
-
-            for award in awards:
+            page = 1
+            while True:
                 if limit and inserted >= limit:
                     break
-                uid_key = (award.get("Recipient Name", "") + naics)
-                if uid_key in seen:
-                    continue
-                seen.add(uid_key)
 
-                lead = _make_lead(award)
-                if not lead:
-                    continue
-                try:
-                    if not dry_run:
-                        _upsert(cur, lead)
-                    inserted += 1
-                    if dry_run and inserted <= 3:
-                        print(f"  [DRY] {lead['company_name']} | "
-                              f"naics={lead['naics_code']} | state={lead['state_code']}")
-                except Exception as e:
-                    errors += 1
-                    if conn: conn.rollback()
+                data   = _fetch_recipients(naics, page, fiscal_year=fiscal_year)
+                awards = data.get("results", [])
+                if not awards:
+                    break
 
-            if not dry_run and inserted % BATCH_COMMIT == 0:
-                conn.commit()
-                elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-                rate = inserted / elapsed if elapsed > 0 else 0
-                print(f"\r  NAICS {naics} | page {page} | "
-                      f"inserted={inserted:,} | {rate:.0f}/s", end="", flush=True)
+                for award in awards:
+                    if limit and inserted >= limit:
+                        break
+                    uid_key = (award.get("Recipient Name", "") + naics)
+                    if uid_key in seen:
+                        continue
+                    seen.add(uid_key)
 
-            meta       = data.get("page_metadata", {})
-            total_pages = meta.get("page", {})
-            has_next   = meta.get("hasNext", False)
-            if not has_next or page >= 20:   # cap at 20 pages per NAICS
-                break
-            page += 1
-            time.sleep(0.2)
+                    lead = _make_lead(award)
+                    if not lead:
+                        continue
+                    try:
+                        if not dry_run:
+                            _upsert(cur, lead)
+                        inserted += 1
+                        if dry_run and inserted <= 3:
+                            print(f"  [DRY] {lead['company_name']} | "
+                                  f"naics={lead['naics_code']} | state={lead['state_code']}")
+                    except Exception as e:
+                        errors += 1
+                        if errors <= 5:
+                            print(f"\n  [ERR USASPENDING] {lead.get('company_name')}: {e}")
+                        if conn:
+                            conn.rollback()
 
-    if not dry_run and conn:
-        conn.commit()
-        cur.execute("SELECT COUNT(*) FROM us_leads WHERE api_source='USASPENDING'")
-        db_count = cur.fetchone()[0]
-        conn.close()
-    else:
-        db_count = inserted
+                if not dry_run and inserted % BATCH_COMMIT == 0 and inserted > 0:
+                    conn.commit()
+                    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+                    rate = inserted / elapsed if elapsed > 0 else 0
+                    print(f"\r  NAICS {naics} | page {page} | "
+                          f"inserted={inserted:,} | {rate:.0f}/s", end="", flush=True)
+
+                meta     = data.get("page_metadata", {})
+                has_next = meta.get("hasNext", False)
+                if not has_next or page >= 20:   # cap at 20 pages per NAICS
+                    break
+                page += 1
+                time.sleep(0.2)
+
+        total_attempted = inserted + errors
+        threshold = float(config_manager.get_registry_config().get("error_threshold_pct", 25.0))
+        if total_attempted >= 20 and (errors / total_attempted * 100.0) > threshold:
+            raise RuntimeError(
+                f"USASpending error rate {(errors / total_attempted * 100.0):.1f}% exceeded threshold {threshold}%"
+            )
+
+        if not dry_run and conn:
+            conn.commit()
+            cur.execute("SELECT COUNT(*) FROM staging_dataextraction.staging_companies WHERE source='USASPENDING'")
+            db_count = cur.fetchone()[0]
+        else:
+            db_count = inserted
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            release_connection(conn)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n\n  {'─'*58}")
     print(f"  USASpending complete in {elapsed:.0f}s")
     print(f"  Inserted : {inserted:,}")
     print(f"  Errors   : {errors}")
-    print(f"  DB total : {db_count:,} USASpending records in us_leads")
+    print(f"  DB total : {db_count:,} USASpending records in staging_companies")
     print(f"  {'─'*58}\n")
+    print(
+        "ACTIVITY_RESULT_JSON:" + json.dumps({
+            "status": "SUCCESS",
+            "source": "USASPENDING",
+            "inserted_count": inserted,
+            "error_count": errors,
+            "db_total": db_count,
+            "dry_run": dry_run,
+        }),
+        flush=True,
+    )
+    return inserted
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit",   type=int, default=0)
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--fiscal-year", type=int, default=None)
+    parser.add_argument("--mode",        default="incremental", choices=["incremental", "full"])
+    parser.add_argument("--limit",       type=int, default=0)
+    parser.add_argument("--dry-run",     action="store_true")
     args = parser.parse_args()
-    run(limit=args.limit, dry_run=args.dry_run)
+    run(limit=args.limit, dry_run=args.dry_run, mode=args.mode, fiscal_year=args.fiscal_year)

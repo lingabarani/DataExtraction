@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from db_connector import get_cursor
+from packages.infrastructure.db_connector import get_cursor
 
 logger = logging.getLogger("oneextraction.dlq")
 

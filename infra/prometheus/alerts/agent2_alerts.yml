@@ -1,0 +1,44 @@
+groups:
+  - name: agent2_geospatial_alerts
+    rules:
+      - alert: Agent2LakehouseOutboxBacklogHigh
+        expr: agent2_lakehouse_outbox_backlog > 500
+        for: 5m
+        labels:
+          severity: warning
+          agent: agent2
+        annotations:
+          summary: "Agent 2 Lakehouse outbox backlog exceeds 500 pending uploads"
+          description: "MinIO/Lakehouse uploads are queueing in PostgreSQL outbox ({{ $value }} pending)."
+
+      - alert: Agent2GeospatialWorkerDown
+        expr: up{job="worker-geospatial"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          agent: agent2
+        annotations:
+          summary: "Agent 2 geospatial worker metrics endpoint is unreachable"
+          description: "Prometheus cannot scrape worker-geospatial metrics on port 9102."
+
+      - alert: Agent2WebsiteVerificationFailureSpike
+        expr: |
+          sum(rate(agent2_website_verifications_total{status="failed"}[5m]))
+          / clamp_min(sum(rate(agent2_website_verifications_total[5m])), 0.001) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          agent: agent2
+        annotations:
+          summary: "Agent 2 website verification failure rate > 50%"
+          description: "Investigate outbound HTTP connectivity, DNS, or SSRF blocks."
+
+      - alert: Agent2DeadLetterQueueBacklogCritical
+        expr: dataextraction_dlq_alert_status == 1
+        for: 5m
+        labels:
+          severity: critical
+          agent: agent2
+        annotations:
+          summary: "Dead-letter queue pending count exceeded critical threshold"
+          description: "DLQ backpressure active; inspect /api/dlq and replay records."

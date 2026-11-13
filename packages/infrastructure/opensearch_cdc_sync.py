@@ -112,6 +112,9 @@ PERSON_INDEX_MAPPING = {
 class OpenSearchCDCSyncClient:
     """
     Manages OpenSearch connection, index templates, and PostgreSQL CDC streaming.
+
+    The requests.Session is created lazily on first use rather than at module
+    import time, eliminating the HTTPAdapter construction cost from cold start.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -120,7 +123,18 @@ class OpenSearchCDCSyncClient:
         self.auth = (self.config.get("user", "admin"), self.config.get("password", "admin"))
         self.verify = self.config.get("verify_certs", False)
         self.timeout = self.config.get("timeout", 30)
-        self.session = self._create_session()
+        self._session: Optional[requests.Session] = None  # created on first use
+
+    def _get_session(self) -> requests.Session:
+        """Return the shared session, creating it lazily on first access."""
+        if self._session is None:
+            self._session = self._create_session()
+        return self._session
+
+    @property
+    def session(self) -> requests.Session:
+        """Backward-compatible property for code that accesses .session directly."""
+        return self._get_session()
 
     def _create_session(self) -> requests.Session:
         s = requests.Session()
@@ -495,14 +509,31 @@ class OpenSearchCDCSyncClient:
         }
 
 
-# Global singleton instance
-opensearch_client = OpenSearchCDCSyncClient()
+# Lazy global singleton proxy — prevents OpenSearchCDCSyncClient initialization
+# (config resolution & HTTP setup) until first attribute access.
+_opensearch_client_instance: Optional[OpenSearchCDCSyncClient] = None
+
+
+def get_opensearch_client() -> OpenSearchCDCSyncClient:
+    global _opensearch_client_instance
+    if _opensearch_client_instance is None:
+        _opensearch_client_instance = OpenSearchCDCSyncClient()
+    return _opensearch_client_instance
+
+
+class _LazyOpenSearchClientProxy:
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_opensearch_client(), name)
+
+
+opensearch_client = _LazyOpenSearchClientProxy()
 opensearch_cdc_sync = opensearch_client
 
 __all__ = [
     "COMPANY_INDEX_MAPPING",
     "PERSON_INDEX_MAPPING",
     "OpenSearchCDCSyncClient",
+    "get_opensearch_client",
     "opensearch_client",
     "opensearch_cdc_sync",
 ]

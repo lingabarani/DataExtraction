@@ -131,8 +131,11 @@ def hydrate_us_leads(conn, target_leads: int = 15000):
 
     leads_to_insert = []
 
-    # 1. First load from us_people.json if available
-    us_people_path = ROOT_DIR.parent / "OneExtraction" / "botasaurus" / "output" / "us" / "api" / "people" / "us_people.json"
+    # 1. Load from us_people.json if available (path relative to repo data directory)
+    us_people_path = ROOT_DIR / "data" / "us_people.json"
+    if not us_people_path.exists():
+        # Legacy fallback path — only works if old project is adjacent
+        us_people_path = ROOT_DIR.parent / "OneExtraction" / "botasaurus" / "output" / "us" / "api" / "people" / "us_people.json"
     if us_people_path.exists():
         with open(us_people_path, "r", encoding="utf-8") as f:
             p_data = json.load(f)

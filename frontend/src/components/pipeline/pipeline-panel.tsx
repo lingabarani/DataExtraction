@@ -1079,43 +1079,43 @@ export function PipelinePanel() {
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">Orgs Ingested</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {(sagaTelemetry.metrics?.organizations_processed || sagaTelemetry.metrics?.records_ingested || (sagaTelemetry.status === "COMPLETED" ? 200147 : 0)).toLocaleString()}
+                      {(sagaTelemetry.metrics?.organizations_processed ?? sagaTelemetry.metrics?.records_ingested ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">Geo Standardized</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {(sagaTelemetry.metrics?.spatial_standardized || (sagaTelemetry.status === "COMPLETED" ? 10691 : 0)).toLocaleString()}
+                      {(sagaTelemetry.metrics?.spatial_standardized ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">Clusters Resolved</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {(sagaTelemetry.metrics?.clusters_resolved || sagaTelemetry.metrics?.records_deduped || (sagaTelemetry.status === "COMPLETED" ? 52661 : 0)).toLocaleString()}
+                      {(sagaTelemetry.metrics?.clusters_resolved ?? sagaTelemetry.metrics?.records_deduped ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">Execs Discovered</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {(sagaTelemetry.metrics?.executives_identified || (sagaTelemetry.status === "COMPLETED" ? 64759 : 0)).toLocaleString()}
+                      {(sagaTelemetry.metrics?.executives_identified ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">Emails Verified</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {(sagaTelemetry.metrics?.emails_verified || sagaTelemetry.metrics?.records_enriched || (sagaTelemetry.status === "COMPLETED" ? 57160 : 0)).toLocaleString()}
+                      {(sagaTelemetry.metrics?.emails_verified ?? sagaTelemetry.metrics?.records_enriched ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">CDC Projections</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {(sagaTelemetry.metrics?.search_documents_projected || sagaTelemetry.metrics?.opensearch_synced || (sagaTelemetry.status === "COMPLETED" ? 210838 : 0)).toLocaleString()}
+                      {(sagaTelemetry.metrics?.search_documents_projected ?? sagaTelemetry.metrics?.opensearch_synced ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-muted/40 p-2.5 rounded-lg border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">Avg Quality</span>
                     <span className="text-lg font-bold font-mono text-emerald-600">
-                      {sagaTelemetry.metrics?.quality_score ?? 94}%
+                      {sagaTelemetry.metrics?.quality_score ? `${sagaTelemetry.metrics.quality_score}%` : "—"}
                     </span>
                   </div>
                 </div>

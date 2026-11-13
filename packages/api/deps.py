@@ -1,24 +1,24 @@
 """
-DataExtraction — API Dependency Re-export
-=========================================
-Re-exports dependencies from packages.api.routers.deps.
-"""
+DataExtraction — Auth Dependency Re-export Shim
+================================================
+Backward-compatibility shim. All new code must import directly from:
+    packages.api.dependencies
 
-from packages.api.routers.deps import (
+This module simply re-exports the canonical symbols so legacy code that
+imports `from packages.api.deps import ...` continues to work.
+"""
+from packages.api.dependencies import (  # noqa: F401
     UserPrincipal,
     get_current_user,
     get_optional_user,
-    SECRET_KEY,
-    ALGORITHM,
-    _bearer_scheme,
+    require_admin,
+    get_db,
 )
 
 __all__ = [
     "UserPrincipal",
     "get_current_user",
     "get_optional_user",
-    "SECRET_KEY",
-    "ALGORITHM",
-    "_bearer_scheme",
+    "require_admin",
+    "get_db",
 ]
-
