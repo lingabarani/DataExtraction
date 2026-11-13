@@ -8,8 +8,9 @@ Usage:
 """
 
 import argparse
-import sqlite3
 import json
+import os
+import sqlite3
 import sys
 import time
 from datetime import datetime

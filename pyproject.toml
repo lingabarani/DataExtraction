@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dataextraction"
+version = "2.0.0"
+description = "Enterprise B2B Data Extraction and Autonomous Orchestration Platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+
+# ── Ruff Linter & Formatter Configuration ────────────────────────────────────
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = [
+    ".git",
+    ".github",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "node_modules",
+    "frontend",
+    "bin",
+    "data",
+    "output",
+    "scratch",
+]
+
+[tool.ruff.lint]
+# Enterprise production lint gate: catch syntax, undefined variables, and breaking bugs
+select = [
+    "E9",  # Syntax errors and fatal runtime breakages
+    "F",   # Pyflakes errors (undefined variables, invalid syntax)
+]
+ignore = [
+    "F401",  # Unused imports (handled per-file or in legacy shims)
+    "F841",  # Local variable assigned but never used
+    "F403",  # Star imports in legacy shims
+    "F541",  # f-string without placeholders
+    "F811",  # Redefinition of unused name / mock overrides
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401", "F841", "F811", "F821", "E712"]
+"packages/**/__init__.py" = ["F401", "F403"]
+"packages/agents/**" = ["F401", "F403", "F811", "F821"]
+
+# ── MyPy Static Type Checking Configuration ──────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "temporalio.*",
+    "splink.*",
+    "duckdb.*",
+    "pyarrow.*",
+    "psycopg2.*",
+    "redis.*",
+]
+ignore_missing_imports = true
+
+# ── Pytest Runner Configuration ──────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]

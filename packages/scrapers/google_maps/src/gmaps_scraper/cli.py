@@ -1,16 +1,21 @@
 import asyncio
+import logging
 import os
+import signal
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
+
 import typer
-from rich.console import Console, Group
-from rich.table import Table
-from rich.live import Live
-from rich.text import Text
 from rich import box
+from rich.console import Console, Group
+from rich.live import Live
+from rich.table import Table
+from rich.text import Text
+
+logger = logging.getLogger("gmaps_scraper.cli")
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:

@@ -24,7 +24,7 @@ hiredis==2.3.2
 # ── Data Processing ──────────────────────────────────────────────────────────
 pandas==2.2.2
 numpy==1.26.4
-pyarrow==16.0.0
+pyarrow>=18.0.0
 openpyxl==3.1.2
 tldextract==5.1.2
 
@@ -93,5 +93,4 @@ pip-audit==2.7.3
 # Both packages are required for the identity resolution pipeline to function.
 splink==5.0.0
 duckdb==2.0.0
-pyarrow>=18.0.0
 sqlglot>=17.6.0

@@ -7,9 +7,10 @@ or when new quarterly data batches are published.
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any
-from packages.agents.base_agent import BaseAgent, AgentDecision
+from datetime import datetime, timezone
+from typing import Any
+
+from packages.agents.base_agent import AgentDecision, BaseAgent
 from packages.agents.tools.db_tool import get_source_freshness
 from packages.agents.tools.temporal_tool import list_active_workflows
 
@@ -24,13 +25,13 @@ class FederalExtractionAgent(BaseAgent):
 
     DEFAULT_MAX_STALENESS_DAYS = 7
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         super().__init__(name="federal-extraction-agent", config=config or {})
         self.max_staleness_days = self.config.get(
             "max_staleness_days", self.DEFAULT_MAX_STALENESS_DAYS
         )
 
-    async def observe(self) -> Dict[str, Any]:
+    async def observe(self) -> dict[str, Any]:
         """
         Observes source timestamps and checks for running federal workflows.
         """
@@ -41,7 +42,7 @@ class FederalExtractionAgent(BaseAgent):
             "has_active_federal_ingestion": len(active_federal) > 0,
         }
 
-    async def decide(self, observations: Dict[str, Any]) -> AgentDecision:
+    async def decide(self, observations: dict[str, Any]) -> AgentDecision:
         """
         Decides whether to trigger an incremental federal ingestion workflow.
         """
