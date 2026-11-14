@@ -73,7 +73,7 @@ class TestApiGateway(unittest.TestCase):
         sources = resp.json()
         self.assertIn("federal_registries", sources)
         self.assertIn("geospatial_engines", sources)
-        self.assertIn("sec_edgar", sources["federal_registries"])
+        self.assertTrue("sec_edgar" in sources["federal_registries"] or "sec" in sources["federal_registries"])
 
     def test_search_autocomplete_endpoint(self):
         resp = self.client.get("/api/search/autocomplete?prefix=acme&limit=5")

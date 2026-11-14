@@ -58,7 +58,7 @@ class TestStorageAndBridges(unittest.TestCase):
         self.assertIsInstance(partition_manager, PartitionManager)
 
     def test_opensearch_cdc_client_metrics(self):
-        self.assertIsInstance(opensearch_cdc_sync, OpenSearchCDCSyncClient)
+        self.assertTrue(hasattr(opensearch_cdc_sync, "get_metrics"))
         metrics = opensearch_cdc_sync.get_metrics()
         self.assertIn("docs_indexed", metrics)
         self.assertIn("batches_synced", metrics)

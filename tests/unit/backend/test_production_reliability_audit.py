@@ -148,6 +148,7 @@ class TestProductionReliabilityAudit(unittest.TestCase):
     def test_orchestration_start_returns_503_when_temporal_offline(self):
         """POST /api/orchestration/start must reject with HTTP 503 if Temporal is offline."""
         import asyncio
+        from unittest.mock import patch
         from fastapi import HTTPException
         from packages.api.routers.orchestration_router import start_master_saga, StartSagaRequest
         from packages.api.dependencies import UserPrincipal
@@ -160,8 +161,9 @@ class TestProductionReliabilityAudit(unittest.TestCase):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            with self.assertRaises(HTTPException) as ctx:
-                loop.run_until_complete(start_master_saga(req, current_user=test_principal))
+            with patch("packages.api.routers.orchestration_router.get_temporal_client", side_effect=RuntimeError("Temporal server unreachable")):
+                with self.assertRaises(HTTPException) as ctx:
+                    loop.run_until_complete(start_master_saga(req, current_user=test_principal))
             self.assertEqual(ctx.exception.status_code, 503)
             self.assertEqual(ctx.exception.detail["error"], "TEMPORAL_CLUSTER_UNAVAILABLE")
         finally:

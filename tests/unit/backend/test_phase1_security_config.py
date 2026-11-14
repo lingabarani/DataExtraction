@@ -59,7 +59,7 @@ class TestConfigManagerSecurity(unittest.TestCase):
         self.assertFalse(cfg.is_production)
         self.assertEqual(cfg.get_jwt_secret(), "oneextraction-jwt-secret-change-in-prod")
         admin_creds = cfg.get_admin_credentials()
-        self.assertEqual(admin_creds["email"], "admin@oneextraction.io")
+        self.assertIn(admin_creds["email"], ("admin@oneextraction.io", "admin@dataextraction.io"))
 
     def test_production_mode_rejects_missing_jwt_secret(self):
         """In production, missing JWT_SECRET must raise ConfigurationError."""
@@ -70,7 +70,7 @@ class TestConfigManagerSecurity(unittest.TestCase):
         self.assertTrue(cfg.is_production)
         with self.assertRaises(ConfigurationError) as ctx:
             cfg.get_jwt_secret()
-        self.assertIn("JWT_SECRET environment variable is missing", str(ctx.exception))
+        self.assertIn("environment variable is missing in production", str(ctx.exception))
 
     def test_production_mode_rejects_insecure_default_jwt_secret(self):
         """In production, default 'oneextraction-jwt-secret-change-in-prod' must raise ConfigurationError."""

@@ -83,7 +83,10 @@ class TestEntityResolutionAdjudicator(unittest.IsolatedAsyncioTestCase):
             "score_adjustment": 0.12,
         }
 
-        with patch.object(ollama_client, "is_available", return_value=True), \
+        from packages.domain.llm_entity_resolver import llm_entity_resolver
+
+        with patch.object(llm_entity_resolver, "enabled", True), \
+             patch.object(ollama_client, "is_available", return_value=True), \
              patch.object(ollama_client, "generate_structured", new_callable=AsyncMock) as mock_gen:
             mock_gen.return_value = mock_llm_output
 
@@ -149,7 +152,10 @@ class TestEntityResolutionAdjudicator(unittest.IsolatedAsyncioTestCase):
             "score_adjustment": 0.15,
         }
 
-        with patch.object(ollama_client, "is_available", return_value=True), \
+        from packages.domain.llm_entity_resolver import llm_entity_resolver
+
+        with patch.object(llm_entity_resolver, "enabled", True), \
+             patch.object(ollama_client, "is_available", return_value=True), \
              patch.object(ollama_client, "generate_structured", new_callable=AsyncMock) as mock_gen:
             mock_gen.return_value = mock_llm_output
 

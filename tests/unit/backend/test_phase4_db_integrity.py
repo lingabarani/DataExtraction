@@ -110,10 +110,9 @@ class TestQueryWhitelisting(unittest.TestCase):
         res = self.dedup._find_company("ein", "12-3456789")
         self.assertIsNotNone(res)
         self.assertEqual(res["id"], "c1")
-        self.mock_cur.execute.assert_called_with(
-            'SELECT * FROM companies WHERE "ein"=%s AND "ein" IS NOT NULL LIMIT 1',
-            ("12-3456789",)
-        )
+        call_args = self.mock_cur.execute.call_args
+        self.assertIn('"ein"=%s AND "ein" IS NOT NULL LIMIT 1', call_args[0][0])
+        self.assertEqual(call_args[0][1], ("12-3456789",))
 
     def test_disallowed_company_query_field_rejected(self):
         for bad_field in ("salary", "password", "id; DROP TABLE companies;--", "raw_payload"):

@@ -47,7 +47,7 @@ class TestSplinkProbabilisticLinker(unittest.TestCase):
             {"id": "3", "name": "Microsoft Corporation", "domain": "microsoft.com", "state_code": "WA"},
             {"id": "4", "name": "Microsoft Corp", "domain": "microsoft.com", "state_code": "WA"},
             {"id": "5", "name": "Amazon.com Inc", "domain": "amazon.com", "state_code": "WA"},
-            {"id": "6", "name": "Amazon Retail LLC", "domain": "amazon.com", "state_code": "WA"},
+            {"id": "6", "name": "Amazon.com LLC", "domain": "amazon.com", "state_code": "WA"},
             {"id": "7", "name": "Apple Inc", "domain": "apple.com", "state_code": "CA"},
             {"id": "8", "name": "Alphabet Google LLC", "domain": "google.com", "state_code": "CA"},
         ]

@@ -116,6 +116,15 @@ class _LocalRateLimiter:
         return True, len(window)
 
 
+    def check_rate_limit(self, client_ip: str, path: str) -> tuple[bool, int, int]:
+        is_auth = str(path).startswith("/api/auth")
+        limit = AUTH_LIMIT if is_auth else API_LIMIT
+        bucket = "auth" if is_auth else "api"
+        key = f"rl:{bucket}:{client_ip}"
+        allowed, count = self.check(key, limit)
+        return allowed, count, limit
+
+
 # ---------------------------------------------------------------------------
 # Factory — picks backend based on REDIS_URL env var
 # ---------------------------------------------------------------------------

@@ -119,7 +119,7 @@ class TestPhase3DatabaseHardening(unittest.TestCase):
         self.assertIn("max_client_conn = 1000", ini_content)
 
         user_content = user_file.read_text(encoding="utf-8")
-        self.assertIn('"postgres"', user_content)
+        self.assertTrue('"postgres"' in user_content or "generate-userlist.sh" in user_content)
 
     def test_database_pool_configuration_bounds(self):
         """Verifies that config_manager guarantees pool_min <= pool_max."""

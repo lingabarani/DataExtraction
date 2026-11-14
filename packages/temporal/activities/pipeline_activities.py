@@ -28,6 +28,33 @@ from packages.infrastructure.db_connector import _assert_safe_identifier  # type
 logger = logging.getLogger("dataextraction.activities.pipeline")
 
 
+def _parse_table_ident(safe_table: str) -> tuple[str, str]:
+    parts = safe_table.split(".")
+    schema = parts[0] if len(parts) > 1 else "public"
+    tname = parts[-1]
+    return schema, tname
+
+
+def _ensure_columns_exist(cur, conn, safe_table: str, required_cols: list[tuple[str, str]]) -> None:
+    schema, tname = _parse_table_ident(safe_table)
+    cur.execute(
+        """
+        SELECT lower(column_name) FROM information_schema.columns
+        WHERE table_schema = %s AND table_name = %s;
+        """,
+        (schema, tname),
+    )
+    existing = {row[0] for row in cur.fetchall()}
+    missing = [c for c in required_cols if c[0].lower() not in existing]
+    if missing:
+        try:
+            for col_name, col_type in missing:
+                cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS {col_name} {col_type};")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
+
 @activity.defn(name="normalize_batch")
 async def normalize_batch_activity(source: str, table: str, batch_size: int = 5000) -> dict:
     """
@@ -58,12 +85,12 @@ async def normalize_batch_activity(source: str, table: str, batch_size: int = 50
         if conn:
             cur = conn.cursor()
             try:
-                # Check whether target is a VIEW or a TABLE
+                schema, tname = _parse_table_ident(safe_table)
                 cur.execute("""
                     SELECT table_type FROM information_schema.tables 
-                    WHERE table_name = %s
+                    WHERE table_schema = %s AND table_name = %s
                     LIMIT 1;
-                """, (safe_table,))
+                """, (schema, tname))
                 type_row = cur.fetchone()
                 is_view = type_row and type_row[0] == "VIEW"
 
@@ -80,12 +107,12 @@ async def normalize_batch_activity(source: str, table: str, batch_size: int = 50
                         normalized_count += 1
                 else:
                     # Ensure tracking columns exist on target base table
-                    try:
-                        cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS normalized_at TIMESTAMPTZ;")
-                        cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS normalized_name TEXT;")
-                        conn.commit()
-                    except Exception:
-                        conn.rollback()
+                    _ensure_columns_exist(
+                        cur,
+                        conn,
+                        safe_table,
+                        [("normalized_at", "TIMESTAMPTZ"), ("normalized_name", "TEXT")],
+                    )
 
                     # Query records that need normalization
                     cur.execute(
@@ -173,13 +200,16 @@ async def deduplicate_batch_activity(table: str, batch_size: int = 1000) -> dict
             cur = conn.cursor()
             try:
                 # Ensure tracking columns exist on target table
-                try:
-                    cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS deduplicated_at TIMESTAMPTZ;")
-                    cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS canonical_cluster_id TEXT;")
-                    cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS is_canonical BOOLEAN DEFAULT TRUE;")
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
+                _ensure_columns_exist(
+                    cur,
+                    conn,
+                    safe_table,
+                    [
+                        ("deduplicated_at", "TIMESTAMPTZ"),
+                        ("canonical_cluster_id", "TEXT"),
+                        ("is_canonical", "BOOLEAN DEFAULT TRUE"),
+                    ],
+                )
 
                 cur.execute(f"SELECT * FROM {safe_table} WHERE deduplicated_at IS NULL LIMIT %s", (batch_size,))
                 rows = cur.fetchall()

@@ -236,11 +236,11 @@ class TestAgent3IdentityExecution(unittest.TestCase):
 
             # Clean up test cluster rows
             conn = psycopg2.connect(
-                dbname="dataextraction",
-                user="dex_user",
-                password="DataExtraction2026!",
-                host="localhost",
-                port=5432,
+                dbname=os.getenv("POSTGRES_DB", "dataextraction"),
+                user=os.getenv("POSTGRES_USER", "dex_user"),
+                password=os.getenv("POSTGRES_PASSWORD", "DataExtraction2026!"),
+                host=os.getenv("POSTGRES_HOST", "localhost"),
+                port=int(os.getenv("POSTGRES_PORT", "5432")),
             )
             with conn.cursor() as cur:
                 cur.execute(

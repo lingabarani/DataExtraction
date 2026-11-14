@@ -250,7 +250,9 @@ class MasterOrchestrator:
             phase_start = self._safe_now()
             try:
                 a2_cfg = dict(config.get("agent_2") or config.get("geospatial") or {})
-                for key in ("sources", "data_count", "countries", "execution_mode", "geospatial_defaults"):
+                if "data_count" in config and "data_count" not in a2_cfg:
+                    a2_cfg["data_count"] = config["data_count"]
+                for key in ("sources", "countries", "execution_mode", "geospatial_defaults"):
                     if key in config and key not in a2_cfg:
                         a2_cfg[key] = config[key]
                 a2_result = await workflow.execute_child_workflow(
