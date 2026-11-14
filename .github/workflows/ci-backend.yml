@@ -67,8 +67,7 @@ jobs:
           POSTGRES_DB: dataextraction_test
           ENVIRONMENT: test
         run: |
-          python packages/infrastructure/setup_postgres.py --password testpassword --host localhost --port 5432 --user postgres --dbname dataextraction_test
-          python scripts/db/apply_kg_migration.py
+          python scripts/db/bootstrap_test_db.py
 
       - name: Run unit tests — backend (122 tests)
         if: matrix.suite == 'unit-backend'

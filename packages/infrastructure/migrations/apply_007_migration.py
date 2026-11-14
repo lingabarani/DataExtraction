@@ -24,7 +24,7 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from packages.infrastructure.db_connector import DB_HOST, DB_PORT, DB_USER, DB_PASS
+from packages.infrastructure.db_connector import DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("migration_007")
@@ -47,7 +47,7 @@ def run_migration_007():
         port=DB_PORT,
         user=DB_USER,
         password=DB_PASS,
-        dbname="dataextraction",
+        dbname=DB_NAME,
     )
     conn.autocommit = True
     cur = conn.cursor()
@@ -111,8 +111,8 @@ def run_migration_007():
 
         logger.info("Step 3: Setting database default search_path...")
         cur.execute(
-            """
-            ALTER DATABASE dataextraction SET search_path TO 
+            f"""
+            ALTER DATABASE "{DB_NAME}" SET search_path TO 
                 staging_dataextraction, 
                 master_dataextraction, 
                 identity_resolution, 
