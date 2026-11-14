@@ -18,9 +18,14 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 _CURRENT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _CURRENT_DIR.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 _MIGRATIONS_DIR = _CURRENT_DIR / "migrations"
 
 from packages.infrastructure.db_connector import get_connection, release_connection, DATABASE_TYPE
+
 
 
 def _compute_checksum(content: str) -> str:

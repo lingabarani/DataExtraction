@@ -32,7 +32,7 @@ jobs:
         image: postgis/postgis:15-3.4
         env:
           POSTGRES_PASSWORD: testpassword
-          POSTGRES_USER: dex_test
+          POSTGRES_USER: postgres
           POSTGRES_DB: dataextraction_test
         options: >-
           --health-cmd pg_isready
@@ -62,20 +62,20 @@ jobs:
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
-          POSTGRES_USER: dex_test
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: dataextraction_test
           ENVIRONMENT: test
         run: |
-          python packages/infrastructure/setup_postgres.py --password testpassword --host localhost --port 5432 || true
-          python packages/infrastructure/migrations/apply_013_migration.py || true
-          python packages/infrastructure/migrations/apply_014_migration.py || true
+          python packages/infrastructure/setup_postgres.py --password testpassword --host localhost --port 5432 --user postgres --dbname dataextraction_test
+          python scripts/db/apply_kg_migration.py
 
       - name: Run unit tests — backend (122 tests)
         if: matrix.suite == 'unit-backend'
         env:
           POSTGRES_HOST: localhost
-          POSTGRES_USER: dex_test
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: dataextraction_test
           ENVIRONMENT: test
@@ -87,7 +87,8 @@ jobs:
         if: matrix.suite == 'unit-gmaps'
         env:
           POSTGRES_HOST: localhost
-          POSTGRES_USER: dex_test
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: dataextraction_test
           ENVIRONMENT: test
@@ -98,7 +99,8 @@ jobs:
         if: matrix.suite == 'unit-osm'
         env:
           POSTGRES_HOST: localhost
-          POSTGRES_USER: dex_test
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: dataextraction_test
           ENVIRONMENT: test
@@ -109,7 +111,8 @@ jobs:
         if: matrix.suite == 'integration'
         env:
           POSTGRES_HOST: localhost
-          POSTGRES_USER: dex_test
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: dataextraction_test
           TEMPORAL_HOST: localhost:7233
@@ -121,7 +124,8 @@ jobs:
         if: matrix.suite == 'e2e'
         env:
           POSTGRES_HOST: localhost
-          POSTGRES_USER: dex_test
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: dataextraction_test
           TEMPORAL_HOST: localhost:7233

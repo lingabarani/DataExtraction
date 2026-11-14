@@ -32,28 +32,48 @@ if not DB_PASSWORD:
 
 
 def ensure_database():
+    # Test if DB_NAME is already reachable directly
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dbname=DB_NAME,
+            connect_timeout=5,
+        )
+        conn.close()
+        print(f"✅ Database '{DB_NAME}' already exists and is reachable.")
+        return
+    except psycopg2.OperationalError:
+        pass
+
     print(f"==> Connecting to PostgreSQL cluster at {DB_HOST}:{DB_PORT} as {DB_USER}...")
-    conn = psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        dbname="postgres",
-    )
-    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-    cur = conn.cursor()
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dbname="postgres",
+            connect_timeout=10,
+        )
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cur = conn.cursor()
 
-    cur.execute("SELECT 1 FROM pg_database WHERE datname = %s;", (DB_NAME,))
-    exists = cur.fetchone()
-    if not exists:
-        print(f"==> Database '{DB_NAME}' does not exist. Creating...")
-        cur.execute(f'CREATE DATABASE "{DB_NAME}";')
-        print(f"✅ Database '{DB_NAME}' created successfully.")
-    else:
-        print(f"✅ Database '{DB_NAME}' already exists.")
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s;", (DB_NAME,))
+        exists = cur.fetchone()
+        if not exists:
+            print(f"==> Database '{DB_NAME}' does not exist. Creating...")
+            cur.execute(f'CREATE DATABASE "{DB_NAME}";')
+            print(f"✅ Database '{DB_NAME}' created successfully.")
+        else:
+            print(f"✅ Database '{DB_NAME}' already exists.")
 
-    cur.close()
-    conn.close()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ ensure_database note: {e}")
 
 
 def apply_migration():

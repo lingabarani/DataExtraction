@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Globe2, BarChart3, Settings,
-  Download, Copy, Radio, Database, ChevronDown,
+  Download, Copy, Database, ChevronDown,
   LogOut, Circle, MapPin, Activity, Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,6 @@ const PRIMARY_NAV = [
 ];
 
 const TOOLS_NAV = [
-  { label: "Scraper", href: "/scraper", icon: Radio, dot: "green" as const },
   { label: "Pipeline & DLQ", href: "/pipeline", icon: Activity },
   { label: "Map Extraction", href: "/map-extraction", icon: MapPin },
   { label: "Duplicates", href: "/duplicates", icon: Copy },

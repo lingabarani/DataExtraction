@@ -41,10 +41,14 @@ secrets/
 *.db
 data/
 output/
+packages/api/output/
+packages/scrapers/open_map/data/
 cache/
 logs/
 *.log
 error_logs/
+bandit-report.json
+pip-audit-report.json
 
 # ── Node / Next.js ────────────────────────────────────────────────────────────
 node_modules/

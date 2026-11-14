@@ -23,13 +23,10 @@ CREATE SCHEMA IF NOT EXISTS master_dataextraction;
 CREATE SCHEMA IF NOT EXISTS search_dataextraction;
 
 -- 2. Configure Default Search Path
-ALTER DATABASE dataextraction SET search_path TO 
-    staging_dataextraction, 
-    master_dataextraction, 
-    identity_resolution, 
-    raw_dataextraction, 
-    search_dataextraction, 
-    public;
+DO $$
+BEGIN
+    EXECUTE format('ALTER DATABASE %I SET search_path TO staging_dataextraction, master_dataextraction, identity_resolution, raw_dataextraction, search_dataextraction, public;', current_database());
+END $$;
 
 -- 3. Grant Permissions
 GRANT USAGE, CREATE ON SCHEMA raw_dataextraction TO PUBLIC;

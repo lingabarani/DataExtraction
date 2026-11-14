@@ -175,7 +175,7 @@ class MDMLeadPromoter:
                     person_seed = f"{email_clean or full_name_clean}:{org_uuid}:{title_clean}"
                     person_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, person_seed))
 
-                    photo_clean = photo_url or f"https://media.licdn.com/dms/image/v2/{hashlib.md5(full_name_clean.encode()).hexdigest()[:16]}/profile-photo.jpg"
+                    photo_clean = photo_url or f"https://media.licdn.com/dms/image/v2/{hashlib.md5(full_name_clean.encode(), usedforsecurity=False).hexdigest()[:16]}/profile-photo.jpg"
                     dept_clean = department or "Executive Leadership"
                     depts_arr = [dept_clean]
 

@@ -154,8 +154,8 @@ class MDMGoldenRecordService:
                 full_name = f"{first} {middle} {last}"
                 work_email = f"{first.lower()}.{last.lower()}@{domain}"
                 phone = company_data.get("phone") or f"+1415{random.randint(2000000, 9999999)}"
-                linkedin_url = f"https://www.linkedin.com/in/{first.lower()}-{last.lower()}-{hashlib.md5(f'{first}{last}{name}'.encode()).hexdigest()[:8]}"
-                photo_url = f"https://media.licdn.com/dms/image/v2/{hashlib.md5(full_name.encode()).hexdigest()[:16]}/profile-photo.jpg"
+                linkedin_url = f"https://www.linkedin.com/in/{first.lower()}-{last.lower()}-{hashlib.md5(f'{first}{last}{name}'.encode(), usedforsecurity=False).hexdigest()[:8]}"
+                photo_url = f"https://media.licdn.com/dms/image/v2/{hashlib.md5(full_name.encode(), usedforsecurity=False).hexdigest()[:16]}/profile-photo.jpg"
 
                 det_person_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{persisted_org_id}:{full_name}:{title}"))
                 person_payload = {

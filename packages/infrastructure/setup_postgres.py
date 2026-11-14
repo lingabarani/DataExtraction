@@ -304,8 +304,22 @@ def warn(msg): _safe_print(f"  [WARN] {msg}")
 # ─── Step 1: Create database ──────────────────────────────────────────────────
 def create_database(host, port, password):
     banner("STEP 1 — Connect & Create Database")
+    # First, test if target database already exists and is directly reachable
     try:
-        # Connect to default 'postgres' db to create our db
+        conn = psycopg2.connect(
+            host=host, port=port,
+            user=PG_USER, password=password,
+            dbname=PG_DB_NAME,
+            connect_timeout=5
+        )
+        conn.close()
+        ok(f"Database '{PG_DB_NAME}' already exists and is reachable.")
+        return True
+    except psycopg2.OperationalError:
+        pass
+
+    try:
+        # Connect to default 'postgres' db to create target db if missing
         conn = psycopg2.connect(
             host=host, port=port,
             user=PG_USER, password=password,
@@ -372,8 +386,8 @@ def migrate_data(host, port, password):
     banner("STEP 3 — Migrate Data (SQLite → PostgreSQL)")
 
     if not Path(SQLITE_DB).exists():
-        fail(f"SQLite DB not found: {SQLITE_DB}")
-        return False
+        info(f"SQLite DB not found: {SQLITE_DB} — skipping data import.")
+        return {"companies": 0, "people": 0, "enrichment_results": 0}
 
     # Open both connections
     sqlite_conn = sqlite3.connect(SQLITE_DB)
@@ -603,13 +617,21 @@ def main():
     default_pwd = _db_conf.get("password") or os.getenv("POSTGRES_PASSWORD", "")
     default_host = _db_conf.get("host") or "localhost"
     default_port = _db_conf.get("port") or 5432
+    default_user = _db_conf.get("user") or os.getenv("POSTGRES_USER", "postgres")
+    default_dbname = _db_conf.get("dbname") or os.getenv("POSTGRES_DB", "dataextraction")
 
     parser = argparse.ArgumentParser(description="Setup OneExtraction PostgreSQL database")
     parser.add_argument("--password", default=default_pwd, help="PostgreSQL postgres user password (default: from config/env)")
     parser.add_argument("--host",     default=default_host, help="PostgreSQL host (default: localhost)")
     parser.add_argument("--port",     default=default_port, type=int, help="PostgreSQL port (default: 5432)")
+    parser.add_argument("--user",     default=default_user, help="PostgreSQL user (default: from config/env)")
+    parser.add_argument("--dbname",   default=default_dbname, help="PostgreSQL database name (default: from config/env)")
     parser.add_argument("--drop-existing", action="store_true", default=False, help="Explicitly drop existing tables (DANGEROUS)")
     args = parser.parse_args()
+
+    global PG_USER, PG_DB_NAME
+    PG_USER = args.user
+    PG_DB_NAME = args.dbname
 
     print("\n" + "="*60)
     print("  🐘 ONEEXTRACTION — POSTGRESQL SETUP & MIGRATION")

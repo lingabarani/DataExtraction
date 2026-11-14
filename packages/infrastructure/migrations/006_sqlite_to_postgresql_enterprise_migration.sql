@@ -22,6 +22,12 @@ CREATE SCHEMA IF NOT EXISTS resolution;
 CREATE SCHEMA IF NOT EXISTS master;
 CREATE SCHEMA IF NOT EXISTS search;
 
+GRANT USAGE, CREATE ON SCHEMA raw TO PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA staging TO PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA resolution TO PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA master TO PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA search TO PUBLIC;
+
 -- =============================================================================
 -- 1. STAGING: GOOGLE MAPS SCRAPER TABLES
 -- =============================================================================

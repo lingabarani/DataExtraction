@@ -24,7 +24,6 @@ const LABELS: Record<string, string> = {
   leads:         "US Leads",
   mexico:        "MX Leads",
   analytics:     "AI Query",
-  scraper:       "Scraper",
   duplicates:    "Duplicates",
   export:        "Export",
   settings:      "Settings",
