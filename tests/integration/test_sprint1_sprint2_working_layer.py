@@ -93,7 +93,7 @@ def test_sprint2_pre_master_redirection_end_to_end(db_conn):
       4. Agent 4 writes to staging_dataextraction.working_persons
       5. Zero records written to master_dataextraction.persons
     """
-    test_org_id = f"test-org-{uuid.uuid4().hex[:8]}"
+    test_org_id = f"00000000-test-org-{uuid.uuid4().hex[:8]}"
     test_domain = f"{test_org_id}.com"
     test_person_id = f"test-person-{uuid.uuid4().hex[:8]}"
 

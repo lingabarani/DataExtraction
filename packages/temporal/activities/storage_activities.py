@@ -110,7 +110,7 @@ async def resolve_dlq_record_activity(record_id: str, status: str, notes: str = 
 
 
 @activity.defn(name="get_dlq_stats")
-async def get_dlq_stats_activity(_: dict = None) -> dict:
+async def get_dlq_stats_activity(_: dict | None = None) -> dict:
     """
     Returns current DLQ statistics for monitoring by agents.
 
@@ -142,7 +142,7 @@ async def get_dlq_stats_activity(_: dict = None) -> dict:
 
 
 @activity.defn(name="storage_query")
-async def storage_query_activity(query_name: str, params: dict = None) -> dict:
+async def storage_query_activity(query_name: str, params: dict | None = None) -> dict:
     """
     Executes a named read-only storage query. Used by agents to observe state
     without direct DB access.
@@ -185,7 +185,7 @@ async def storage_query_activity(query_name: str, params: dict = None) -> dict:
 
 
 @activity.defn(name="check_gmp_budget")
-async def check_gmp_budget_activity(_: dict = None) -> dict:
+async def check_gmp_budget_activity(_: dict | None = None) -> dict:
     """
     Checks remaining Google Maps Platform daily budget.
     Used as a pre-condition gate before GMP enrichment activities.
@@ -666,11 +666,11 @@ async def resolve_cluster_membership_activity(payload: dict) -> dict:
             raise RuntimeError("PostgreSQL connection unavailable for resolve_cluster_membership")
         res = graph_identity_resolver.resolve_cluster_membership(
             conn=conn,
-            entity_type=payload.get("entity_type", "organization"),
-            canonical_id=payload.get("canonical_id"),
-            source_name=payload.get("source_name"),
-            source_record_id=payload.get("source_record_id"),
-            match_type=payload.get("match_type", "deterministic_domain"),
+            entity_type=str(payload.get("entity_type", "organization")),
+            canonical_id=str(payload.get("canonical_id") or ""),
+            source_name=str(payload.get("source_name") or "pipeline"),
+            source_record_id=str(payload.get("source_record_id") or ""),
+            match_type=str(payload.get("match_type", "deterministic_domain")),
             match_probability=float(payload.get("match_probability", 1.0)),
             match_features=payload.get("match_features"),
         )
@@ -701,9 +701,9 @@ async def unmerge_cluster_member_activity(payload: dict) -> dict:
             raise RuntimeError("PostgreSQL connection unavailable for unmerge_cluster_member")
         res = graph_identity_resolver.unmerge_member(
             conn=conn,
-            member_id=payload.get("member_id"),
-            reason=payload.get("reason", "Operator review"),
-            operator=payload.get("operator", "OPERATOR_DISPUTE_REVIEW"),
+            member_id=str(payload.get("member_id") or ""),
+            reason=str(payload.get("reason", "Operator review")),
+            operator=str(payload.get("operator", "OPERATOR_DISPUTE_REVIEW")),
         )
         conn.commit()
         return res
@@ -799,7 +799,7 @@ async def compute_bayesian_quality_activity(payload: dict) -> dict:
                     total_score = 0
                     for r in rows:
                         row_dict = dict(zip(cols, r))
-                        src = [row_dict.get("source")] if row_dict.get("source") else []
+                        src = [str(row_dict.get("source"))] if row_dict.get("source") else ["REGISTRY"]
                         score_res = bayesian_quality_engine.compute_entity_quality_score(
                             entity_data=row_dict,
                             entity_type="organization",
@@ -890,10 +890,12 @@ async def evaluate_working_governance_activity(config: Any = None, *args) -> dic
     against Bayesian Quality (>= 80), Trust (>= 0.8500), and Sanctions clearance.
     Transitions certified entities to 'APPROVED'; quarantines sub-threshold records to DLQ.
     """
+    target_org_ids = None
     if isinstance(config, dict):
         batch_size = int(config.get("batch_size", 5000))
         min_quality = int(config.get("min_quality", 80))
         min_trust = float(config.get("min_trust", 0.8500))
+        target_org_ids = config.get("org_ids")
     elif isinstance(config, (int, float)):
         batch_size = int(config)
         min_quality = int(args[0]) if len(args) > 0 else 80
@@ -921,18 +923,30 @@ async def evaluate_working_governance_activity(config: Any = None, *args) -> dic
         if conn:
             cur = conn.cursor()
             try:
-                cur.execute("""
-                    SELECT org_id, legal_name, display_name, primary_domain, website,
-                           statutory_tax_id, sec_cik, jurisdiction, industry, naics_code,
-                           employee_count_min, employee_count_max, annual_revenue_usd,
-                           phones, locations, identity_confidence, contributing_sources,
-                           lineage_ids
-                    FROM staging_dataextraction.working_organizations
-                    WHERE governance_status IN ('IN_ENRICHMENT', 'REVALIDATION_PENDING')
-                    ORDER BY created_at ASC
-                    LIMIT %s
-                    FOR UPDATE SKIP LOCKED;
-                """, (batch_size,))
+                if target_org_ids:
+                    cur.execute("""
+                        SELECT org_id, legal_name, display_name, primary_domain, website,
+                               statutory_tax_id, sec_cik, jurisdiction, industry, naics_code,
+                               employee_count_min, employee_count_max, annual_revenue_usd,
+                               phones, locations, identity_confidence, contributing_sources,
+                               lineage_ids
+                        FROM staging_dataextraction.working_organizations
+                        WHERE org_id = ANY(%s)
+                        FOR UPDATE;
+                    """, (target_org_ids,))
+                else:
+                    cur.execute("""
+                        SELECT org_id, legal_name, display_name, primary_domain, website,
+                               statutory_tax_id, sec_cik, jurisdiction, industry, naics_code,
+                               employee_count_min, employee_count_max, annual_revenue_usd,
+                               phones, locations, identity_confidence, contributing_sources,
+                               lineage_ids
+                        FROM staging_dataextraction.working_organizations
+                        WHERE governance_status IN ('IN_ENRICHMENT', 'REVALIDATION_PENDING')
+                        ORDER BY created_at ASC
+                        LIMIT %s
+                        FOR UPDATE SKIP LOCKED;
+                    """, (batch_size,))
                 rows = cur.fetchall()
                 col_names = [c[0] for c in cur.description] if cur.description else []
 

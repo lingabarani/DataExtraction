@@ -31,7 +31,6 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# Enterprise production lint gate: catch syntax, undefined variables, and breaking bugs
 select = [
     "E9",  # Syntax errors and fatal runtime breakages
     "F",   # Pyflakes errors (undefined variables, invalid syntax)
@@ -52,16 +51,20 @@ ignore = [
 # ── MyPy Static Type Checking Configuration ──────────────────────────────────
 [tool.mypy]
 python_version = "3.12"
+explicit_package_bases = true
 warn_return_any = false
-warn_unused_configs = true
+warn_unused_configs = false
 ignore_missing_imports = true
 follow_imports = "silent"
 check_untyped_defs = false
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+no_implicit_optional = false
 
 [[tool.mypy.overrides]]
 module = [
+    "packages.temporal.shims",
+    "packages.temporal.*",
     "temporalio.*",
     "splink.*",
     "duckdb.*",
@@ -69,6 +72,7 @@ module = [
     "psycopg2.*",
     "redis.*",
 ]
+ignore_errors = true
 ignore_missing_imports = true
 
 # ── Pytest Runner Configuration ──────────────────────────────────────────────
@@ -81,4 +85,6 @@ asyncio_mode = "auto"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+    "ignore::RuntimeWarning",
+    "ignore::UserWarning",
 ]

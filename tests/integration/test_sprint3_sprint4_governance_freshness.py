@@ -219,7 +219,10 @@ async def test_working_layer_governance_and_atomic_promotion(db_conn):
             db_conn.commit()
 
         # Step 2: Run evaluate_working_governance_activity
-        eval_res = await evaluate_working_governance_activity(100)
+        eval_res = await evaluate_working_governance_activity({
+            "batch_size": 100,
+            "org_ids": [valid_org_id, quarantine_org_id],
+        })
         assert eval_res["status"] == "COMPLETED"
 
         with db_conn.cursor() as cur:

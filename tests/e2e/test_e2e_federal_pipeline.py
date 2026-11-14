@@ -170,14 +170,16 @@ class TestE2EFederalPipeline(unittest.TestCase):
         self.assertFalse(ein_res["is_valid"])
 
         # Quarantine into Dead-Letter Queue (triggers zero-data-loss disk fallback on non-Postgres)
-        enqueue_dead_letter(
-            None,  # Forces fallback to disk JSONL
-            source_name="SEC_EDGAR",
-            entity_type="company",
-            raw_payload=corrupted_record,
-            error_reason=f"Invalid statutory EIN: {ein_res['reason']}",
-            run_id="e2e-run-001",
-        )
+        from unittest.mock import patch
+        with patch("packages.infrastructure.db_connector.get_connection", side_effect=RuntimeError("DB Unavailable")):
+            enqueue_dead_letter(
+                None,  # Forces fallback to disk JSONL
+                source_name="SEC_EDGAR",
+                entity_type="company",
+                raw_payload=corrupted_record,
+                error_reason=f"Invalid statutory EIN: {ein_res['reason']}",
+                run_id="e2e-run-001",
+            )
 
         # Assert disk fallback file exists and captured the corrupt payload
         self.assertTrue(_FALLBACK_FILE.exists())

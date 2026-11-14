@@ -43,7 +43,8 @@ async def normalize_batch_activity(source: str, table: str, batch_size: int = 50
         {"normalized": int, "source": str, "table": str, "status": str}
     """
     activity.logger.info("Normalizing: source=%s table=%s batch=%d", source, table, batch_size)
-    activity.heartbeat(f"Normalizing {source} → {table}")
+    if activity.in_activity():
+        activity.heartbeat(f"Normalizing {source} → {table}")
 
     from packages.pipeline.normalizer import normalize_company, normalize_person  # type: ignore
     from packages.infrastructure.db_connector import get_connection, release_connection  # type: ignore
@@ -57,35 +58,56 @@ async def normalize_batch_activity(source: str, table: str, batch_size: int = 50
         if conn:
             cur = conn.cursor()
             try:
-                # Ensure tracking columns exist on target table
-                try:
-                    cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS normalized_at TIMESTAMPTZ;")
-                    cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS normalized_name TEXT;")
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
+                # Check whether target is a VIEW or a TABLE
+                cur.execute("""
+                    SELECT table_type FROM information_schema.tables 
+                    WHERE table_name = %s
+                    LIMIT 1;
+                """, (safe_table,))
+                type_row = cur.fetchone()
+                is_view = type_row and type_row[0] == "VIEW"
 
-                # Query records that need normalization
-                cur.execute(
-                    f"SELECT id, COALESCE(raw_payload, '{{}}'::jsonb), name FROM {safe_table} WHERE normalized_at IS NULL LIMIT %s",
-                    (batch_size,),
-                )
-                rows = cur.fetchall()
-                for row in rows:
-                    rec_id, raw_payload, comp_name = row[0], row[1], row[2]
-                    raw_dict = raw_payload if isinstance(raw_payload, dict) else {"name": comp_name}
-                    try:
-                        norm = normalize_company(raw_dict, source=source)
-                    except ValueError as ve:
-                        errors.append(str(ve))
-                        activity.logger.error("Normalizer source error for record %s: %s", rec_id, ve)
-                        continue
+                if is_view:
+                    # View is read-only projection
                     cur.execute(
-                        f"UPDATE {safe_table} SET normalized_name = %s, normalized_at = NOW() WHERE id = %s",
-                        (norm.get("name") or comp_name, rec_id),
+                        f"SELECT id, name FROM {safe_table} LIMIT %s",
+                        (batch_size,),
                     )
-                    normalized_count += 1
-                conn.commit()
+                    rows = cur.fetchall()
+                    for row in rows:
+                        rec_id, comp_name = row[0], row[1]
+                        norm = normalize_company({"name": comp_name}, source=source)
+                        normalized_count += 1
+                else:
+                    # Ensure tracking columns exist on target base table
+                    try:
+                        cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS normalized_at TIMESTAMPTZ;")
+                        cur.execute(f"ALTER TABLE {safe_table} ADD COLUMN IF NOT EXISTS normalized_name TEXT;")
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+
+                    # Query records that need normalization
+                    cur.execute(
+                        f"SELECT id, COALESCE(raw_payload, '{{}}'::jsonb), name FROM {safe_table} WHERE normalized_at IS NULL LIMIT %s",
+                        (batch_size,),
+                    )
+                    rows = cur.fetchall()
+                    for row in rows:
+                        rec_id, raw_payload, comp_name = row[0], row[1], row[2]
+                        raw_dict = raw_payload if isinstance(raw_payload, dict) else {"name": comp_name}
+                        try:
+                            norm = normalize_company(raw_dict, source=source)
+                        except ValueError as ve:
+                            errors.append(str(ve))
+                            activity.logger.error("Normalizer source error for record %s: %s", rec_id, ve)
+                            continue
+                        cur.execute(
+                            f"UPDATE {safe_table} SET normalized_name = %s, normalized_at = NOW() WHERE id = %s",
+                            (norm.get("name") or comp_name, rec_id),
+                        )
+                        normalized_count += 1
+                    conn.commit()
             except Exception as q_err:
                 conn.rollback()
                 errors.append(str(q_err))
@@ -129,7 +151,8 @@ async def deduplicate_batch_activity(table: str, batch_size: int = 1000) -> dict
         {"merged": int, "removed": int, "isolated": int, "splink_matches": int, "clusters_resolved": int, "table": str, "status": str}
     """
     activity.logger.info("Deduplicating: table=%s batch=%d", table, batch_size)
-    activity.heartbeat(f"Deduplicating {table}")
+    if activity.in_activity():
+        activity.heartbeat(f"Deduplicating {table}")
 
     from packages.pipeline.deduplicator import Deduplicator  # type: ignore
     from packages.pipeline.splink_identity_linker import splink_linker  # type: ignore
@@ -1071,7 +1094,8 @@ async def link_records_splink_activity(records: List[Dict[str, Any]], threshold:
         }
     """
     activity.logger.info("Executing Splink probabilistic linkage on %d candidate records", len(records))
-    activity.heartbeat(f"Linking {len(records)} records with Splink")
+    if activity.in_activity():
+        activity.heartbeat(f"Linking {len(records)} records with Splink")
 
     try:
         from packages.pipeline.splink_identity_linker import splink_linker
@@ -1105,7 +1129,8 @@ async def populate_working_organizations_activity(
     Master database receives 0 rows.
     """
     activity.logger.info("Populating working organizations: source=%s batch=%d", source_table, batch_size)
-    activity.heartbeat(f"Populating working organizations from {source_table}")
+    if activity.in_activity():
+        activity.heartbeat(f"Populating working organizations from {source_table}")
 
     import uuid
     from packages.infrastructure.db_connector import get_connection, release_connection, _assert_safe_identifier

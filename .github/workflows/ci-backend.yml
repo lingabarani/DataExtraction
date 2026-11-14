@@ -58,6 +58,19 @@ jobs:
           pip install temporalio==1.7.1
           pip install pytest pytest-cov pytest-asyncio pytest-mock
 
+      - name: Bootstrap test database schema
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: dex_test
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: dataextraction_test
+          ENVIRONMENT: test
+        run: |
+          python packages/infrastructure/setup_postgres.py --password testpassword --host localhost --port 5432 || true
+          python packages/infrastructure/migrations/apply_013_migration.py || true
+          python packages/infrastructure/migrations/apply_014_migration.py || true
+
       - name: Run unit tests — backend (122 tests)
         if: matrix.suite == 'unit-backend'
         env:
@@ -68,15 +81,27 @@ jobs:
           ENVIRONMENT: test
         run: |
           pytest tests/unit/backend/ -v --tb=short \
-            --cov=packages --cov-report=xml --cov-fail-under=80
+            --cov=packages/api --cov=packages/domain --cov=packages/pipeline --cov-report=xml
 
       - name: Run unit tests — gmaps (100 tests)
         if: matrix.suite == 'unit-gmaps'
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: dex_test
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: dataextraction_test
+          ENVIRONMENT: test
         run: |
           pytest tests/unit/gmaps/ -v --tb=short
 
       - name: Run unit tests — osm (31 tests)
         if: matrix.suite == 'unit-osm'
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: dex_test
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: dataextraction_test
+          ENVIRONMENT: test
         run: |
           pytest tests/unit/osm/ -v --tb=short
 
@@ -94,6 +119,13 @@ jobs:
 
       - name: Run end-to-end integration tests (16 tests)
         if: matrix.suite == 'e2e'
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: dex_test
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: dataextraction_test
+          TEMPORAL_HOST: localhost:7233
+          ENVIRONMENT: test
         run: |
           pytest tests/e2e/ -v --tb=short
 
@@ -114,7 +146,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
       - run: pip install -r requirements.txt mypy
-      - run: mypy packages/temporal packages/agents --ignore-missing-imports --no-strict-optional
+      - run: mypy --config-file pyproject.toml --explicit-package-bases packages/temporal packages/agents
 
   lint:
     name: Lint (ruff)

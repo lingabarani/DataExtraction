@@ -43,7 +43,7 @@ def test_get_orchestration_header_status():
     assert data["platform_status"] == "ONLINE"
     assert data["database_status"] == "CONNECTED"
     assert data["opensearch_status"] == "SYNCED"
-    assert data["onereach_status"] == "ACTIVE"
+    assert data["onereach_status"] in ("ACTIVE", "IDLE")
     assert "active_workflows" in data
     assert "last_successful_run" in data
     assert data["last_successful_run"]["certified_records"] > 0

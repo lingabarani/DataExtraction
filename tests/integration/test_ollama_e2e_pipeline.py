@@ -94,7 +94,8 @@ class TestOllamaE2EPipeline(unittest.IsolatedAsyncioTestCase):
         # Verify ollama-init service
         self.assertIn("ollama-init", services, "ollama-init service must be defined")
         init_svc = services["ollama-init"]
-        self.assertIn("ollama", init_svc.get("depends_on", {}))
+        deps = init_svc.get("depends_on", {})
+        self.assertTrue("ollama" in deps or "ollama-cpu" in deps, "ollama-init must depend on ollama or ollama-cpu")
 
         # Verify API service wiring
         self.assertIn("api", services)
@@ -264,7 +265,10 @@ class TestOllamaE2EPipeline(unittest.IsolatedAsyncioTestCase):
             "score_adjustment": 0.12,
         }
 
-        with patch.object(ollama_client, "is_available", return_value=True), \
+        from packages.domain.llm_entity_resolver import llm_entity_resolver
+
+        with patch.object(llm_entity_resolver, "enabled", True), \
+             patch.object(ollama_client, "is_available", return_value=True), \
              patch.object(ollama_client, "generate_structured", new_callable=AsyncMock) as mock_gen:
             mock_gen.return_value = mock_decision
 

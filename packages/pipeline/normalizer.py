@@ -738,6 +738,10 @@ _COMPANY_NORMALIZERS = {
     'OPEN_MAP':         _normalize_company_osm,
     'OSM':              _normalize_company_osm,
     'REGISTRY_MERGED':  _normalize_company_registry_merged,
+    'CMS_NPI':          _normalize_company_internal_json,
+    'CMS':              _normalize_company_internal_json,
+    'NPI':              _normalize_company_internal_json,
+    'FEDERAL':          _normalize_company_internal_json,
 }
 
 _PERSON_NORMALIZERS = {
@@ -747,6 +751,10 @@ _PERSON_NORMALIZERS = {
     'SEC':           _normalize_person_sec,
     'APOLLO':        _normalize_person_apollo,
     'ZOOMINFO':      _normalize_person_zoominfo,
+    'CMS_NPI':       _normalize_person_internal_json,
+    'CMS':           _normalize_person_internal_json,
+    'NPI':           _normalize_person_internal_json,
+    'FEDERAL':       _normalize_person_internal_json,
 }
 
 
