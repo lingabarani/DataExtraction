@@ -34,6 +34,8 @@ from packages.temporal.activities.storage_activities import (
     fetch_overdue_revalidations_activity,
     stage_overdue_for_reharvest_activity,
 )
+from packages.temporal.activities.planner_activities import run_autonomy_planner_cycle_activity
+from packages.temporal.workflows.autonomy_planner_workflow import AutonomyPlannerWorkflow
 from packages.temporal.workflows.w5_governance_workflow import Agent5GovernanceWorkflow
 from packages.temporal.workflows.dlq_replay_workflow import DLQReplayWorkflow
 from packages.temporal.workflows.promotion_gate_workflow import PromotionGateWorkflow
@@ -64,8 +66,10 @@ async def run_worker():
         apply_freshness_decay_activity,
         fetch_overdue_revalidations_activity,
         stage_overdue_for_reharvest_activity,
+        run_autonomy_planner_cycle_activity,
     ]
     workflows = [
+        AutonomyPlannerWorkflow,
         Agent5GovernanceWorkflow,
         DLQReplayWorkflow,
         PromotionGateWorkflow,

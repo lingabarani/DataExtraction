@@ -44,6 +44,13 @@ from packages.temporal.activities.storage_activities import (
     replay_lakehouse_outbox_activity,
     storage_query_activity,
 )
+from packages.temporal.activities.place_deep_activities import run_place_deep_extraction_activity
+from packages.temporal.activities.discovery_activities import (
+    run_discovery_search_activity,
+    persist_discovery_results_activity,
+)
+from packages.temporal.workflows.discovery_workflow import DiscoverySearchWorkflow
+from packages.temporal.workflows.w2_place_deep_workflow import PlaceDeepExtractionWorkflow
 from packages.temporal.workflows.w2_geospatial_workflow import Agent2GeospatialWorkflow
 from packages.temporal.workflows.gmaps_extraction_workflow import GMapsExtractionWorkflow
 from packages.temporal.workflows.osm_state_workflow import OSMStateWorkflow, OSMSingleStateWorkflow
@@ -77,8 +84,13 @@ async def run_worker():
         check_gmp_budget_activity,
         replay_lakehouse_outbox_activity,
         storage_query_activity,
+        run_place_deep_extraction_activity,
+        run_discovery_search_activity,
+        persist_discovery_results_activity,
     ]
     workflows = [
+        DiscoverySearchWorkflow,
+        PlaceDeepExtractionWorkflow,
         Agent2GeospatialWorkflow,
         GMapsExtractionWorkflow,
         OSMStateWorkflow,

@@ -69,3 +69,11 @@ schedules:
       freshness_threshold: 0.70
       auto_reharvest: true
     paused: false
+
+  autonomy_planner:
+    id: "autonomy-planner-cycle"
+    workflow: "AutonomyPlannerWorkflow"
+    task_queue: "governance-quality-queue"
+    cron: "*/15 * * * *"       # every 15 minutes
+    input: {}                  # dry_run comes from PLANNER_DRY_RUN (defaults to true in .env.example)
+    paused: false

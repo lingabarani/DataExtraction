@@ -25,6 +25,7 @@ from temporalio.client import (
     Schedule,
     ScheduleActionStartWorkflow,
     ScheduleSpec,
+    ScheduleState,
     ScheduleAlreadyRunningError,
 )
 
@@ -33,7 +34,7 @@ if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
 from packages.temporal.client import get_temporal_client
-from packages.temporal.config import QUEUE_EMAIL_ENRICHMENT, QUEUE_GOVERNANCE
+from packages.temporal.config import QUEUE_EMAIL_ENRICHMENT, QUEUE_GEOSPATIAL, QUEUE_GOVERNANCE
 from packages.temporal.workflows.federal_ingestion_workflow import FederalIngestionWorkflow
 from packages.temporal.workflows.gmaps_extraction_workflow import GMapsExtractionWorkflow
 from packages.temporal.workflows.osm_state_workflow import OSMStateWorkflow
@@ -44,6 +45,8 @@ from packages.temporal.workflows.w7_email_enrichment_workflow import (
 )
 from packages.temporal.workflows.revalidation_sweep_workflow import RevalidationSweepWorkflow
 from packages.temporal.workflows.promotion_gate_workflow import PromotionGateWorkflow
+from packages.temporal.workflows.autonomy_planner_workflow import AutonomyPlannerWorkflow
+from packages.temporal.workflows.w2_place_deep_workflow import PlaceDeepExtractionWorkflow
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
@@ -60,6 +63,8 @@ WORKFLOW_MAP = {
     "Agent7EmailEnrichmentWorkflow": Agent7EmailEnrichmentWorkflow,
     "RevalidationSweepWorkflow":    RevalidationSweepWorkflow,
     "PromotionGateWorkflow":        PromotionGateWorkflow,
+    "AutonomyPlannerWorkflow":      AutonomyPlannerWorkflow,
+    "PlaceDeepExtractionWorkflow":  PlaceDeepExtractionWorkflow,
 }
 
 TASK_QUEUE_MAP = {
@@ -71,6 +76,8 @@ TASK_QUEUE_MAP = {
     "Agent7EmailEnrichmentWorkflow": QUEUE_EMAIL_ENRICHMENT,
     "RevalidationSweepWorkflow":    QUEUE_GOVERNANCE,
     "PromotionGateWorkflow":        QUEUE_GOVERNANCE,
+    "AutonomyPlannerWorkflow":      QUEUE_GOVERNANCE,
+    "PlaceDeepExtractionWorkflow":  QUEUE_GEOSPATIAL,
 }
 
 
@@ -103,10 +110,7 @@ async def register_schedules(client: Client, config: dict) -> None:
                         task_queue=task_queue,
                     ),
                     spec=ScheduleSpec(cron_expressions=[cron_expr]),
-                    state=type(
-                        "ScheduleState", (),
-                        {"paused": paused, "notes": f"Auto-registered by register_schedules.py"}
-                    )(),
+                    state=ScheduleState(note="Auto-registered by register_schedules.py", paused=paused),
                 ),
             )
             logger.info("✅ Registered schedule: %s [%s] → %s",

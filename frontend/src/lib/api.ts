@@ -33,6 +33,12 @@ function getToken(): string | null {
   return token;
 }
 
+/** Appends the auth token as ?token= (EventSource cannot send an Authorization header). */
+export function withAuthToken(url: string): string {
+  const token = getToken();
+  if (!token) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
+}
 export function clearAuth(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
@@ -66,7 +72,8 @@ async function request<T>(path: string, options?: ApiRequestOptions): Promise<T>
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(`${API_URL}${path}`, {
+    const url = /^https?:\/\//i.test(path) ? path : `${API_URL}${path}`;
+    const res = await fetch(url, {
       ...options,
       headers,
       signal: options?.signal || controller.signal,
@@ -198,4 +205,153 @@ export const api = {
       eventSource.close();
     };
   },
+
+  discovery: {
+    initSearch: (query: string, filters: DiscoverySearchOptions = {}, budgetSeconds = 45.0) => {
+      const baseUrl = API_URL.replace(/\/api$/, "");
+      return request<{ search_id: string; query: string; stream_url: string }>(
+        `${baseUrl}/api/v1/discovery/search`,
+        {
+          method: "POST",
+          body: JSON.stringify({ query, filters, budget_seconds: budgetSeconds }),
+        }
+      );
+    },
+    getSearchResult: (searchId: string) => {
+      const baseUrl = API_URL.replace(/\/api$/, "");
+      return request<{ search_id: string; status: string; answer?: DiscoveryAnswer }>(
+        `${baseUrl}/api/v1/discovery/search/${encodeURIComponent(searchId)}`
+      );
+    },
+    getSourcesStatus: () => {
+      const baseUrl = API_URL.replace(/\/api$/, "");
+      return request<Array<{ source: string; status: string; type: string }>>(
+        `${baseUrl}/api/v1/discovery/sources/status`
+      );
+    },
+    getStreamUrl: (searchId: string) => {
+      const baseUrl = API_URL.replace(/\/api$/, "");
+      return withAuthToken(`${baseUrl}/api/v1/discovery/search/${encodeURIComponent(searchId)}/stream`);
+    },
+    getOrganization: (orgId: string) => {
+      const baseUrl = API_URL.replace(/\/api$/, "");
+      return request<DiscoveryOrganization>(`${baseUrl}/api/v1/discovery/organizations/${encodeURIComponent(orgId)}`);
+    },
+    exportUrl: (searchId: string, format: "csv" | "jsonl") => {
+      const baseUrl = API_URL.replace(/\/api$/, "");
+      return `${baseUrl}/api/v1/discovery/search/${encodeURIComponent(searchId)}/export?format=${format}`;
+    },
+  },
 };
+
+export interface DiscoveryCard {
+  org_id: string;
+  name: string;
+  category?: string;
+  address: Record<string, any>;
+  phone?: string;
+  phones: string[];
+  website?: string;
+  hours: Array<Record<string, any>>;
+  social: Record<string, string>;
+  source_links: Array<{ source: string; url: string }>;
+  rating?: number;
+  review_count?: number;
+  services: string[];
+  cms_star_rating?: number;
+  cms_ownership?: string;
+  nc_license_number?: string;
+  nc_license_status?: string;
+  named_people: Array<{
+    name: string;
+    title?: string;
+    role_type?: string;
+    emails: Array<{ value: string; label: string; confidence: number }>;
+    phones: string[];
+    profile_urls: string[];
+  }>;
+  emails: Array<{ value: string; label: string; confidence: number }>;
+  sources: string[];
+  citation_ids: number[];
+}
+
+export interface DiscoveryCitation {
+  id: number;
+  source: string;
+  url?: string;
+  entity_name: string;
+  fact_description: string;
+}
+
+export interface DiscoverySourceStatus {
+  source: string;
+  status: "ok" | "empty" | "blocked" | "error" | "unavailable" | "timeout" | "running";
+  count: number;
+  elapsed_ms: number;
+  message?: string;
+}
+
+export interface DiscoveryAnswer {
+  query: string;
+  total_organizations: number;
+  total_people: number;
+  summary_markdown: string;
+  source_breakdown: Record<string, number>;
+  shown_organizations: number;
+  needs_location: boolean;
+  message?: string | null;
+  geography: Record<string, any>;
+  cards: DiscoveryCard[];
+  citations: DiscoveryCitation[];
+  source_statuses: DiscoverySourceStatus[];
+  elapsed_ms: number;
+}
+/** Merged cards received so far while a search is still running (ids are not final; no citations yet). */
+export interface DiscoverySnapshot {
+  total_organizations: number;
+  total_people: number;
+  cards: DiscoveryCard[];
+  elapsed_ms: number;
+  sources_done: number;
+  preliminary: boolean;
+}
+
+export interface DiscoverySearchOptions {
+  /** 1-1000 */
+  max_results?: number;
+  /** "internet" skips the saved database; "all" also includes previously saved results */
+  sources?: "all" | "internet";
+  /** false = fast search without reading company websites */
+  crawl_websites?: boolean;
+  include_unverified?: boolean;
+}
+export interface DiscoveryFact {
+  field: string;
+  value: any;
+  source: string;
+  source_url?: string | null;
+  confidence: number;
+  retrieved_at?: string | null;
+}
+export interface DiscoveryOrganization {
+  id: string;
+  name: string;
+  category?: string;
+  subcategories: string[];
+  address: Record<string, any>;
+  coordinates: { lat?: number; lng?: number };
+  phones: Array<{ number: string; source_url?: string }>;
+  emails: Array<{ value: string; label: string; source_url?: string }>;
+  website?: string;
+  hours: Array<Record<string, any>>;
+  rating?: number;
+  review_count?: number;
+  services: string[];
+  regulatory: Record<string, any>;
+  social: Record<string, string>;
+  people: Array<{ id: string; name: string; title?: string; role_type?: string; verified: boolean; provenance: string;
+    emails: Array<{ value: string; label: string }>; profile_urls: string[] }>;
+  facts: DiscoveryFact[];
+  first_seen?: string;
+  last_seen?: string;
+}

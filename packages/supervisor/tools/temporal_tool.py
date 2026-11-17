@@ -9,6 +9,19 @@ import logging
 from typing import Dict, Any, List, Optional
 from packages.temporal.client import get_temporal_client
 
+
+def _iter_workflows(client, query):
+    """temporalio 1.7 returns an async iterator directly; some versions return an awaitable of one."""
+    import inspect
+
+    async def gen():
+        it = client.list_workflows(query)
+        if inspect.isawaitable(it):
+            it = await it
+        async for item in it:
+            yield item
+    return gen()
+
 logger = logging.getLogger("dataextraction.supervisor.tools.temporal")
 
 
@@ -23,7 +36,7 @@ async def list_active_workflows(workflow_type: Optional[str] = None) -> List[Dic
         if workflow_type:
             query += f" AND WorkflowType='{workflow_type}'"
 
-        async for wf in await client.list_workflows(query):
+        async for wf in _iter_workflows(client, query):
             workflows.append({
                 "id": wf.id,
                 "run_id": wf.run_id,
@@ -49,7 +62,7 @@ async def list_completed_workflows(workflow_type: Optional[str] = None, limit: i
             query += f" AND WorkflowType='{workflow_type}'"
 
         count = 0
-        async for wf in await client.list_workflows(query):
+        async for wf in _iter_workflows(client, query):
             workflows.append({
                 "id": wf.id,
                 "run_id": wf.run_id,

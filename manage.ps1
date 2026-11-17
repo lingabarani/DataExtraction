@@ -135,22 +135,22 @@ switch ($Command) {
 
     "worker:federal" {
         Write-Host "==> Launching Temporal Federal Scrapers Worker..." -ForegroundColor Cyan
-        & $Python (Join-Path $Root "packages\temporal\workers\federal_worker.py")
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_registry.py")
     }
 
     "worker:gmaps" {
         Write-Host "==> Launching Temporal Google Maps Worker..." -ForegroundColor Cyan
-        & $Python (Join-Path $Root "packages\temporal\workers\gmaps_worker.py")
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_geospatial.py")
     }
 
     "worker:osm" {
         Write-Host "==> Launching Temporal OSM Worker..." -ForegroundColor Cyan
-        & $Python (Join-Path $Root "packages\temporal\workers\osm_worker.py")
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_geospatial.py")
     }
 
     "worker:pipeline" {
         Write-Host "==> Launching Temporal Pipeline & Normalizer Worker..." -ForegroundColor Cyan
-        & $Python (Join-Path $Root "packages\temporal\workers\pipeline_worker.py")
+        & $Python (Join-Path $Root "packages\temporal\workers\worker_executive.py")
     }
 
     "worker:registry" {

@@ -33,6 +33,11 @@ from packages.api.routers.enrichment_router import router as enrichment_router
 from packages.api.routers.delivery_router import router as delivery_router
 from packages.api.routers.compliance_router import router as compliance_router
 from packages.api.routers.governance_router import router as governance_router
+from packages.api.routers.secrets_router import router as secrets_router
+from packages.api.routers.llm_router import router as llm_router
+from packages.api.routers.planner_router import router as planner_router
+from packages.api.routers.places_router import router as places_router
+from packages.api.routers.discovery_router import router as discovery_router
 
 logger = get_structured_logger("api.gateway")
 
@@ -203,6 +208,11 @@ def create_app() -> FastAPI:
     app.include_router(delivery_router)
     app.include_router(compliance_router)
     app.include_router(governance_router)
+    app.include_router(secrets_router)
+    app.include_router(llm_router)
+    app.include_router(planner_router)
+    app.include_router(places_router)
+    app.include_router(discovery_router)
 
     # ── Legacy routers (each registered exactly once with /api prefix) ─────────
     for router_obj, prefix, _tags in _legacy_routers:

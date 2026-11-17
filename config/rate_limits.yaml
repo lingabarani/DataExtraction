@@ -64,3 +64,38 @@ rate_limits:
       - office
       - support
       - inquiries
+
+  # Discovery Engine Source Limits
+  discovery_linkedin_public:
+    requests_per_second: 0.5
+    burst: 2
+    hourly_cap: 60
+    retry_after_429_seconds: 60
+
+  discovery_linkedin_voyager:
+    requests_per_hour: 30
+    retry_after_429_seconds: 300
+
+  discovery_geocode:             # OpenStreetMap Nominatim: policy maximum is 1 request per second
+    requests_per_second: 1.0
+    burst: 1
+  discovery_gmaps:               # Live Discovery Google Maps pages (up to 24 per search)
+    requests_per_second: 8.0
+    burst: 12
+  discovery_web_search:
+    requests_per_second: 1.0
+    burst: 3
+
+  discovery_cms:
+    requests_per_second: 5.0
+    burst: 10
+
+  discovery_state_registry:
+    requests_per_second: 5.0
+    burst: 10
+
+  discovery_website_crawl:
+    per_host_limit: 2
+    requests_per_second: 10.0
+    max_pages_per_domain: 5
+

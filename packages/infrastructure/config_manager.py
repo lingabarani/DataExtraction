@@ -25,8 +25,10 @@ if not logger.handlers:
 # Load local .env files if present (bottom-up: config dir, packages, and repo root)
 _CURRENT_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _CURRENT_DIR.parent.parent
+# DEX_SKIP_DOTENV=true skips the .env files so tests/CI can point at a throw-away database via real environment variables.
+_SKIP_DOTENV = os.getenv("DEX_SKIP_DOTENV", "").strip().lower() in ("1", "true", "yes", "on")
 for env_path in [_CURRENT_DIR / ".env", _CURRENT_DIR.parent / ".env", _REPO_ROOT / ".env"]:
-    if env_path.exists():
+    if env_path.exists() and not _SKIP_DOTENV:
         load_dotenv(env_path, override=True)
 
 

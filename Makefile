@@ -123,16 +123,16 @@ db-migrate:
 
 # ── Workers (local, non-Docker) ───────────────────────────────────────────────
 worker-federal:
-	PYTHONPATH=. $(PY) -m packages.temporal.workers.federal_worker
+	PYTHONPATH=. $(PY) -m packages.temporal.workers.worker_registry
 
 worker-gmaps:
-	PYTHONPATH=. $(PY) -m packages.temporal.workers.gmaps_worker
+	PYTHONPATH=. $(PY) -m packages.temporal.workers.worker_geospatial
 
 worker-osm:
-	PYTHONPATH=. $(PY) -m packages.temporal.workers.osm_worker
+	PYTHONPATH=. $(PY) -m packages.temporal.workers.worker_geospatial
 
 worker-pipeline:
-	PYTHONPATH=. $(PY) -m packages.temporal.workers.pipeline_worker
+	PYTHONPATH=. $(PY) -m packages.temporal.workers.worker_executive
 
 # ── Maintenance ───────────────────────────────────────────────────────────────
 backup:

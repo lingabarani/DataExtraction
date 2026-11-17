@@ -98,3 +98,14 @@ agents:
       workflow_failure_rate_pct: 5.0
       db_pool_pct: 95.0
       api_error_rate_pct: 10.0
+
+  autonomy_planner:
+    enabled: true
+    max_actions_per_cycle: 3        # at most this many workflows started per 15-minute cycle
+    max_running_per_queue: 2
+    max_running_total: 6
+    stale_hours: 24
+    dlq_replay_threshold: 100
+    place_batch: 50                 # places per deep-extraction run started by the planner
+    regions: [US-CA, US-TX, US-NY]
+    categories: [restaurant, hotel, retail, healthcare]
