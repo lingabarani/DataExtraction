@@ -1097,3 +1097,186 @@ async def run_gmaps_export_activity(job_id: str, export_format: str = "csv") -> 
         "output_path": str(out_file),
         "status": "SUCCESS",
     }
+
+
+@activity.defn(name="run_gmaps_reviews")
+async def run_gmaps_reviews_activity(
+    batch_id: str,
+    limit: Optional[int] = None,
+    max_reviews_per_place: Optional[int] = None,
+) -> dict:
+    """
+    Dedicated Google Maps review extraction and independent sentiment/topic analysis activity.
+    Extracts available reviews using BOQ RPC with unconstrained pagination and crash-safe resumption.
+    Executes independent review analysis for sentiment, topics, complaints, praise, and experience.
+    """
+    act_logger = _get_activity_logger()
+    act_logger.info("Executing GMaps reviews activity: batch_id=%s, limit=%s", batch_id, limit)
+    _safe_heartbeat({"stage": "init", "batch_id": batch_id})
+
+    from packages.scrapers.google_maps.reviews.scraper import GoogleMapsReviewScraper
+    from packages.scrapers.google_maps.reviews.analyzer import ReviewAnalyzer
+
+    conn = _get_postgres_connection()
+    if not conn:
+        return {"status": "FAILED", "error": "Database connection unavailable", "reviews_saved": 0}
+
+    places_to_scrape: List[Dict[str, Any]] = []
+    eff_limit = limit or 50
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT sc.raw_payload->>'cid' as cid,
+                       COALESCE(pd.ftid, sc.raw_payload->>'ftid') as ftid,
+                       sc.name,
+                       sc.id as company_id
+                FROM staging_dataextraction.staging_companies sc
+                LEFT JOIN staging_dataextraction.place_details pd ON pd.place_id = sc.raw_payload->>'cid'
+                LEFT JOIN staging_dataextraction.place_review_checkpoints prc ON prc.place_id = sc.raw_payload->>'cid'
+                WHERE sc.source = 'GOOGLE_MAPS'
+                  AND sc.raw_payload->>'cid' IS NOT NULL
+                  AND (prc.status IS NULL OR prc.status = 'in_progress')
+                ORDER BY sc.updated_at DESC
+                LIMIT %s
+                """,
+                (eff_limit,),
+            )
+            for cid, ftid, name, company_id in cur.fetchall():
+                if cid:
+                    places_to_scrape.append({
+                        "cid": cid,
+                        "place_id": cid,
+                        "ftid": ftid,
+                        "name": name,
+                        "company_id": company_id,
+                    })
+    except Exception as exc:
+        act_logger.warning("Error querying places for review extraction: %s", exc)
+    finally:
+        _release_postgres_connection(conn)
+
+    scraper = GoogleMapsReviewScraper(
+        get_conn_fn=_get_postgres_connection,
+        release_conn_fn=_release_postgres_connection,
+    )
+    analyzer = ReviewAnalyzer(
+        get_conn_fn=_get_postgres_connection,
+        release_conn_fn=_release_postgres_connection,
+    )
+
+    total_saved = 0
+    places_done = 0
+
+    for idx, stub in enumerate(places_to_scrape, 1):
+        _safe_heartbeat({
+            "stage": "scraping_reviews",
+            "batch_id": batch_id,
+            "place": stub.get("name"),
+            "done": idx - 1,
+            "total": len(places_to_scrape),
+        })
+        try:
+            res = await scraper.extract_reviews_for_place(
+                place_stub=stub,
+                run_id=batch_id,
+                max_reviews=max_reviews_per_place,
+                resume=True,
+                heartbeat=_safe_heartbeat,
+            )
+            saved = res.get("reviews_saved", 0)
+            total_saved += saved
+            places_done += 1
+        except Exception as exc:
+            act_logger.warning("Review extraction failed for place %s: %s", stub.get("cid"), exc)
+
+    # Independent review analysis run on newly collected reviews
+    _safe_heartbeat({"stage": "analyzing_reviews", "batch_id": batch_id})
+    analysis_res = analyzer.analyze_stored_reviews(limit=eff_limit * 10)
+    analyzed_count = analysis_res.get("analyzed_count", 0)
+
+    act_logger.info(
+        "GMaps reviews activity completed: places=%d, saved=%d, analyzed=%d",
+        places_done, total_saved, analyzed_count
+    )
+
+    return {
+        "status": "COMPLETED",
+        "batch_id": batch_id,
+        "places_processed": places_done,
+        "reviews_saved": total_saved,
+        "reviews_analyzed": analyzed_count,
+    }
+
+
+@activity.defn(name="run_gmaps_services")
+async def run_gmaps_services_activity(
+    batch_id: str,
+    limit: Optional[int] = None,
+) -> dict:
+    """
+    Dedicated Google Maps service extraction and hierarchical taxonomy classification activity.
+    Extracts published services and attributes from place details, maps to standard taxonomy,
+    and persists into `staging_dataextraction.place_services`.
+    """
+    act_logger = _get_activity_logger()
+    act_logger.info("Executing GMaps services activity: batch_id=%s, limit=%s", batch_id, limit)
+    _safe_heartbeat({"stage": "init", "batch_id": batch_id})
+
+    from packages.scrapers.google_maps.services.extractor import GoogleMapsServiceExtractor
+
+    extractor = GoogleMapsServiceExtractor(
+        get_conn_fn=_get_postgres_connection,
+        release_conn_fn=_release_postgres_connection,
+    )
+
+    conn = _get_postgres_connection()
+    if not conn:
+        return {"status": "FAILED", "error": "Database connection unavailable", "services_saved": 0}
+
+    eff_limit = limit or 100
+    places_details: List[Tuple[str, Dict[str, Any]]] = []
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT place_id, attributes
+                FROM staging_dataextraction.place_details
+                WHERE attributes IS NOT NULL AND jsonb_array_length(attributes) > 0
+                ORDER BY scraped_at DESC
+                LIMIT %s
+                """,
+                (eff_limit,),
+            )
+            for place_id, attrs in cur.fetchall():
+                places_details.append((place_id, {"attributes": attrs if isinstance(attrs, list) else []}))
+    except Exception as exc:
+        act_logger.warning("Error querying place attributes for service extraction: %s", exc)
+    finally:
+        _release_postgres_connection(conn)
+
+    total_services = 0
+    for place_id, details in places_details:
+        rows = extractor.extract_from_place_details(place_id, details, run_id=batch_id)
+        if rows:
+            saved = extractor.persist_services(rows)
+            total_services += saved
+
+    # Also classify any existing unclassified services
+    classified_backlog = extractor.classify_existing_place_services(limit=eff_limit * 5)
+
+    act_logger.info(
+        "GMaps services activity completed: places=%d, services_saved=%d, backlogged_classified=%d",
+        len(places_details), total_services, classified_backlog
+    )
+
+    return {
+        "status": "COMPLETED",
+        "batch_id": batch_id,
+        "places_processed": len(places_details),
+        "services_saved": total_services,
+        "backlog_classified": classified_backlog,
+    }
+

@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    DataExtraction Enterprise Platform — Local Development Launcher
+    DataExtraction Enterprise Platform - Local Development Launcher
 .DESCRIPTION
     Starts the FastAPI backend and Next.js frontend for local development.
     Prerequisites: Python 3.12+, Node.js 20+, PostgreSQL running, .env populated.
@@ -25,7 +25,7 @@ $ROOT     = $PSScriptRoot
 $FRONTEND = Join-Path $ROOT "frontend"
 $LOGS_DIR = Join-Path $ROOT "logs"
 
-# ── Resolve Python ────────────────────────────────────────────────────────────
+# -- Resolve Python ------------------------------------------------------------
 function Find-Python {
     # Priority 1: venv in repo root (created by bootstrap.ps1 or manually)
     $venvPy = Join-Path $ROOT ".venv\Scripts\python.exe"
@@ -36,7 +36,7 @@ function Find-Python {
         $found = (Get-Command python -ErrorAction Stop).Source
         $ver = & $found --version 2>&1
         if ($ver -match "Python 3\.(1[2-9]|[2-9]\d)") { return $found }
-        Write-Warning "python on PATH is $ver — Python 3.12+ preferred."
+        Write-Warning "python on PATH is $ver - Python 3.12+ preferred."
         return $found
     } catch {}
 
@@ -51,14 +51,14 @@ function Find-Python {
         if (Test-Path $c) { return $c }
     }
 
-    throw "Python 3.12+ not found. Install it or create a .venv with: python -m venv .venv && .\.venv\Scripts\activate && pip install -r requirements.txt"
+    throw 'Python 3.12+ not found. Install it or create a .venv with: python -m venv .venv; .\.venv\Scripts\activate; pip install -r requirements.txt'
 }
 
-# ── Validate .env ─────────────────────────────────────────────────────────────
+# -- Validate .env -------------------------------------------------------------
 function Assert-DotEnv {
     $envFile = Join-Path $ROOT ".env"
     if (-not (Test-Path $envFile)) {
-        Write-Warning ".env not found — copying from .env.example. Edit it before continuing."
+        Write-Warning ".env not found - copying from .env.example. Edit it before continuing."
         Copy-Item (Join-Path $ROOT ".env.example") $envFile
     }
 
@@ -66,7 +66,7 @@ function Assert-DotEnv {
     $required = @("POSTGRES_PASSWORD", "JWT_SECRET", "API_ADMIN_PASSWORD")
     $missing  = @()
     foreach ($key in $required) {
-        if ($content -notmatch "^${key}=.+") { $missing += $key }
+        if ($content -notmatch "(?m)^${key}=.+") { $missing += $key }
     }
     if ($missing.Count -gt 0) {
         Write-Host ""
@@ -77,10 +77,10 @@ function Assert-DotEnv {
     }
 }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "  DataExtraction Enterprise Platform — Local Dev Launcher" -ForegroundColor Cyan
+Write-Host "  DataExtraction Enterprise Platform - Local Dev Launcher" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -88,7 +88,9 @@ Assert-DotEnv
 
 $PYTHON = Find-Python
 Write-Host "  Python  : $PYTHON" -ForegroundColor Gray
-Write-Host "  Node    : $(node --version 2>$null || 'not found')" -ForegroundColor Gray
+$nodeVer = try { (node --version 2>$null) } catch { "not found" }
+if (-not $nodeVer) { $nodeVer = "not found" }
+Write-Host "  Node    : $nodeVer" -ForegroundColor Gray
 Write-Host ""
 
 # Ensure logs directory exists
@@ -96,7 +98,7 @@ if (-not (Test-Path $LOGS_DIR)) {
     New-Item -ItemType Directory -Path $LOGS_DIR -Force | Out-Null
 }
 
-# ── Build PYTHONPATH ──────────────────────────────────────────────────────────
+# -- Build PYTHONPATH ----------------------------------------------------------
 # Must include the repo root so `packages.*` imports resolve correctly,
 # AND packages/infrastructure for any legacy standalone scripts that still
 # use bare imports during the transition period.
@@ -107,7 +109,7 @@ $env:API_PORT = "$BackendPort"
 
 $jobs = @()
 
-# ── Backend ───────────────────────────────────────────────────────────────────
+# -- Backend -------------------------------------------------------------------
 if (-not $NoBackend) {
     Write-Host "[1/2] Starting FastAPI backend on http://localhost:$BackendPort ..." -ForegroundColor Yellow
     $backendLog = Join-Path $LOGS_DIR "backend.log"
@@ -123,10 +125,10 @@ if (-not $NoBackend) {
             --log-level info 2>&1 | Tee-Object -FilePath $log
     } -ArgumentList $ROOT, $backendLog, $PYTHON, $BackendPort, $InfraDir, $GmapsSrc
     $jobs += $backendJob
-    Write-Host "  [OK] Backend starting (Job $($backendJob.Id)) — logs/backend.log" -ForegroundColor Green
+    Write-Host "  [OK] Backend starting (Job $($backendJob.Id)) - logs/backend.log" -ForegroundColor Green
 }
 
-# ── Frontend ──────────────────────────────────────────────────────────────────
+# -- Frontend ------------------------------------------------------------------
 if (-not $NoFrontend) {
     Write-Host ""
     Write-Host "[2/2] Starting Next.js frontend on http://localhost:$FrontendPort ..." -ForegroundColor Yellow
@@ -155,13 +157,13 @@ if (-not $NoFrontend) {
         npm run dev -- --port $port 2>&1 | Tee-Object -FilePath $log
     } -ArgumentList $FRONTEND, $frontendLog, $FrontendPort
     $jobs += $frontendJob
-    Write-Host "  [OK] Frontend starting (Job $($frontendJob.Id)) — logs/frontend.log" -ForegroundColor Green
+    Write-Host "  [OK] Frontend starting (Job $($frontendJob.Id)) - logs/frontend.log" -ForegroundColor Green
 }
 
-# ── Summary ───────────────────────────────────────────────────────────────────
+# -- Summary -------------------------------------------------------------------
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "  Services starting — allow 10-15s for full readiness" -ForegroundColor Cyan
+Write-Host "  Services starting - allow 10-15s for full readiness" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Frontend   :  http://localhost:$FrontendPort" -ForegroundColor White
@@ -176,7 +178,12 @@ Write-Host ""
 Write-Host "  Press Ctrl+C to stop all services." -ForegroundColor DarkGray
 Write-Host ""
 
-# ── Log tail loop ─────────────────────────────────────────────────────────────
+if ($jobs.Count -eq 0) {
+    Write-Host "No services selected to start." -ForegroundColor Yellow
+    return
+}
+
+# -- Log tail loop -------------------------------------------------------------
 try {
     while ($true) {
         Start-Sleep -Seconds 3

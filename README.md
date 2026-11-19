@@ -72,11 +72,12 @@ DataExtraction/
 │   ├── agents/               # NEW: AI agent framework
 │   ├── api/                  # FastAPI backend (extended)
 │   ├── infrastructure/       # Shared DB, config, logging, metrics
-│   └── frontend/             # Next.js 15 dashboard (extended)
+│   └── (frontend lives at ./frontend, see below)
+├── frontend/                 # Next.js dashboard
 ├── infra/                    # Docker, docker-compose, nginx
 ├── config/                   # Temporal, workers, schedules, agents config
 ├── scripts/                  # Migration, DB, ops scripts
-├── tests/                    # Unified test suite (353 tests)
+├── tests/                    # Unit, integration, e2e and load tests
 └── docs/                     # ADRs, architecture, operations runbook
 ```
 
@@ -114,11 +115,39 @@ docker compose -f infra/docker-compose.temporal.yml up -d
 ### Run Tests
 
 ```powershell
-.\manage.ps1 test              # All 353 tests
-.\manage.ps1 test:backend      # 122 backend unit tests
-.\manage.ps1 test:gmaps        # 100 gmaps-scraper tests
+.\manage.ps1 test              # All tests
+.\manage.ps1 test:backend      # Backend unit tests
+.\manage.ps1 test:gmaps        # gmaps-scraper tests
 .\manage.ps1 test:activities   # Temporal activity tests
 ```
+
+### Live Discovery search
+
+```powershell
+python -m packages.infrastructure.migration_manager   # applies migrations up to 018
+python scripts/data/fetch_census_geo.py               # Census geography for location parsing
+python -m uvicorn packages.api.main:app --host 127.0.0.1 --port 8000
+cd frontend; npm run dev                              # then open http://localhost:3000/search
+```
+
+Sources, API, test command and known limits: [docs/operations/discovery.md](docs/operations/discovery.md).
+
+## Autonomous AI layer
+
+* **LLM**: Groq (openai/gpt-oss-120b) by default, AWS Bedrock and Ollama supported, chosen with LLM_PROVIDER
+  and LLM_FALLBACK_CHAIN. Code: packages/infrastructure/llm/.
+* **API keys**: add them in the dashboard under **AI Keys** (encrypted, rotated automatically, no restart).
+  AWS Secrets Manager and environment variables are also read. Code: packages/infrastructure/key_vault/.
+* **Deep place data**: details, services, address, contacts, people and all reviews for Google Maps places,
+  stored in staging_dataextraction.place_*. Start with POST /api/v1/places/extract.
+* **Autonomy planner**: every 15 minutes the planner decides which allowed workflows to start. It ships in dry-run mode.
+* Setup, key rotation, AWS switch and privacy settings: [docs/operations/autonomous-ai.md](docs/operations/autonomous-ai.md).
+
+## Task queues
+
+The platform runs seven agent workers (see packages/temporal/config.py). The older per-source queues are
+served by them: ederal-ingestion by the registry worker, gmaps-extraction and osm-extraction by the
+geospatial worker, storage-ops by the governance worker.
 
 ---
 
@@ -170,7 +199,7 @@ See [docs/development/getting-started.md](docs/development/getting-started.md).
 
 Key rules:
 1. **Never modify scraper business logic** — only activity wrapper files may change
-2. All PRs require passing all 353 tests
+2. All PRs require passing the test suite
 3. New scrapers must be added as Temporal Activities with corresponding tests
 
 ---

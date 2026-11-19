@@ -1,0 +1,21 @@
+{
+  "timestamp": 1794826263.3577204,
+  "gmaps_deep_place": {
+    "num_stubs": 50,
+    "total_requests": 100,
+    "wall_time_seconds": 0.7903,
+    "requests_per_second": 126.53,
+    "stubs_per_second": 63.27
+  },
+  "website_crawl": {
+    "num_crawls": 10,
+    "total_pages_crawled": 50,
+    "wall_time_seconds": 0.0373,
+    "pages_per_second": 1340.06
+  },
+  "db_upsert_10k": {
+    "num_rows": 10000,
+    "wall_time_seconds": 0.03,
+    "rows_per_second": 333684.81
+  }
+}

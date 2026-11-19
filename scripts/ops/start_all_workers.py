@@ -65,6 +65,12 @@ WORKERS_SPEC = [
         queue="geospatial-domain-queue",
     ),
     WorkerSpec(
+        id="worker-8-website",
+        name="Agent 8: Website Intelligence & Enrichment",
+        module="packages.temporal.workers.worker_website_intelligence",
+        queue="website-intelligence-queue",
+    ),
+    WorkerSpec(
         id="worker-3-identity",
         name="Agent 3: Identity & Splink Clustering",
         module="packages.temporal.workers.worker_identity",

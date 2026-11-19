@@ -21,6 +21,7 @@ Capabilities:
 
 import asyncio
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -253,8 +254,12 @@ class LLMEntityResolver:
                 method="statutory_rule",
             )
 
-        # 2. Invoke Ollama LLaMA 3.1:8B if available
-        if self.enabled and ollama_client.is_available():
+        # 2. Invoke the configured LLM if available.
+        #    LLM_PROVIDER unset or "ollama" keeps the original Ollama path unchanged.
+        #    Any other provider (groq, bedrock) goes through the provider-agnostic layer.
+        _provider = os.getenv("LLM_PROVIDER", "").strip().lower()
+        _use_ollama = _provider in ("", "ollama")
+        if self.enabled and (ollama_client.is_available() if _use_ollama else True):
             prompt = f"""Compare these two business records and adjudicate whether they are the same entity:
 
 Record 1:
@@ -278,11 +283,17 @@ Record 2:
 Prior Linker Match Probability: {prior_prob:.2f}
 """
             try:
-                llm_json = await ollama_client.generate_structured(
-                    prompt=prompt,
-                    system=ADJUDICATION_SYSTEM_PROMPT,
-                    timeout=self.timeout,
-                )
+                if _use_ollama:
+                    llm_json = await ollama_client.generate_structured(
+                        prompt=prompt,
+                        system=ADJUDICATION_SYSTEM_PROMPT,
+                        timeout=self.timeout,
+                    )
+                else:
+                    from packages.infrastructure.llm import generate_structured_json
+                    llm_json = await generate_structured_json(
+                        prompt, system=ADJUDICATION_SYSTEM_PROMPT, timeout=self.timeout,
+                    )
                 if isinstance(llm_json, dict) and "decision" in llm_json:
                     dec = str(llm_json.get("decision")).upper().strip()
                     if dec not in ("MERGE", "SEPARATE", "ESCALATE_HUMAN"):
@@ -301,7 +312,7 @@ Prior Linker Match Probability: {prior_prob:.2f}
                         confidence=conf,
                         reasoning=str(llm_json.get("reasoning", "Semantic analysis performed by LLaMA 3.1:8B")),
                         score_adjustment=score_adj,
-                        method="ollama_llama3.1:8b",
+                        method="ollama_llama3.1:8b" if _use_ollama else f"llm_{_provider}",
                     )
             except Exception as exc:
                 logger.warning("LLM entity adjudication failed, utilizing heuristic fallback: %s", exc)

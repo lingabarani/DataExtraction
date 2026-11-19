@@ -166,6 +166,14 @@ def get_structured_logger(name: str = "oneextraction", json_format: Optional[boo
     return BoundLogger(raw_logger)
 
 
+# Scrub credential-shaped strings (Groq/AWS keys, bearer tokens) from every log handler.
+try:
+    from packages.infrastructure.log_redaction import install_redaction as _install_redaction
+    _install_redaction()
+except Exception:  # pragma: no cover - logging must never break import
+    pass
+
+
 _HEALTH_METRICS_CACHE: Optional[Dict[str, Any]] = None
 _HEALTH_CACHE_TIMESTAMP: float = 0.0
 _HEALTH_CACHE_TTL: float = 4.0

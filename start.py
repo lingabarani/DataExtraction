@@ -125,8 +125,31 @@ def start_temporal():
     return proc
 
 
+def register_schedules() -> None:
+    """Registers cron schedules from config/schedules.yaml (idempotent: existing ones are skipped)."""
+    print("        -> Registering Temporal schedules (config/schedules.yaml)...")
+    env = {**os.environ, "PYTHONPATH": str(PROJECT_ROOT)}
+    try:
+        res = subprocess.run(
+            [VENV_PYTHON, "-m", "packages.temporal.schedules.register_schedules"],
+            cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True, timeout=90,
+        )
+    except Exception as exc:
+        print(f"        -> WARNING: schedule registration failed to run: {exc}")
+        return
+    out = (res.stdout or "") + (res.stderr or "")
+    registered = out.count("Registered schedule")
+    existing = out.count("already exists")
+    failed = out.count("Failed to register")
+    if res.returncode == 0 and not failed:
+        print(f"        -> Schedules ready ({registered} new, {existing} already present).")
+    else:
+        tail = " | ".join(line.strip() for line in out.strip().splitlines()[-3:])
+        print(f"        -> WARNING: schedule registration problem (exit {res.returncode}): {tail}")
+
+
 def start_workers():
-    """Starts the 7-Agent Temporal Worker Supervisor."""
+    """Starts the 7-Agent Temporal Worker Supervisor and verifies it is still alive."""
     print("  [3/5] Starting 7-Agent Worker Supervisor...")
     supervisor_script = PROJECT_ROOT / "scripts" / "ops" / "start_all_workers.py"
     if not supervisor_script.exists():
@@ -139,16 +162,28 @@ def start_workers():
         "PYTHONPATH": str(PROJECT_ROOT),
     }
 
+    log_dir = PROJECT_ROOT / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "workers.log"
+
     try:
+        log_file = open(log_path, "ab")
         proc = subprocess.Popen(
             cmd, cwd=str(PROJECT_ROOT), env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=log_file, stderr=subprocess.STDOUT,
         )
-        print("        -> SUCCESS: 7-Agent Worker Supervisor active and polling queues.")
-        return proc
     except Exception as exc:
         print(f"        -> ERROR starting worker supervisor: {exc}")
         return None
+
+    # Give the supervisor a moment: it exits immediately if Temporal is unreachable.
+    time.sleep(4.0)
+    code = proc.poll()
+    if code is not None:
+        print(f"        -> ERROR: worker supervisor exited with code {code}. See {log_path}")
+        return None
+    print(f"        -> Worker supervisor running (PID {proc.pid}); output in {log_path}")
+    return proc
 
 
 def start_backend():
@@ -209,6 +244,10 @@ def main():
     # Step 2: Temporal Dev Server
     temporal_proc = start_temporal()
     time.sleep(1.0)
+    if _is_port_open("127.0.0.1", 7233):
+        register_schedules()
+    else:
+        print("        -> WARNING: Temporal is not reachable; schedules were not registered.")
 
     # Step 3: Worker Supervisor
     workers_proc = start_workers()

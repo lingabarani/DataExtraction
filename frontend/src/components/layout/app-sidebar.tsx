@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Globe2, BarChart3, Settings,
   Download, Copy, Database, ChevronDown,
-  LogOut, Circle, MapPin, Activity, Cpu,
+  LogOut, Circle, MapPin, Activity, Cpu, Bot, KeyRound, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +24,7 @@ const PLATFORM_NAV = [
 
 const PRIMARY_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
   { label: "US Leads", href: "/leads", icon: Globe2, count: "213K" },
   { label: "MX Leads", href: "/leads/mexico", icon: Globe2, count: "50K" },
   { label: "AI Query", href: "/analytics", icon: BarChart3 },
@@ -32,11 +33,13 @@ const PRIMARY_NAV = [
 const TOOLS_NAV = [
   { label: "Pipeline & DLQ", href: "/pipeline", icon: Activity },
   { label: "Map Extraction", href: "/map-extraction", icon: MapPin },
+  { label: "Autonomy", href: "/autonomy", icon: Bot },
   { label: "Duplicates", href: "/duplicates", icon: Copy },
   { label: "Export", href: "/export", icon: Download },
 ];
 
 const BOTTOM_NAV = [
+  { label: "AI Keys", href: "/settings/ai-keys", icon: KeyRound },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

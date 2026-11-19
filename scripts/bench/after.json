@@ -1,0 +1,29 @@
+{
+  "timestamp": 1794829275.6122656,
+  "gmaps_deep_place": {
+    "num_stubs": 50,
+    "total_requests": 100,
+    "wall_time_seconds": 1.4307,
+    "requests_per_second": 69.89,
+    "stubs_per_second": 34.95
+  },
+  "website_crawl": {
+    "num_crawls": 10,
+    "total_pages_crawled": 50,
+    "wall_time_seconds": 0.0326,
+    "pages_per_second": 1533.5
+  },
+  "db_upsert_10k": {
+    "num_rows": 10000,
+    "wall_time_seconds": 0.0468,
+    "rows_per_second": 213646.0
+  },
+  "discovery_engine": {
+    "wall_time_seconds": 3.8941,
+    "total_organizations": 10,
+    "total_people": 5,
+    "total_cards": 10,
+    "total_citations": 25,
+    "cards_per_second": 2.57
+  }
+}

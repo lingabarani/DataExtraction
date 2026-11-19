@@ -1,0 +1,30 @@
+[
+  {
+    "facility_name": "TEST REGISTRY AGENCY ONE",
+    "category": "Home Care Agency",
+    "license_number": "HC9901",
+    "license_status": "Active",
+    "address": "300 STATE REGISTRY WAY",
+    "city": "Charlotte",
+    "state": "NC",
+    "zip": "28203",
+    "phone": "7045550201",
+    "administrator": "Test Administrator One",
+    "admin_title": "Administrator",
+    "capacity": "Comprehensive Home Care"
+  },
+  {
+    "facility_name": "TEST REGISTRY FACILITY TWO",
+    "category": "Adult Care Home",
+    "license_number": "HA9902",
+    "license_status": "Active",
+    "address": "400 ASSISTED LIVING LN",
+    "city": "Charlotte",
+    "state": "NC",
+    "zip": "28277",
+    "phone": "7045550202",
+    "administrator": "Test Administrator Two",
+    "admin_title": "Executive Director",
+    "capacity": "60 Beds"
+  }
+]
