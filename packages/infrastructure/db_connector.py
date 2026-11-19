@@ -261,7 +261,7 @@ def get_db_connection() -> Generator[object, None, None]:
 
 
 @contextmanager
-def get_db_cursor(dict_cursor: bool = False) -> Generator[Tuple[object, object], None, None]:
+def get_db_cursor(dict_cursor: bool = False) -> Generator[Tuple[Any, Any], None, None]:
     """
     Context manager yielding (connection, cursor).
     Closes cursor and returns connection to pool cleanly upon completion.

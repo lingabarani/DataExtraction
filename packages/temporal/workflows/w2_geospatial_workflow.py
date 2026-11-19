@@ -27,6 +27,8 @@ with workflow.unsafe.imports_passed_through():
         run_gmaps_collection_activity,
         run_gmaps_reviews_activity,
         run_gmaps_services_activity,
+        run_gmaps_website_verification_activity,
+        run_gmaps_website_crawl_activity,
     )
     from packages.temporal.activities.osm_activities import (
         run_osm_state_extraction_activity,
@@ -391,6 +393,55 @@ class Agent2GeospatialWorkflow:
             except Exception as exc:
                 self._results["services"] = {"status": "FAILED", "error": str(exc), "services_saved": 0}
 
+        # ── Step 2b: Domain Verification & Website Contact Crawl (Optional/Legacy) ────
+        if not config.get("skip_website_enrichment", False):
+            verify_limit = int(
+                config.get("website_verification_limit")
+                or geo_defaults.get("website_verification_limit", 50)
+            )
+            raw_data_count = config.get("data_count")
+            if raw_data_count is not None:
+                try:
+                    verify_limit = max(1, min(verify_limit, int(raw_data_count)))
+                except (TypeError, ValueError):
+                    pass
+
+            try:
+                ver_res = await workflow.execute_activity(
+                    run_gmaps_website_verification_activity,
+                    args=[wf_id, verify_limit],
+                    task_queue=TASK_QUEUE,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=GEOSPATIAL_RETRY_POLICY,
+                )
+                self._results["website_verification"] = ver_res
+            except Exception as exc:
+                self._results["website_verification"] = {"status": "FAILED", "error": str(exc)}
+
+            crawl_limit = int(
+                config.get("website_crawl_limit")
+                or geo_defaults.get("website_crawl_limit", 25)
+            )
+            if raw_data_count is not None:
+                try:
+                    crawl_limit = max(1, min(crawl_limit, int(raw_data_count)))
+                except (TypeError, ValueError):
+                    pass
+
+            try:
+                crawl_res = await workflow.execute_activity(
+                    run_gmaps_website_crawl_activity,
+                    args=[wf_id, crawl_limit],
+                    task_queue=TASK_QUEUE,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=GEOSPATIAL_RETRY_POLICY,
+                )
+                self._results["website_crawl"] = crawl_res
+            except Exception as exc:
+                self._results["website_crawl"] = {"status": "FAILED", "error": str(exc)}
+
         # ── Step 3: Geographic Standardization & Validation ───────────────────
         await workflow.wait_condition(lambda: not self._paused)
         geo_validation_table = config.get("target_table", "staging_dataextraction.staging_companies")
@@ -438,6 +489,8 @@ class Agent2GeospatialWorkflow:
         reviews_saved = int((self._results.get("reviews") or {}).get("reviews_saved", 0) or 0)
         reviews_analyzed = int((self._results.get("reviews") or {}).get("reviews_analyzed", 0) or 0)
         services_saved = int((self._results.get("services") or {}).get("services_saved", 0) or 0)
+        websites_verified = int((self._results.get("website_verification") or {}).get("verified", 0) or 0)
+        contacts_found = int((self._results.get("website_crawl") or {}).get("contacts_found", 0) or 0)
         geo_validated = int((self._results.get("geo_validation") or {}).get("validated", 0) or 0)
 
         # ── Step 4: Best-Effort KG Observation Recording ──────────────────────
@@ -508,6 +561,8 @@ class Agent2GeospatialWorkflow:
             "reviews_saved": reviews_saved,
             "reviews_analyzed": reviews_analyzed,
             "services_saved": services_saved,
+            "websites_verified": websites_verified,
+            "contacts_found": contacts_found,
             "geo_validated": geo_validated,
             "spatial_standardized": total_inserted,
             "duration_seconds": duration_seconds,

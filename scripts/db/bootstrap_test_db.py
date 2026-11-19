@@ -159,7 +159,21 @@ def bootstrap():
             except Exception as e:
                 logger.warning("Notice on %s: %s", apply_module, e)
 
-        # Phase 6: Public legacy schema tables (setup_postgres schema)
+        # Phase 6: AI Stack, Deep Places, Discovery & Agent 8 Website Intelligence (015-019)
+        for m_name in [
+            "015_secrets_llm_planner.sql",
+            "016_place_deep_data.sql",
+            "017_discovery_schema.sql",
+            "018_discovery_answer_store.sql",
+            "019_website_intelligence.sql",
+        ]:
+            sql_file = MIGRATIONS_DIR / m_name
+            try:
+                execute_sql_file(conn, sql_file)
+            except Exception as e:
+                logger.warning("Notice on %s: %s", m_name, e)
+
+        # Phase 7: Public legacy schema tables (setup_postgres schema)
         try:
             from packages.infrastructure.setup_postgres import create_schema
             create_schema(params["host"], params["port"], params["password"], drop_existing=False)
@@ -167,14 +181,15 @@ def bootstrap():
         except Exception as e:
             logger.warning("Notice on public schema: %s", e)
 
-        # Phase 7: Verification Query
+        # Phase 8: Verification Query
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT table_schema, count(*)
                 FROM information_schema.tables
                 WHERE table_schema IN (
                     'master_dataextraction', 'staging_dataextraction', 'identity_resolution',
-                    'raw_dataextraction', 'search_dataextraction', 'public'
+                    'raw_dataextraction', 'search_dataextraction', 'discovery_dataextraction',
+                    'ops_dataextraction', 'public'
                 )
                 GROUP BY table_schema
                 ORDER BY table_schema;

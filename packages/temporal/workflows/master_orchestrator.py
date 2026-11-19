@@ -265,6 +265,7 @@ class MasterOrchestrator:
                 for key in ("sources", "countries", "execution_mode", "geospatial_defaults"):
                     if key in config and key not in a2_cfg:
                         a2_cfg[key] = config[key]
+                a2_cfg.setdefault("skip_website_enrichment", True)
                 a2_result = await workflow.execute_child_workflow(
                     Agent2GeospatialWorkflow.run,
                     args=[a2_cfg],
