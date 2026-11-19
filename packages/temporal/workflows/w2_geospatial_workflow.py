@@ -25,8 +25,8 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from packages.temporal.activities.gmaps_activities import (
         run_gmaps_collection_activity,
-        run_gmaps_website_verification_activity,
-        run_gmaps_website_crawl_activity,
+        run_gmaps_reviews_activity,
+        run_gmaps_services_activity,
     )
     from packages.temporal.activities.osm_activities import (
         run_osm_state_extraction_activity,
@@ -358,54 +358,38 @@ class Agent2GeospatialWorkflow:
             for r in osm_out
         ]
 
-        # ── Step 2: Domain Verification & Website Contact Crawl ───────────────
+        # ── Step 2: Google Maps Reviews & Services Extraction ────────────────
         await workflow.wait_condition(lambda: not self._paused)
-        if not config.get("skip_website_enrichment", False):
-            verify_limit = int(
-                config.get("website_verification_limit")
-                or geo_defaults.get("website_verification_limit", 50)
-            )
-            if raw_data_count is not None:
-                try:
-                    verify_limit = max(1, min(verify_limit, int(raw_data_count)))
-                except (TypeError, ValueError):
-                    pass
-
+        if run_gmaps and not config.get("skip_reviews_extraction", False):
+            reviews_limit = int(config.get("reviews_place_limit") or 50)
+            max_rev = config.get("max_reviews_per_place")
             try:
-                ver_res = await workflow.execute_activity(
-                    run_gmaps_website_verification_activity,
-                    args=[wf_id, verify_limit],
+                rev_res = await workflow.execute_activity(
+                    run_gmaps_reviews_activity,
+                    args=[wf_id, reviews_limit, max_rev],
                     task_queue=TASK_QUEUE,
-                    start_to_close_timeout=timedelta(minutes=30),
+                    start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=5),
                     retry_policy=GEOSPATIAL_RETRY_POLICY,
                 )
-                self._results["website_verification"] = ver_res
+                self._results["reviews"] = rev_res
             except Exception as exc:
-                self._results["website_verification"] = {"status": "FAILED", "error": str(exc)}
+                self._results["reviews"] = {"status": "FAILED", "error": str(exc), "reviews_saved": 0}
 
-            crawl_limit = int(
-                config.get("website_crawl_limit")
-                or geo_defaults.get("website_crawl_limit", 25)
-            )
-            if raw_data_count is not None:
-                try:
-                    crawl_limit = max(1, min(crawl_limit, int(raw_data_count)))
-                except (TypeError, ValueError):
-                    pass
-
+        if run_gmaps and not config.get("skip_services_extraction", False):
+            services_limit = int(config.get("services_place_limit") or 100)
             try:
-                crawl_res = await workflow.execute_activity(
-                    run_gmaps_website_crawl_activity,
-                    args=[wf_id, crawl_limit],
+                svc_res = await workflow.execute_activity(
+                    run_gmaps_services_activity,
+                    args=[wf_id, services_limit],
                     task_queue=TASK_QUEUE,
-                    start_to_close_timeout=timedelta(minutes=30),
+                    start_to_close_timeout=timedelta(hours=1),
                     heartbeat_timeout=timedelta(minutes=5),
                     retry_policy=GEOSPATIAL_RETRY_POLICY,
                 )
-                self._results["website_crawl"] = crawl_res
+                self._results["services"] = svc_res
             except Exception as exc:
-                self._results["website_crawl"] = {"status": "FAILED", "error": str(exc)}
+                self._results["services"] = {"status": "FAILED", "error": str(exc), "services_saved": 0}
 
         # ── Step 3: Geographic Standardization & Validation ───────────────────
         await workflow.wait_condition(lambda: not self._paused)
@@ -451,8 +435,9 @@ class Agent2GeospatialWorkflow:
             if isinstance(r, dict)
         )
         total_inserted = gmaps_inserted + osm_inserted
-        websites_verified = int((self._results.get("website_verification") or {}).get("verified", 0) or 0)
-        contacts_found = int((self._results.get("website_crawl") or {}).get("contacts_found", 0) or 0)
+        reviews_saved = int((self._results.get("reviews") or {}).get("reviews_saved", 0) or 0)
+        reviews_analyzed = int((self._results.get("reviews") or {}).get("reviews_analyzed", 0) or 0)
+        services_saved = int((self._results.get("services") or {}).get("services_saved", 0) or 0)
         geo_validated = int((self._results.get("geo_validation") or {}).get("validated", 0) or 0)
 
         # ── Step 4: Best-Effort KG Observation Recording ──────────────────────
@@ -472,8 +457,9 @@ class Agent2GeospatialWorkflow:
                             "osm_extracted": osm_extracted,
                             "osm_inserted": osm_inserted,
                             "locations_upserted": locations_upserted,
-                            "websites_verified": websites_verified,
-                            "contacts_found": contacts_found,
+                            "reviews_saved": reviews_saved,
+                            "reviews_analyzed": reviews_analyzed,
+                            "services_saved": services_saved,
                             "geo_validated": geo_validated,
                         },
                     }],
@@ -497,12 +483,12 @@ class Agent2GeospatialWorkflow:
             if str(r.get("status", "")).upper() in ("FAILED", "ERROR")
         ]
         geo_failed = str((self._results.get("geo_validation") or {}).get("status", "")).upper() == "FAILED"
-        ver_failed = str((self._results.get("website_verification") or {}).get("status", "")).upper() == "FAILED"
-        crawl_failed = str((self._results.get("website_crawl") or {}).get("status", "")).upper() == "FAILED"
+        reviews_failed = str((self._results.get("reviews") or {}).get("status", "")).upper() == "FAILED"
+        services_failed = str((self._results.get("services") or {}).get("status", "")).upper() == "FAILED"
 
         if executed_collection and len(failed_collection) == len(executed_collection) and total_inserted == 0:
             self._status = "FAILED"
-        elif failed_collection or geo_failed or ver_failed or crawl_failed:
+        elif failed_collection or geo_failed or reviews_failed or services_failed:
             self._status = "COMPLETED_WITH_ERRORS"
         else:
             self._status = "COMPLETED"
@@ -519,8 +505,9 @@ class Agent2GeospatialWorkflow:
             "osm_inserted": osm_inserted,
             "postgres_inserted": total_inserted,
             "locations_upserted": locations_upserted,
-            "websites_verified": websites_verified,
-            "contacts_found": contacts_found,
+            "reviews_saved": reviews_saved,
+            "reviews_analyzed": reviews_analyzed,
+            "services_saved": services_saved,
             "geo_validated": geo_validated,
             "spatial_standardized": total_inserted,
             "duration_seconds": duration_seconds,

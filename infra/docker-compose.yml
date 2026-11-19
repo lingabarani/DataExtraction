@@ -39,7 +39,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dex_user} -d ${POSTGRES_DB:-dataextraction}"]
       interval: 10s
@@ -254,7 +254,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER:-dex_user}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
@@ -265,7 +265,7 @@ services:
     ports:
       - "7233:7233"
     healthcheck:
-      test: ["CMD-SHELL", "temporal operator cluster health 2>/dev/null | grep -q SERVING || exit 1"]
+      test: ["CMD-SHELL", "temporal --address $$TEMPORAL_ADDRESS operator cluster health 2>/dev/null | grep -q SERVING || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -275,7 +275,7 @@ services:
 
   # ── Temporal Namespace Initializer ───────────────────────────────────────
   temporal-namespace-init:
-    image: temporalio/admin-tools:1.24.2
+    image: temporalio/admin-tools:latest
     container_name: dex-temporal-ns-init
     restart: "no"
     depends_on:

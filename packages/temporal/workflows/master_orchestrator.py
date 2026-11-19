@@ -1,9 +1,10 @@
 """
-DataExtraction — Master 7-Agent Orchestrator Saga
+DataExtraction — Master 8-Agent Orchestrator Saga
 =================================================
-Top-level deterministic saga coordinating the 7-Agent Enterprise Intelligence Platform:
+Top-level deterministic saga coordinating the 8-Agent Enterprise Intelligence Platform:
   Phase 1: Agent 1 – Sovereign & Corporate Registry Ingestion (QUEUE_REGISTRY)
-  Phase 2: Agent 2 – Geospatial & Domain Intelligence (QUEUE_GEOSPATIAL)
+  Phase 2: Agent 2 – Geospatial & Maps Intelligence (QUEUE_GEOSPATIAL)
+  Phase 2.5: Agent 8 – Website Intelligence & Enrichment (QUEUE_WEBSITE_INTELLIGENCE)
   Phase 3: Agent 3 – Identity Resolution & Deduplication (QUEUE_IDENTITY)
   Phase 3.5: Agent 7 – Deliverability & Email Verification (QUEUE_EMAIL_ENRICHMENT)
   Phase 4: Agent 4 – Executive Discovery & Contact Graph (QUEUE_EXECUTIVE)
@@ -50,10 +51,12 @@ with workflow.unsafe.imports_passed_through():
         QUEUE_GOVERNANCE,
         QUEUE_SEARCH,
         QUEUE_EMAIL_ENRICHMENT,
+        QUEUE_WEBSITE_INTELLIGENCE,
         WORKFLOW_EXECUTION_TIMEOUT,
     )
     from packages.temporal.workflows.w1_registry_workflow import Agent1RegistryWorkflow
     from packages.temporal.workflows.w2_geospatial_workflow import Agent2GeospatialWorkflow
+    from packages.temporal.workflows.w8_website_intelligence_workflow import Agent8WebsiteIntelligenceWorkflow
     from packages.temporal.workflows.w3_identity_workflow import Agent3IdentityWorkflow
     from packages.temporal.workflows.w7_email_enrichment_workflow import EmailEnrichmentWorkflow
     from packages.temporal.workflows.w4_executive_workflow import Agent4ExecutiveWorkflow
@@ -84,6 +87,13 @@ class MasterOrchestrator:
         self._metrics: Dict[str, Any] = {
             "organizations_processed": 0,
             "spatial_standardized": 0,
+            "reviews_extracted": 0,
+            "reviews_analyzed": 0,
+            "services_extracted": 0,
+            "websites_verified": 0,
+            "websites_crawled": 0,
+            "csuite_identified": 0,
+            "tech_stack_detected": 0,
             "clusters_resolved": 0,
             "executives_identified": 0,
             "emails_verified": 0,
@@ -295,11 +305,15 @@ class MasterOrchestrator:
                         "warning",
                     )
                 else:
-                    ver_cnt = int(a2_result.get("websites_verified", 0) or 0)
+                    rev_cnt = int(a2_result.get("reviews_saved", 0) or 0)
+                    svc_cnt = int(a2_result.get("services_saved", 0) or 0)
                     val_cnt = int(a2_result.get("geo_validated", 0) or 0)
+                    self._metrics["reviews_extracted"] = rev_cnt
+                    self._metrics["services_extracted"] = svc_cnt
+                    self._metrics["reviews_analyzed"] = int(a2_result.get("reviews_analyzed", 0) or 0)
                     self._append_log(
                         "AGENT 2: GEOSPATIAL",
-                        f"Staged {geo_count:,} geospatial records, verified {ver_cnt:,} domains, geo-validated {val_cnt:,} rows in {phase_dur}s.",
+                        f"Staged {geo_count:,} geospatial records, extracted {rev_cnt:,} reviews, {svc_cnt:,} services, geo-validated {val_cnt:,} rows in {phase_dur}s.",
                         "telemetry",
                     )
             except Exception as exc:
@@ -309,6 +323,66 @@ class MasterOrchestrator:
                     self._phase_results[k] = err_res
                 workflow.logger.error("Phase 2 (Agent 2 Geospatial) FAILED: %s", exc)
                 self._append_log("AGENT 2: GEOSPATIAL", f"Phase 2 error: {exc}", "error")
+
+        # ── Phase 2.5: Website Intelligence & Enrichment (Agent 8) ───────────
+        self._phase = "WEBSITE_INTELLIGENCE"
+        self._append_log("AGENT 8: WEBSITE", "Resolving corporate domains, verifying SSL/SSRF, crawling internal pages & auditing company evidence...", "info")
+        await workflow.wait_condition(lambda: not self._paused)
+
+        if not self._cancelled and "WEBSITE" not in self._cancelled_phases and "WEBSITE_INTELLIGENCE" not in self._cancelled_phases:
+            phase_start = self._safe_now()
+            try:
+                a8_cfg = dict(config.get("agent_8") or config.get("website_intelligence") or {})
+                if "data_count" in config and "data_count" not in a8_cfg:
+                    a8_cfg["data_count"] = config["data_count"]
+                a8_result = await workflow.execute_child_workflow(
+                    Agent8WebsiteIntelligenceWorkflow.run,
+                    args=[a8_cfg],
+                    id=f"agent8-website-{wf_id}",
+                    task_queue=QUEUE_WEBSITE_INTELLIGENCE,
+                    execution_timeout=timedelta(hours=12),
+                )
+                a8_status = str(a8_result.get("status", "COMPLETED")).upper()
+                phase_dur = round(max((self._safe_now() - phase_start).total_seconds(), 0.0), 2)
+                normalized_status = (
+                    "FAILED" if a8_status in ("FAILED", "ERROR")
+                    else ("SKIPPED" if a8_status == "SKIPPED" else "COMPLETED")
+                )
+                res_payload = {
+                    **a8_result,
+                    "status": normalized_status,
+                    "duration_seconds": a8_result.get("duration_seconds", phase_dur),
+                }
+                for k in ("WEBSITE_INTELLIGENCE", "WEBSITE", "agent_8_website_intelligence", "enrichment"):
+                    self._phase_results[k] = res_payload
+
+                domains_ver = int(a8_result.get("domains_verified", 0) or 0)
+                domains_crw = int(a8_result.get("domains_crawled", 0) or 0)
+                execs_found = int(a8_result.get("executives_found", 0) or 0)
+                tech_found = int(a8_result.get("tech_stack_detected", 0) or 0)
+
+                self._metrics["websites_verified"] = domains_ver
+                self._metrics["websites_crawled"] = domains_crw
+                self._metrics["csuite_identified"] = execs_found
+                self._metrics["tech_stack_detected"] = tech_found
+
+                if normalized_status == "FAILED":
+                    self._append_log("AGENT 8: WEBSITE", f"Phase 2.5 FAILED in {phase_dur}s.", "error")
+                elif normalized_status == "SKIPPED":
+                    self._append_log("AGENT 8: WEBSITE", "Phase 2.5 SKIPPED (no active candidate websites).", "warning")
+                else:
+                    self._append_log(
+                        "AGENT 8: WEBSITE",
+                        f"Verified {domains_ver} domains, crawled {domains_crw} sites, discovered {execs_found} executives & {tech_found} technologies in {phase_dur}s.",
+                        "telemetry",
+                    )
+            except Exception as exc:
+                phase_dur = round(max((self._safe_now() - phase_start).total_seconds(), 0.0), 2)
+                err_res = {"status": "FAILED", "error": str(exc), "duration_seconds": phase_dur}
+                for k in ("WEBSITE_INTELLIGENCE", "WEBSITE", "agent_8_website_intelligence", "enrichment"):
+                    self._phase_results[k] = err_res
+                workflow.logger.error("Phase 2.5 (Agent 8 Website) FAILED: %s", exc)
+                self._append_log("AGENT 8: WEBSITE", f"Phase 2.5 error: {exc}", "error")
 
         # ── Phase 3: Identity Resolution & Entity Clustering (Agent 3) ────────
         self._phase = "IDENTITY_RESOLUTION"

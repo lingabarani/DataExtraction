@@ -27,6 +27,7 @@ QUEUE_EXECUTIVE: str = os.getenv("QUEUE_EXECUTIVE", "executive-contact-queue")
 QUEUE_GOVERNANCE: str = os.getenv("QUEUE_GOVERNANCE", "governance-quality-queue")
 QUEUE_SEARCH: str = os.getenv("QUEUE_SEARCH", "search-persistence-queue")
 QUEUE_EMAIL_ENRICHMENT: str = os.getenv("QUEUE_EMAIL_ENRICHMENT", "email-enrichment-queue")
+QUEUE_WEBSITE_INTELLIGENCE: str = os.getenv("QUEUE_WEBSITE_INTELLIGENCE", "website-intelligence-queue")
 
 # ── Cluster Settings ──────────────────────────────────────────────────────
 TEMPORAL_HOST: str = os.getenv("TEMPORAL_HOST", "localhost:7233")
@@ -105,6 +106,14 @@ EMAIL_ENRICHMENT_RETRY_POLICY = RetryPolicy(
     non_retryable_error_types=["PermissionError", "ValueError"],
 )
 
+WEBSITE_INTELLIGENCE_RETRY_POLICY = RetryPolicy(
+    initial_interval=timedelta(seconds=10),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=10),
+    maximum_attempts=3,
+    non_retryable_error_types=["PermissionError", "ValueError"],
+)
+
 # ── Worker Concurrency Defaults ───────────────────────────────────────────
 WORKER_MAX_ACTIVITIES = {
     QUEUE_REGISTRY: int(os.getenv("REGISTRY_WORKER_MAX_CONCURRENT_ACTIVITIES", "6")),
@@ -114,6 +123,7 @@ WORKER_MAX_ACTIVITIES = {
     QUEUE_GOVERNANCE: int(os.getenv("GOVERNANCE_WORKER_MAX_CONCURRENT_ACTIVITIES", "8")),
     QUEUE_SEARCH: int(os.getenv("SEARCH_WORKER_MAX_CONCURRENT_ACTIVITIES", "12")),
     QUEUE_EMAIL_ENRICHMENT: int(os.getenv("EMAIL_ENRICHMENT_WORKER_MAX_CONCURRENT_ACTIVITIES", "10")),
+    QUEUE_WEBSITE_INTELLIGENCE: int(os.getenv("WEBSITE_INTELLIGENCE_WORKER_MAX_CONCURRENT_ACTIVITIES", "8")),
 }
 
 
@@ -122,6 +132,7 @@ def get_task_queues() -> Dict[str, str]:
     return {
         "agent_1_registry": QUEUE_REGISTRY,
         "agent_2_geospatial": QUEUE_GEOSPATIAL,
+        "agent_8_website_intelligence": QUEUE_WEBSITE_INTELLIGENCE,
         "agent_3_identity": QUEUE_IDENTITY,
         "agent_4_executive": QUEUE_EXECUTIVE,
         "agent_5_governance": QUEUE_GOVERNANCE,
@@ -138,6 +149,7 @@ __all__ = [
     "QUEUE_GOVERNANCE",
     "QUEUE_SEARCH",
     "QUEUE_EMAIL_ENRICHMENT",
+    "QUEUE_WEBSITE_INTELLIGENCE",
     "TEMPORAL_HOST",
     "TEMPORAL_NAMESPACE",
     "TEMPORAL_TLS_CERT_PATH",
@@ -156,6 +168,7 @@ __all__ = [
     "GOVERNANCE_RETRY_POLICY",
     "SEARCH_RETRY_POLICY",
     "EMAIL_ENRICHMENT_RETRY_POLICY",
+    "WEBSITE_INTELLIGENCE_RETRY_POLICY",
     "WORKER_MAX_ACTIVITIES",
     "get_task_queues",
 ]

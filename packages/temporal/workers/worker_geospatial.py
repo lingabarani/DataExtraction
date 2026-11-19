@@ -28,6 +28,8 @@ from packages.temporal.client import get_temporal_client
 from packages.temporal.config import QUEUE_GEOSPATIAL, WORKER_MAX_ACTIVITIES
 from packages.temporal.activities.gmaps_activities import (
     run_gmaps_collection_activity,
+    run_gmaps_reviews_activity,
+    run_gmaps_services_activity,
     run_gmaps_website_verification_activity,
     run_gmaps_website_crawl_activity,
     run_gmaps_export_activity,
@@ -73,6 +75,8 @@ async def run_worker():
 
     activities = [
         run_gmaps_collection_activity,
+        run_gmaps_reviews_activity,
+        run_gmaps_services_activity,
         run_gmaps_website_verification_activity,
         run_gmaps_website_crawl_activity,
         run_gmaps_export_activity,
