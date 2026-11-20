@@ -355,3 +355,126 @@ export interface DiscoveryOrganization {
   first_seen?: string;
   last_seen?: string;
 }
+
+// ── B2B AI Chatbot Interfaces & API Methods ─────────────────────────────────
+
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  title: string;
+  context: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatCompany {
+  company_id: string;
+  company_name: string;
+  canonical_name?: string;
+  industry?: string;
+  website?: string;
+  domain?: string;
+  phone?: string;
+  phones?: Array<{ number: string; type?: string }>;
+  email?: string;
+  emails?: Array<{ value: string; label?: string }>;
+  address_street?: string;
+  address_city?: string;
+  address_state?: string;
+  address_postal_code?: string;
+  address_country?: string;
+  executive?: string;
+  rating?: number;
+  review_count?: number;
+  services?: string[];
+  lead_score?: number;
+  email_status?: string;
+  origin?: string;
+  pending_review?: boolean;
+  website_pending_review?: boolean;
+  phone_pending_review?: boolean;
+  email_pending_review?: boolean;
+  executive_pending_review?: boolean;
+  phone_conflict?: { database: string; discovered: string };
+  email_conflict?: { database: string; discovered: string };
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  structured_plan?: Record<string, any>;
+  completeness_report?: Record<string, any>;
+  results_summary?: Record<string, any>;
+  companies?: ChatCompany[];
+  created_at: string;
+}
+
+export interface ChatReviewItem {
+  id: string;
+  session_id: string;
+  run_id?: string;
+  company_id: string;
+  company_name: string;
+  field_name: string;
+  existing_value?: any;
+  discovered_value: any;
+  source_url?: string;
+  source_type: string;
+  evidence?: string;
+  field_confidence: number;
+  verification_status: "UNVERIFIED" | "VERIFIED" | "CONFLICTING";
+  conflict_details?: Record<string, any>;
+  review_status: "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_INVESTIGATION";
+  reviewed_by?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+  created_at: string;
+}
+
+export const chatApi = {
+  createSession: (title?: string) =>
+    api.post<ChatSession>("/v1/chat/sessions", { title: title || "New Conversation" }),
+
+  listSessions: (limit: number = 50) =>
+    api.get<ChatSession[]>(`/v1/chat/sessions?limit=${limit}`),
+
+  getSession: (id: string) =>
+    api.get<ChatSession>(`/v1/chat/sessions/${id}`),
+
+  deleteSession: (id: string) =>
+    api.delete<void>(`/v1/chat/sessions/${id}`),
+
+  getHistory: (sessionId: string) =>
+    api.get<ChatMessage[]>(`/v1/chat/sessions/${sessionId}/history`),
+
+  sendMessage: (sessionId: string, content: string) =>
+    api.post<any>(`/v1/chat/sessions/${sessionId}/messages`, { content }),
+
+  cancelExecution: (sessionId: string) =>
+    api.post<any>(`/v1/chat/sessions/${sessionId}/cancel`, {}),
+
+  listReviews: (params?: { status?: string; session_id?: string; company_id?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.session_id) q.set("session_id", params.session_id);
+    if (params?.company_id) q.set("company_id", params.company_id);
+    if (params?.limit) q.set("limit", String(params.limit));
+    return api.get<ChatReviewItem[]>(`/v1/chat/reviews?${q.toString()}`);
+  },
+
+  getReview: (id: string) =>
+    api.get<ChatReviewItem>(`/v1/chat/reviews/${id}`),
+
+  approveReview: (id: string, notes?: string) =>
+    api.post<any>(`/v1/chat/reviews/${id}/approve`, { notes }),
+
+  rejectReview: (id: string, reason?: string) =>
+    api.post<any>(`/v1/chat/reviews/${id}/reject`, { reason }),
+
+  getStreamUrl: (sessionId: string, prompt: string) => {
+    const rawUrl = `${API_URL}/v1/chat/sessions/${sessionId}/stream?prompt=${encodeURIComponent(prompt)}`;
+    return withAuthToken(rawUrl);
+  },
+};

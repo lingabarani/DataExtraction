@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Globe2, BarChart3, Settings,
   Download, Copy, Database, ChevronDown,
   LogOut, Circle, MapPin, Activity, Cpu, Bot, KeyRound, Search,
+  Sparkles, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +25,7 @@ const PLATFORM_NAV = [
 
 const PRIMARY_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "AI Chatbot", href: "/chat", icon: Sparkles, count: "AI" },
   { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
   { label: "US Leads", href: "/leads", icon: Globe2, count: "213K" },
   { label: "MX Leads", href: "/leads/mexico", icon: Globe2, count: "50K" },
@@ -31,6 +33,7 @@ const PRIMARY_NAV = [
 ];
 
 const TOOLS_NAV = [
+  { label: "Review Queue", href: "/reviews", icon: ShieldCheck },
   { label: "Pipeline & DLQ", href: "/pipeline", icon: Activity },
   { label: "Map Extraction", href: "/map-extraction", icon: MapPin },
   { label: "Autonomy", href: "/autonomy", icon: Bot },
