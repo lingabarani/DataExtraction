@@ -99,6 +99,11 @@ class ConfigManager:
         if self._secrets_cache is not None:
             return self._secrets_cache
 
+        use_aws = os.getenv("USE_AWS_SECRETS", "false").lower() in ("true", "1", "yes")
+        if not use_aws:
+            self._secrets_cache = {}
+            return self._secrets_cache
+
         secret_name = os.getenv("AWS_SECRETS_NAME")
         if not secret_name:
             self._secrets_cache = {}

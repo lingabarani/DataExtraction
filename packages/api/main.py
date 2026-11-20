@@ -38,6 +38,7 @@ from packages.api.routers.llm_router import router as llm_router
 from packages.api.routers.planner_router import router as planner_router
 from packages.api.routers.places_router import router as places_router
 from packages.api.routers.discovery_router import router as discovery_router
+from packages.chatbot.api.chat_router import router as chat_router
 
 logger = get_structured_logger("api.gateway")
 
@@ -213,6 +214,7 @@ def create_app() -> FastAPI:
     app.include_router(planner_router)
     app.include_router(places_router)
     app.include_router(discovery_router)
+    app.include_router(chat_router)
 
     # ── Legacy routers (each registered exactly once with /api prefix) ─────────
     for router_obj, prefix, _tags in _legacy_routers:
