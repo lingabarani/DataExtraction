@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     DataExtraction Enterprise Platform - Unified Local Development Launcher
@@ -247,7 +247,7 @@ function Start-WorkerSupervisor {
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "   DATAEXTRACTION — ENTERPRISE B2B LEAD INTELLIGENCE PLATFORM        " -ForegroundColor Cyan
+Write-Host "   DATAEXTRACTION - ENTERPRISE B2B LEAD INTELLIGENCE PLATFORM        " -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
