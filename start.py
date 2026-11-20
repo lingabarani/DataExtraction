@@ -5,7 +5,7 @@ DataExtraction — Unified Single-Command Application Launcher
 Runs the entire enterprise stack with a single command:
   1. Validates PostgreSQL Database connection (localhost:5432)
   2. Ensures Temporal Dev Server is running (localhost:7233 & UI localhost:8233)
-  3. Launches 7-Agent Temporal Worker Supervisor (scripts/ops/start_all_workers.py)
+  3. Launches 8-Agent Temporal Worker Supervisor (scripts/ops/start_all_workers.py)
   4. Launches Backend FastAPI Gateway (http://localhost:8000)
      Override port with:  API_PORT=3001 python start.py
   5. Launches Frontend Next.js Dashboard (http://localhost:3000)
@@ -105,10 +105,14 @@ def start_temporal():
         "--db-filename", str(sqlite_db),
     ]
 
+    log_dir = PROJECT_ROOT / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    temp_log = open(log_dir / "temporal.log", "ab")
+
     try:
         proc = subprocess.Popen(
             cmd, cwd=str(PROJECT_ROOT),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=temp_log, stderr=subprocess.STDOUT,
         )
     except Exception as exc:
         print(f"        -> ERROR launching temporal: {exc}")
@@ -149,8 +153,8 @@ def register_schedules() -> None:
 
 
 def start_workers():
-    """Starts the 7-Agent Temporal Worker Supervisor and verifies it is still alive."""
-    print("  [3/5] Starting 7-Agent Worker Supervisor...")
+    """Starts the 8-Agent Temporal Worker Supervisor and verifies it is still alive."""
+    print("  [3/5] Starting 8-Agent Worker Supervisor...")
     supervisor_script = PROJECT_ROOT / "scripts" / "ops" / "start_all_workers.py"
     if not supervisor_script.exists():
         print(f"        -> WARNING: Supervisor script not found at {supervisor_script}")
@@ -228,7 +232,7 @@ def print_banner():
     print( "   * Temporal UI : http://localhost:8233 (gRPC: localhost:7233)")
     print(f"   * Backend API : http://localhost:{BACKEND_PORT}  (Docs: http://localhost:{BACKEND_PORT}/api/docs)")
     print( "   * Frontend UI : http://localhost:3000")
-    print( "   * Agents (7)  : Supervised & Polling Dedicated Task Queues")
+    print( "   * Agents (8)  : Supervised & Polling Dedicated Task Queues")
     print( "   * Press Ctrl+C at any time to stop all services.")
     print("=" * 70 + "\n")
 

@@ -183,7 +183,7 @@ def main():
     worker_env.setdefault("TEMPORAL_HOST", host_str)
     worker_env.setdefault("TEMPORAL_NAMESPACE", os.getenv("TEMPORAL_NAMESPACE", "dataextraction"))
 
-    # Spawn all 7 workers
+    # Spawn all workers
     for spec in WORKERS_SPEC:
         spawn_worker(spec, worker_env)
         time.sleep(0.5)
@@ -201,7 +201,7 @@ def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
-    logger.info("All 7 Worker Daemons running and supervised. Press Ctrl+C to stop.")
+    logger.info("All %d Worker Daemons running and supervised. Press Ctrl+C to stop.", len(WORKERS_SPEC))
 
     # Supervision loop: monitor health and restart on abnormal crash
     while not shutdown_flag:
