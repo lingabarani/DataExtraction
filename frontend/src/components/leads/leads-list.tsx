@@ -9,11 +9,21 @@ import {
 } from "@/components/ui/select";
 import {
   Search, X, Download, ChevronLeft, ChevronRight,
-  SlidersHorizontal, Loader2,
+  SlidersHorizontal, Loader2, Table as TableIcon, MapPin,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useLeads, type LeadFilter } from "@/hooks/use-leads";
 import { LeadsTable } from "./leads-table";
 import { api } from "@/lib/api";
+
+const LeadsMap = dynamic(() => import("./leads-map").then((m) => m.LeadsMap), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[500px] w-full flex items-center justify-center border rounded-lg bg-muted/20 text-muted-foreground text-sm">
+      Loading interactive map...
+    </div>
+  ),
+});
 
 // ── Quick filter pill definitions ────────────────────────────────────────────
 
@@ -89,6 +99,7 @@ export function LeadsList({ table = "us_leads" }: Props) {
   const [emailStatus, setEmailStatus] = useState("all");
   const [page,        setPage]        = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode,    setViewMode]    = useState<"table" | "map">("table");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Merge pill filters ─────────────────────────────────────────────────────
@@ -200,6 +211,26 @@ export function LeadsList({ table = "us_leads" }: Props) {
         <span className="text-[12px] font-mono tabnum text-muted-foreground whitespace-nowrap">
           {loading ? "..." : `${total.toLocaleString()} records`}
         </span>
+
+        {/* View Toggle */}
+        <div className="flex items-center border border-border rounded-md p-0.5 bg-muted/30">
+          <Button
+            variant={viewMode === "table" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-[12px] gap-1"
+            onClick={() => setViewMode("table")}
+          >
+            <TableIcon className="w-3.5 h-3.5" /> Table
+          </Button>
+          <Button
+            variant={viewMode === "map" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-[12px] gap-1"
+            onClick={() => setViewMode("map")}
+          >
+            <MapPin className="w-3.5 h-3.5" /> Map
+          </Button>
+        </div>
 
         {/* Export */}
         <Button
@@ -327,10 +358,16 @@ export function LeadsList({ table = "us_leads" }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── Table ───────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto scrollbar-enterprise rounded-md border border-border mt-3">
-        <LeadsTable leads={leads} loading={loading} table={table} />
-      </div>
+      {/* ── Table or Map View ─────────────────────────────────── */}
+      {viewMode === "table" ? (
+        <div className="flex-1 overflow-auto scrollbar-enterprise rounded-md border border-border mt-3">
+          <LeadsTable leads={leads} loading={loading} table={table} />
+        </div>
+      ) : (
+        <div className="flex-1 rounded-md border border-border mt-3 overflow-hidden min-h-[500px]">
+          <LeadsMap leads={leads} className="h-full w-full min-h-[500px]" />
+        </div>
+      )}
 
       {/* ── Pagination ──────────────────────────────────────────── */}
       {total > 50 && (

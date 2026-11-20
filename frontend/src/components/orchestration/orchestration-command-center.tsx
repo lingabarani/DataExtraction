@@ -147,6 +147,19 @@ export function OrchestrationCommandCenter() {
     onereach_deliveries: cachedKpis.onereach_deliveries || 0,
   };
 
+  // ── Fetch Active Workflow ─────────────────────────────────────────────────
+  const fetchActiveWorkflow = useCallback(async () => {
+    try {
+      const res = await api.get<WorkflowStatusResponse>("/orchestration/active/status");
+      if (res && res.workflow_id) {
+        setActiveWorkflowId(res.workflow_id);
+        setWorkflowStatus(res);
+      }
+    } catch {
+      // Standby / idle cluster
+    }
+  }, []);
+
   // ── Fetch Header & Queues Status ──────────────────────────────────────────
   const fetchHeaderStatus = useCallback(async () => {
     setIsLoadingHeader(true);
@@ -171,20 +184,7 @@ export function OrchestrationCommandCenter() {
     } finally {
       setIsLoadingHeader(false);
     }
-  }, [activeWorkflowId]);
-
-  // ── Fetch Active Workflow ─────────────────────────────────────────────────
-  const fetchActiveWorkflow = useCallback(async () => {
-    try {
-      const res = await api.get<WorkflowStatusResponse>("/orchestration/active/status");
-      if (res && res.workflow_id) {
-        setActiveWorkflowId(res.workflow_id);
-        setWorkflowStatus(res);
-      }
-    } catch {
-      // Standby / idle cluster
-    }
-  }, []);
+  }, [activeWorkflowId, fetchActiveWorkflow]);
 
   // ── Setup SSE Stream when Workflow is Active ──────────────────────────────
   useEffect(() => {

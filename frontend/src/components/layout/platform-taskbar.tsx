@@ -11,6 +11,8 @@ import {
   Send,
   Clock,
   Settings,
+  Search,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +26,10 @@ interface PlatformNavTab {
 
 const PLATFORM_TABS: PlatformNavTab[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Live Discovery", href: "/search", icon: Search, badge: "NEW", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
   { label: "Orchestration", href: "/orchestration", icon: Cpu, badge: "LIVE", badgeColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
   { label: "Data Pipeline", href: "/pipeline", icon: Layers },
+  { label: "Autonomy", href: "/autonomy", icon: Bot },
   { label: "Observability", href: "/orchestration#observability", icon: Activity },
   { label: "OneReach", href: "/orchestration#onereach", icon: Send },
   { label: "Freshness", href: "/orchestration#freshness", icon: Clock },

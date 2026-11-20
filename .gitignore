@@ -87,6 +87,7 @@ test_render.png
 scratch/
 
 # ── Test & E2E Artifacts ──────────────────────────────────────────────────────
+.playwright-mcp/
 playwright-report/
 test-results/
 blob-report/

@@ -305,7 +305,7 @@ export default function DiscoverySearchPage() {
           <p className="font-medium text-foreground">How to use</p>
           <p>1. Type what you are looking for and where, for example &quot;home care in Chennai&quot; or &quot;dentists near Anna Nagar, Chennai&quot;.</p>
           <p>2. Press Search. The first results appear in about a second and keep filling in.</p>
-          <p>3. Use "Only show" to keep results with a phone, website or email, and "Download CSV" to save them.</p>
+          <p>3. Use &quot;Only show&quot; to keep results with a phone, website or email, and &quot;Download CSV&quot; to save them.</p>
           <p>Click a name to see every detail and where it came from.</p>
         </div>
       )}

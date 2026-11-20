@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -265,7 +266,7 @@ export function AnalyticsDashboard() {
               <p className="text-xs text-center text-muted-foreground">
                 Showing first {result.leads.length.toLocaleString()} of {result.total.toLocaleString()} results.
                 Use the{" "}
-                <a href="/leads" className="text-primary underline">Leads page</a>
+                <Link href="/leads" className="text-primary underline">Leads page</Link>
                 {" "}for full paginated results.
               </p>
             )}

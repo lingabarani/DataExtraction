@@ -104,13 +104,23 @@ def get_current_user(
 
     try:
         payload = _decode_token(token)
-    except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired. Please log in again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except JWTError as exc:
+    except (ExpiredSignatureError, JWTError) as exc:
+        if not config_manager.is_auth_required():
+            op = config_manager.get_operator_principal_config()
+            logger.debug("Non-prod AUTH_REQUIRED=false: stale/invalid token (%s), falling back to operator", exc)
+            return UserPrincipal(
+                id=op["id"],
+                email=op["email"],
+                name=op["name"],
+                workspace_id=op["workspace_id"],
+                is_admin=op["is_admin"],
+            )
+        if isinstance(exc, ExpiredSignatureError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired. Please log in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         logger.warning("JWT decode failure from %s: %s", request.client and request.client.host, exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

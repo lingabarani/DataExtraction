@@ -311,8 +311,8 @@ export function useDbStats() {
     setLoading(true);
     try {
       const url = forceRefresh ? "/stats?refresh=true" : "/stats";
-      const data = await api.get<DbStats>(url, { timeoutMs: 3000 });
-      if (data && (data.us_total > 0 || data.by_source?.length > 0)) {
+      const data = await api.get<DbStats>(url, { timeoutMs: 5000 });
+      if (data && typeof data.us_total === "number") {
         cachedStats = data;
         setStats(data);
         setError(null);

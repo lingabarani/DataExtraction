@@ -157,7 +157,7 @@ export function PipelinePanel() {
 
   // Orchestrator & Live SSE state
   const [orchHealth, setOrchHealth] = useState<OrchestratorHealthResponse | null>(null);
-  const [workflowIdInput, setWorkflowIdInput] = useState(`saga-${Date.now()}`);
+  const [workflowIdInput, setWorkflowIdInput] = useState(() => `saga-${Date.now()}`);
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
   const [sagaTelemetry, setSagaTelemetry] = useState<SagaTelemetryData | null>(null);
   const [streamingActive, setStreamingActive] = useState(false);

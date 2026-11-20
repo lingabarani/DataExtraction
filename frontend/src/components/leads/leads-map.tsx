@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Phone, ChevronRight, MapPin } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Lead } from "@/hooks/use-leads";
 
 const DEFAULT_CENTER: [number, number] = [37.0902, -95.7129]; // US geographic center
@@ -58,6 +59,7 @@ function FitBounds({ points }: { points: [number, number][] }) {
 
 interface Props {
   leads: Lead[];
+  className?: string;
 }
 
 interface GeocodedLead extends Lead {
@@ -65,7 +67,7 @@ interface GeocodedLead extends Lead {
   lng: number;
 }
 
-export function LeadsMap({ leads }: Props) {
+export function LeadsMap({ leads, className }: Props) {
   const pinned = useMemo<GeocodedLead[]>(() => {
     return leads
       .map((l) => {
@@ -97,7 +99,7 @@ export function LeadsMap({ leads }: Props) {
   }
 
   return (
-    <div className="h-[520px] w-full overflow-hidden rounded-b-lg">
+    <div className={cn("h-[520px] w-full overflow-hidden rounded-b-lg", className)}>
       <style>{`
         .oe-marker-pin { filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.35)); transition: transform 0.15s ease; }
         .oe-marker-pin:hover { transform: scale(1.15) translateY(-2px); }

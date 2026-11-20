@@ -18,15 +18,21 @@ import { cn } from "@/lib/utils";
 // ── Breadcrumb builder ────────────────────────────────────────────────────────
 
 const LABELS: Record<string, string> = {
-  dashboard:     "Dashboard",
-  orchestration: "Temporal Orchestration",
-  pipeline:      "Pipeline & DLQ",
-  leads:         "US Leads",
-  mexico:        "MX Leads",
-  analytics:     "AI Query",
-  duplicates:    "Duplicates",
-  export:        "Export",
-  settings:      "Settings",
+  dashboard:      "Dashboard",
+  orchestration:  "Temporal Orchestration",
+  pipeline:       "Pipeline & DLQ",
+  search:         "Live Discovery",
+  leads:          "US Leads",
+  mexico:         "MX Leads",
+  analytics:      "AI Query",
+  autonomy:       "Autonomy Planner",
+  "map-extraction": "Map Extraction",
+  duplicates:     "Duplicates",
+  export:         "Export",
+  places:         "Place Intelligence",
+  org:            "Organization Profile",
+  "ai-keys":      "AI Keys",
+  settings:       "Settings",
 };
 
 function Breadcrumb() {

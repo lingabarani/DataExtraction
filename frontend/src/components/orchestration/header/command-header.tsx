@@ -198,7 +198,7 @@ export function CommandHeader({ data, isLoading, onRefresh }: CommandHeaderProps
             <p className="text-sm font-semibold font-mono tracking-tight text-foreground truncate max-w-[200px]">
               {lastRun ? `${lastRun.duration_seconds.toFixed(1)}s elapsed` : "Certified Golden Run"}
             </p>
-            <p className="text-[10px] font-mono text-muted-foreground/60">
+            <p className="text-[10px] font-mono text-muted-foreground/60" suppressHydrationWarning>
               {lastRun?.completed_at ? new Date(lastRun.completed_at).toLocaleTimeString() : "Ready for Ingestion"}
             </p>
           </div>

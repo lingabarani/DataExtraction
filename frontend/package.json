@@ -8,7 +8,7 @@
     "build": "next build --webpack",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint"
+    "lint": "eslint src"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",

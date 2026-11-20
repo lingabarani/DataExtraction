@@ -78,7 +78,7 @@ function MetricCard({
         </div>
         {value !== undefined ? (
           <p className="text-2xl font-bold tabnum font-mono tracking-tight text-foreground">
-            {typeof value === "number" ? value.toLocaleString() : value}
+            {typeof value === "number" ? value.toLocaleString("en-US") : value}
           </p>
         ) : (
           <Skeleton className="h-8 w-24 mb-0.5" />
@@ -130,7 +130,7 @@ function ChartTooltip({ active, payload, label }: {
       </p>
       <div className="flex items-center gap-2">
         <span className="font-mono tabnum text-primary font-bold">
-          {count.toLocaleString()}
+          {count.toLocaleString("en-US")}
         </span>
         <span className="text-[11px] text-muted-foreground">
           certified entities
@@ -188,7 +188,7 @@ function IndustryRow({ rank, name, count, max }: {
         <div className="h-full bg-primary/70 rounded-full" style={{ width: `${pct}%` }} />
       </div>
       <span className="w-16 text-right text-[12px] font-mono tabnum text-muted-foreground flex-shrink-0 font-medium">
-        {count.toLocaleString()}
+        {count.toLocaleString("en-US")}
       </span>
     </div>
   );
@@ -309,7 +309,7 @@ export function DashboardOverview() {
             title="Records by Verified Data Source"
             action={
               <span className="text-[11px] font-mono text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded">
-                {usTotal.toLocaleString()} total entities
+                {usTotal.toLocaleString("en-US")} total entities
               </span>
             }
           />
@@ -395,7 +395,7 @@ export function DashboardOverview() {
               <div key={r.label} className="flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground font-medium">{r.label}</span>
                 <span className="text-[12px] font-mono tabnum font-bold text-foreground">
-                  {r.val.toLocaleString()}
+                  {r.val.toLocaleString("en-US")}
                 </span>
               </div>
             ))}
