@@ -25,14 +25,14 @@ export function ProspectingWorkspace() {
   const [companyFilters, setCompanyFilters] = useState<CompanySearchParams>({
     limit: 25,
     offset: 0,
-    sort_by: "trust_score",
+    sort_by: "recent",
     sort_order: "desc",
   });
 
   const [peopleFilters, setPeopleFilters] = useState<PeopleSearchParams>({
     limit: 25,
     offset: 0,
-    sort_by: "trust_score",
+    sort_by: "recent",
     sort_order: "desc",
   });
 
@@ -232,9 +232,9 @@ export function ProspectingWorkspace() {
     setExpandedKeywords([]);
     setSelectedIds([]);
     if (mode === "company") {
-      setCompanyFilters({ limit: 25, offset: 0, sort_by: "trust_score", sort_order: "desc" });
+      setCompanyFilters({ limit: 25, offset: 0, sort_by: "recent", sort_order: "desc" });
     } else {
-      setPeopleFilters({ limit: 25, offset: 0, sort_by: "trust_score", sort_order: "desc" });
+      setPeopleFilters({ limit: 25, offset: 0, sort_by: "recent", sort_order: "desc" });
     }
   };
 
@@ -402,9 +402,9 @@ export function ProspectingWorkspace() {
 
   const handleClearAllPills = () => {
     if (mode === "company") {
-      setCompanyFilters({ limit: 25, offset: 0, sort_by: "trust_score", sort_order: "desc" });
+      setCompanyFilters({ limit: 25, offset: 0, sort_by: "recent", sort_order: "desc" });
     } else {
-      setPeopleFilters({ limit: 25, offset: 0, sort_by: "trust_score", sort_order: "desc" });
+      setPeopleFilters({ limit: 25, offset: 0, sort_by: "recent", sort_order: "desc" });
     }
     setAiSummary(null);
   };
@@ -509,6 +509,14 @@ export function ProspectingWorkspace() {
           total={total}
           limit={mode === "company" ? companyFilters.limit || 25 : peopleFilters.limit || 25}
           offset={mode === "company" ? companyFilters.offset || 0 : peopleFilters.offset || 0}
+          currentSort={mode === "company" ? (companyFilters.sort_by || "recent") : (peopleFilters.sort_by || "recent")}
+          onSortChange={(newSort) => {
+            if (mode === "company") {
+              setCompanyFilters({ ...companyFilters, sort_by: newSort, offset: 0 });
+            } else {
+              setPeopleFilters({ ...peopleFilters, sort_by: newSort, offset: 0 });
+            }
+          }}
           isLoading={isLoading}
           selectedIds={selectedIds}
           onToggleSelectId={handleToggleSelectId}

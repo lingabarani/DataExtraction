@@ -35,6 +35,8 @@ export interface CompanySearchParams {
   intent_strengths?: string[];
   intent_topics?: string[];
   min_trust_score?: number;
+  min_rating?: number;
+  recent_only?: boolean;
   has_verified_contacts?: boolean;
   limit?: number;
   offset?: number;
@@ -63,6 +65,13 @@ export interface CompanyRecord {
   intent_topics?: string[];
   short_description?: string;
   decision_maker_count?: number;
+  rating?: number | null;
+  review_count?: number;
+  sentiment_summary?: string | null;
+  praise_highlights?: string[];
+  complaint_alerts?: string[];
+  updated_at?: string | null;
+  last_verified_at?: string | null;
 }
 
 export interface PeopleSearchParams {
@@ -77,6 +86,7 @@ export interface PeopleSearchParams {
   company_domain?: string;
   min_deliverability_score?: number;
   min_propensity_score?: number;
+  recent_only?: boolean;
   company_name?: string;
   company_industries?: string[];
   limit?: number;
@@ -108,6 +118,8 @@ export interface PeopleRecord {
   company_name: string;
   company_domain: string;
   company_industry: string;
+  updated_at?: string | null;
+  last_verified_at?: string | null;
 }
 
 export interface FacetItem {

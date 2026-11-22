@@ -21,9 +21,14 @@ import {
   DollarSign,
   Loader2,
   Sparkles,
+  Star,
+  MessageSquare,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
 import {
   CompanyRecord,
   PeopleRecord,
@@ -49,11 +54,13 @@ export function DetailDrawer({
   onPushToOneReach,
   isPushing,
 }: DetailDrawerProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "tech" | "compliance" | "leadership">(
+  const [activeTab, setActiveTab] = useState<"overview" | "reviews" | "tech" | "compliance" | "leadership">(
     "overview"
   );
   const [decisionMakers, setDecisionMakers] = useState<DecisionMaker[]>([]);
   const [isLoadingLeaders, setIsLoadingLeaders] = useState(false);
+  const [reviewsData, setReviewsData] = useState<any>(null);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
 
   useEffect(() => {
     if (company && isOpen) {
@@ -63,6 +70,18 @@ export function DetailDrawer({
         .then((res) => setDecisionMakers(res.decision_makers || []))
         .catch(() => setDecisionMakers([]))
         .finally(() => setIsLoadingLeaders(false));
+
+      setIsLoadingReviews(true);
+      const dom = company.primary_domain || "";
+      api
+        .get<any>(`/leads/company/${encodeURIComponent(company.org_id)}/intelligence?domain=${encodeURIComponent(dom)}`)
+        .then((res) => {
+          if (res?.reviews) {
+            setReviewsData(res.reviews);
+          }
+        })
+        .catch(() => setReviewsData(null))
+        .finally(() => setIsLoadingReviews(false));
     }
   }, [company, isOpen]);
 
@@ -168,9 +187,10 @@ export function DetailDrawer({
 
         {/* Company Tab Navigation */}
         {company && (
-          <div className="flex items-center border-b border-border/60 px-5 bg-background text-xs">
+          <div className="flex items-center border-b border-border/60 px-5 bg-background text-xs overflow-x-auto">
             {[
               { id: "overview", label: "Overview & Intent" },
+              { id: "reviews", label: `Reviews (${company.review_count || reviewsData?.total_scraped || 0})` },
               { id: "tech", label: "Technographics" },
               { id: "compliance", label: "Security & Badges" },
               { id: "leadership", label: `Leadership (${decisionMakers.length})` },
@@ -180,7 +200,7 @@ export function DetailDrawer({
                 type="button"
                 onClick={() => setActiveTab(tab.id as any)}
                 className={cn(
-                  "py-2.5 px-3 border-b-2 font-medium transition-colors",
+                  "py-2.5 px-3 border-b-2 font-medium transition-colors whitespace-nowrap",
                   activeTab === tab.id
                     ? "border-primary text-primary font-semibold"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -258,6 +278,187 @@ export function DetailDrawer({
                         </Badge>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            ) : activeTab === "reviews" ? (
+              <div className="space-y-4">
+                {isLoadingReviews ? (
+                  <div className="flex items-center justify-center h-36 gap-2 text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                    <span>Loading customer reviews and sentiment intelligence...</span>
+                  </div>
+                ) : (reviewsData?.total_scraped || 0) > 0 || (company.review_count || 0) > 0 ? (
+                  <>
+                    {/* Rating & Sentiment Header Card */}
+                    <div className="p-4 rounded-xl border border-border/70 bg-card/60 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-bold font-mono text-foreground">
+                              {Number(reviewsData?.average_rating || company.rating || 0).toFixed(1)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">/ 5.0</span>
+                            <div className="flex items-center text-amber-500 ml-1">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star
+                                  key={s}
+                                  className={cn(
+                                    "size-3.5",
+                                    s <= Math.round(Number(reviewsData?.average_rating || company.rating || 0))
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-muted-foreground/30"
+                                  )}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Based on{" "}
+                            <span className="font-semibold text-foreground">
+                              {reviewsData?.total_scraped || company.review_count || 0}
+                            </span>{" "}
+                            verified reviews • Google Maps &amp; Places
+                          </p>
+                        </div>
+
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs px-2.5 py-1 font-semibold",
+                            (reviewsData?.ai_summary?.sentiment || "").toLowerCase().includes("positive") || (reviewsData?.average_rating || company.rating || 0) >= 4.0
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                              : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                          )}
+                        >
+                          {reviewsData?.ai_summary?.sentiment || (Number(company.rating || 0) >= 4.0 ? "Strong Positive Sentiment" : "Neutral Sentiment")}
+                        </Badge>
+                      </div>
+
+                      {/* AI Sentiment Summary */}
+                      {(reviewsData?.ai_summary?.summary || company.sentiment_summary) && (
+                        <p className="text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/50">
+                          {reviewsData?.ai_summary?.summary || company.sentiment_summary}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Praise & Caution Bento */}
+                    {((reviewsData?.ai_summary?.pros && reviewsData.ai_summary.pros.length > 0) ||
+                      (company.praise_highlights && company.praise_highlights.length > 0) ||
+                      (reviewsData?.ai_summary?.cons && reviewsData.ai_summary.cons.length > 0) ||
+                      (company.complaint_alerts && company.complaint_alerts.length > 0)) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Praise Highlights */}
+                        <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                            <ThumbsUp className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Praise &amp; Strengths</span>
+                          </div>
+                          <ul className="space-y-1.5 text-[11px] text-emerald-950 dark:text-emerald-200">
+                            {(reviewsData?.ai_summary?.pros || company.praise_highlights || []).slice(0, 4).map((p: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-1.5 leading-snug">
+                                <span className="text-emerald-500 font-bold">•</span>
+                                <span>{p}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Points of Caution */}
+                        <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                            <ThumbsDown className="size-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>Points of Caution</span>
+                          </div>
+                          <ul className="space-y-1.5 text-[11px] text-amber-950 dark:text-amber-200">
+                            {(reviewsData?.ai_summary?.cons || company.complaint_alerts || []).length > 0 ? (
+                              (reviewsData?.ai_summary?.cons || company.complaint_alerts || []).slice(0, 4).map((c: string, idx: number) => (
+                                <li key={idx} className="flex items-start gap-1.5 leading-snug">
+                                  <span className="text-amber-500 font-bold">•</span>
+                                  <span>{c}</span>
+                                </li>
+                              ))
+                            ) : (
+                              <li className="text-muted-foreground italic">No recurring operational complaints detected.</li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Customer Review Feed */}
+                    <div className="space-y-3 pt-1">
+                      <h5 className="font-semibold text-xs text-foreground flex items-center justify-between">
+                        <span>Customer Review Feed</span>
+                        <span className="text-[11px] font-normal text-muted-foreground font-mono">
+                          {reviewsData?.recent_reviews?.length || 0} reviews shown
+                        </span>
+                      </h5>
+
+                      {reviewsData?.recent_reviews && reviewsData.recent_reviews.length > 0 ? (
+                        reviewsData.recent_reviews.map((rev: any, idx: number) => {
+                          const author = rev.reviewer_name || rev.author || "Verified Customer";
+                          const rating = Number(rev.rating || 5);
+                          const date = rev.relative_date || rev.published_at || "Recent";
+                          const text = rev.review_text || rev.text || "";
+
+                          return (
+                            <div
+                              key={idx}
+                              className="p-3.5 rounded-xl border border-border/70 bg-card/40 space-y-2 hover:bg-card/70 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="size-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center shrink-0">
+                                    {author.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="font-semibold text-foreground text-xs">{author}</span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground font-mono">{date}</span>
+                              </div>
+
+                              <div className="flex items-center gap-1 text-amber-500">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <Star
+                                    key={s}
+                                    className={cn(
+                                      "size-3",
+                                      s <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"
+                                    )}
+                                  />
+                                ))}
+                              </div>
+
+                              {text && (
+                                <p className="text-xs text-muted-foreground leading-relaxed italic">
+                                  &ldquo;{text}&rdquo;
+                                </p>
+                              )}
+
+                              {rev.owner_response && (
+                                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-[11px] space-y-1 mt-2">
+                                  <span className="font-semibold text-foreground">Response from owner:</span>
+                                  <p className="text-muted-foreground leading-snug">{rev.owner_response}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic text-center py-4">
+                          No individual review excerpts archived for this domain yet.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-8 text-center space-y-2 border border-dashed border-border/70 rounded-xl">
+                    <MessageSquare className="size-8 mx-auto text-muted-foreground/40" />
+                    <p className="font-medium text-xs text-foreground">No Customer Reviews Linked</p>
+                    <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                      No Google Maps or Places reviews have been synchronized for this organization yet.
+                    </p>
                   </div>
                 )}
               </div>

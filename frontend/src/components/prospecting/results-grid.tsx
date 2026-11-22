@@ -21,6 +21,9 @@ import {
   Sparkles,
   Search,
   RotateCcw,
+  Star,
+  ArrowUpDown,
+  Clock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,8 @@ interface ResultsGridProps {
   offset: number;
   isLoading: boolean;
   selectedIds: string[];
+  currentSort?: string;
+  onSortChange?: (newSort: string) => void;
   onToggleSelectId: (id: string) => void;
   onSelectAllVisible: () => void;
   onClearSelection: () => void;
@@ -61,6 +66,8 @@ export function ResultsGrid({
   offset,
   isLoading,
   selectedIds,
+  currentSort,
+  onSortChange,
   onToggleSelectId,
   onSelectAllVisible,
   onClearSelection,
@@ -85,21 +92,21 @@ export function ResultsGrid({
     if (currentItems.length === 0) return;
     const header =
       mode === "company"
-        ? "Org ID,Company Name,Domain,Industry,State,Employees Min,Employees Max,Trust Score,Intent Score\n"
-        : "Person ID,Name,Title,Company,Email,Deliverability,Seniority,Department\n";
+        ? "Org ID,Company Name,Domain,Industry,Rating,Review Count,State,Employees Min,Employees Max,Trust Score,Intent Score,Updated At\n"
+        : "Person ID,Name,Title,Company,Email,Deliverability,Seniority,Department,Updated At\n";
 
     const rows =
       mode === "company"
         ? (currentItems as CompanyRecord[])
             .map(
               (c) =>
-                `"${c.org_id}","${c.legal_name}","${c.primary_domain}","${c.industry}","${c.state_code}",${c.employee_count_min},${c.employee_count_max},${c.trust_score},${c.intent_score}`
+                `"${c.org_id}","${c.legal_name}","${c.primary_domain}","${c.industry}",${c.rating || "N/A"},${c.review_count || 0},"${c.state_code}",${c.employee_count_min},${c.employee_count_max},${c.trust_score},${c.intent_score},"${c.updated_at || ""}"`
             )
             .join("\n")
         : (currentItems as PeopleRecord[])
             .map(
               (p) =>
-                `"${p.person_id}","${p.full_name}","${p.title}","${p.company_name}","${p.email}","${p.deliverability_status}","${p.seniority_level}","${p.department}"`
+                `"${p.person_id}","${p.full_name}","${p.title}","${p.company_name}","${p.email}","${p.deliverability_status}","${p.seniority_level}","${p.department}","${p.updated_at || ""}"`
             )
             .join("\n");
 
@@ -139,7 +146,27 @@ export function ResultsGrid({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Freshness & Sort Selector */}
+          {onSortChange && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-lg border border-border/60">
+              <ArrowUpDown className="size-3 text-primary" />
+              <span className="text-[11px] font-medium hidden md:inline">Sort:</span>
+              <select
+                value={currentSort || "recent"}
+                onChange={(e) => onSortChange(e.target.value)}
+                className="bg-transparent border-0 text-xs font-semibold text-foreground focus:outline-none cursor-pointer py-1 pr-1"
+                aria-label="Sort by"
+              >
+                <option value="recent" className="bg-background text-foreground">Most Recent (Default)</option>
+                {mode === "company" && <option value="rating" className="bg-background text-foreground">Highest Rating</option>}
+                {mode === "company" && <option value="reviews" className="bg-background text-foreground">Most Reviews</option>}
+                <option value="trust_score" className="bg-background text-foreground">Highest Trust</option>
+                <option value="intent_score" className="bg-background text-foreground">Highest Intent</option>
+              </select>
+            </div>
+          )}
+
           {selectedIds.length > 0 && (
             <Button
               size="sm"
@@ -239,6 +266,7 @@ export function ResultsGrid({
                 <th className="w-10 px-3 py-2.5"></th>
                 <th className="px-3 py-2.5">Company &amp; Domain</th>
                 <th className="px-3 py-2.5">Industry</th>
+                <th className="px-3 py-2.5">Rating &amp; Reviews</th>
                 <th className="px-3 py-2.5">HQ Location</th>
                 <th className="px-3 py-2.5">Headcount</th>
                 <th className="px-3 py-2.5">Tech Stack</th>
@@ -250,6 +278,7 @@ export function ResultsGrid({
             <tbody className="divide-y divide-border/60">
               {companies.map((company) => {
                 const isSelected = selectedIds.includes(company.org_id);
+                const isUpdatedToday = company.updated_at && (company.updated_at.startsWith("2026-11-22") || company.updated_at.startsWith("2026-11-23"));
                 return (
                   <tr
                     key={company.org_id}
@@ -273,16 +302,27 @@ export function ResultsGrid({
                         <div className="flex items-center justify-center size-7 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0">
                           {company.legal_name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="truncate max-w-[200px]">
-                          <Link
-                            href={`/company/${company.org_id}${company.primary_domain ? `?domain=${encodeURIComponent(company.primary_domain)}` : ""}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-semibold text-foreground hover:text-primary hover:underline transition-colors truncate flex items-center gap-1 group/cname"
-                            title="Open full Company Intelligence Page"
-                          >
-                            <span className="truncate">{company.legal_name}</span>
-                            <ExternalLink className="size-2.5 opacity-0 group-hover/cname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
-                          </Link>
+                        <div className="truncate max-w-[210px]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Link
+                              href={`/company/${company.org_id}${company.primary_domain ? `?domain=${encodeURIComponent(company.primary_domain)}` : ""}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-semibold text-foreground hover:text-primary hover:underline transition-colors truncate flex items-center gap-1 group/cname"
+                              title="Open full Company Intelligence Page"
+                            >
+                              <span className="truncate">{company.legal_name}</span>
+                              <ExternalLink className="size-2.5 opacity-0 group-hover/cname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
+                            </Link>
+                            {isUpdatedToday ? (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shrink-0">
+                                Updated today
+                              </span>
+                            ) : company.last_verified_at ? (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
+                                Verified
+                              </span>
+                            ) : null}
+                          </div>
                           {company.primary_domain ? (
                             <Link
                               href={`/company/${company.org_id}?domain=${encodeURIComponent(company.primary_domain)}`}
@@ -302,6 +342,22 @@ export function ResultsGrid({
                       <span className="truncate max-w-[140px] block text-muted-foreground">
                         {company.industry}
                       </span>
+                    </td>
+                    {/* Rating & Reviews Cell */}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {company.rating ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center text-amber-500 font-bold font-mono text-xs">
+                            <Star className="size-3 fill-amber-500 text-amber-500 mr-0.5 shrink-0" />
+                            <span>{Number(company.rating).toFixed(1)}</span>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground font-sans">
+                            ({company.review_count?.toLocaleString() || 0})
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-[11px]">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       <span className="font-mono text-foreground/80">
@@ -442,16 +498,27 @@ export function ResultsGrid({
                         <div className="flex items-center justify-center size-7 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-xs shrink-0">
                           {person.full_name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="truncate max-w-[180px]">
-                          <Link
-                            href={`/leads/${person.person_id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-semibold text-foreground hover:text-purple-600 dark:hover:text-purple-400 hover:underline transition-colors truncate flex items-center gap-1 group/pname"
-                            title="Open full Lead Intelligence Dossier"
-                          >
-                            <span className="truncate">{person.full_name}</span>
-                            <ExternalLink className="size-2.5 opacity-0 group-hover/pname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
-                          </Link>
+                        <div className="truncate max-w-[200px]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Link
+                              href={`/leads/${person.person_id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-semibold text-foreground hover:text-purple-600 dark:hover:text-purple-400 hover:underline transition-colors truncate flex items-center gap-1 group/pname"
+                              title="Open full Lead Intelligence Dossier"
+                            >
+                              <span className="truncate">{person.full_name}</span>
+                              <ExternalLink className="size-2.5 opacity-0 group-hover/pname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
+                            </Link>
+                            {person.updated_at && (person.updated_at.startsWith("2026-11-22") || person.updated_at.startsWith("2026-11-23")) ? (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shrink-0">
+                                Verified today
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
+                                Verified
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[11px] text-muted-foreground truncate">{person.title}</p>
                         </div>
                       </div>

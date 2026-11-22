@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Building2, ExternalLink, Globe, ShieldCheck,
-  ChevronRight, Sparkles, Layers,
+  ChevronRight, Sparkles, Layers, Star,
 } from "lucide-react";
 import type { Lead } from "@/hooks/use-leads";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,7 @@ export function CompaniesTable({ companies, loading }: Props) {
             <TH>Organization</TH>
             <TH>Domain</TH>
             <TH>Industry</TH>
+            <TH>Rating</TH>
             <TH>Region</TH>
             <TH className="hidden lg:table-cell">Size</TH>
             <TH className="hidden xl:table-cell">Revenue</TH>
@@ -103,6 +104,7 @@ export function CompaniesTable({ companies, loading }: Props) {
               <TD><Skeleton className="h-3.5 w-28" /></TD>
               <TD><Skeleton className="h-3.5 w-24" /></TD>
               <TD><Skeleton className="h-3.5 w-20" /></TD>
+              <TD><Skeleton className="h-3.5 w-14" /></TD>
               <TD><Skeleton className="h-3.5 w-10" /></TD>
               <TD className="hidden lg:table-cell"><Skeleton className="h-3.5 w-14" /></TD>
               <TD className="hidden xl:table-cell"><Skeleton className="h-3.5 w-14" /></TD>
@@ -129,13 +131,14 @@ export function CompaniesTable({ companies, loading }: Props) {
     <table className="w-full text-left">
       <thead>
         <tr>
-          <TH className="w-[26%] min-w-[160px]">Organization</TH>
-          <TH className="w-[20%] min-w-[140px]">Domain</TH>
-          <TH className="w-[20%] min-w-[130px]">Industry</TH>
+          <TH className="w-[24%] min-w-[150px]">Organization</TH>
+          <TH className="w-[18%] min-w-[130px]">Domain</TH>
+          <TH className="w-[18%] min-w-[120px]">Industry</TH>
+          <TH className="w-[10%] min-w-[80px]">Rating</TH>
           <TH className="w-[8%] min-w-[60px]">Region</TH>
-          <TH className="hidden lg:table-cell w-[12%] min-w-[90px]">Size</TH>
-          <TH className="hidden xl:table-cell w-[12%] min-w-[90px]">Revenue</TH>
-          <TH className="w-[8%] min-w-[60px] text-center">Trust</TH>
+          <TH className="hidden lg:table-cell w-[10%] min-w-[80px]">Size</TH>
+          <TH className="hidden xl:table-cell w-[10%] min-w-[80px]">Revenue</TH>
+          <TH className="w-[6%] min-w-[50px] text-center">Trust</TH>
           <TH className="w-[6%] min-w-[70px] text-right pr-4">Dossier</TH>
         </tr>
       </thead>
@@ -166,8 +169,15 @@ export function CompaniesTable({ companies, loading }: Props) {
                     {companyName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 max-w-[200px]">
-                    <div className="truncate font-semibold text-foreground group-hover:text-primary transition-colors" title={companyName}>
-                      {companyName}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="truncate font-semibold text-foreground group-hover:text-primary transition-colors" title={companyName}>
+                        {companyName}
+                      </span>
+                      {(org as any).updated_at && String((org as any).updated_at).startsWith("2026-11-22") ? (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shrink-0">
+                          Updated today
+                        </span>
+                      ) : null}
                     </div>
                     {org.ein && (
                       <div className="text-[10px] text-muted-foreground font-mono">
@@ -203,6 +213,23 @@ export function CompaniesTable({ companies, loading }: Props) {
                 <span className="truncate block" title={org.industry || "General Commercial"}>
                   {org.industry || "General Commercial"}
                 </span>
+              </TD>
+
+              {/* Rating & Reviews */}
+              <TD className="whitespace-nowrap">
+                {(org as any).rating ? (
+                  <div className="flex items-center gap-1">
+                    <Star className="size-3 fill-amber-500 text-amber-500 shrink-0" />
+                    <span className="font-mono text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      {Number((org as any).rating).toFixed(1)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/80 font-sans">
+                      ({(org as any).review_count || 0})
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground/40 text-[11px]">—</span>
+                )}
               </TD>
 
               {/* Region */}

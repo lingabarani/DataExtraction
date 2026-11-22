@@ -14,7 +14,7 @@ import {
   Tag, ChevronDown, Clock, FileText, CheckSquare,
   Send, MessageSquare, History, Layers, CheckCircle2,
   ChevronRight, Quote, Check, RefreshCw,
-  Lock, AlertTriangle, Users,
+  Lock, AlertTriangle, Users, Star, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import { useCompanyIntelligence } from "@/hooks/use-leads";
 import type { CompanyIntelligence } from "@/hooks/use-leads";
@@ -33,6 +33,7 @@ function copyToClipboard(value: string, label: string) {
 
 const SUB_NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: FileText, count: null },
+  { id: "reviews", label: "Customer Reviews", icon: Star, count: null },
   { id: "timeline", label: "Timeline", icon: History, count: null },
   { id: "people", label: "People", icon: Users, count: 4 },
   { id: "lists", label: "Lists", icon: Layers, count: null },
@@ -205,6 +206,7 @@ export function CompanyDetail({
             {SUB_NAV_ITEMS.map((nav) => {
               const Icon = nav.icon;
               const isActive = activeTab === nav.id;
+              const count = nav.id === "reviews" ? (intel.reviews?.total_scraped || null) : nav.count;
               return (
                 <button
                   key={nav.id}
@@ -220,14 +222,14 @@ export function CompanyDetail({
                     <Icon className={cn("w-4 h-4", isActive ? "text-white" : "text-muted-foreground")} />
                     <span>{nav.label}</span>
                   </div>
-                  {nav.count !== null && (
+                  {count !== null && (
                     <span
                       className={cn(
                         "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
                         isActive ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
                       )}
                     >
-                      {nav.count}
+                      {count}
                     </span>
                   )}
                 </button>
@@ -238,7 +240,189 @@ export function CompanyDetail({
 
         {/* Right Main Content (Enterprise Enriched Cards) */}
         <motion.div variants={item} className="md:col-span-9 lg:col-span-10 space-y-5">
-          {/* Row 1: FIRMOGRAPHICS + ONLINE */}
+          {activeTab === "reviews" ? (
+            /* Dedicated Customer Reviews & Sentiment View */
+            <div className="space-y-5">
+              {/* Rating & Sentiment Header Card */}
+              <Card className="bg-card border-border/80 shadow-2xs hover:border-border transition-all">
+                <CardHeader className="py-3 px-5 border-b border-border/50 flex flex-row items-center justify-between">
+                  <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+                    <span>Customer Reviews &amp; Sentiment Intelligence</span>
+                  </CardTitle>
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    Google Maps &amp; Places
+                  </Badge>
+                </CardHeader>
+                <CardContent className="p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-baseline gap-2.5">
+                        <span className="text-3xl font-bold font-mono text-foreground">
+                          {Number(intel.reviews?.average_rating || 0).toFixed(1)}
+                        </span>
+                        <span className="text-sm text-muted-foreground">/ 5.0</span>
+                        <div className="flex items-center text-amber-500 ml-1.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              className={cn(
+                                "size-4",
+                                s <= Math.round(Number(intel.reviews?.average_rating || 0))
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-muted-foreground/30"
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Aggregate score based on{" "}
+                        <span className="font-semibold text-foreground">
+                          {intel.reviews?.total_scraped || 0}
+                        </span>{" "}
+                        verified customer reviews
+                      </p>
+                    </div>
+
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs px-3 py-1.5 font-semibold self-start sm:self-center",
+                        (intel.reviews?.ai_summary?.sentiment || "").toLowerCase().includes("positive") || (intel.reviews?.average_rating || 0) >= 4.0
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                      )}
+                    >
+                      {intel.reviews?.ai_summary?.sentiment || (Number(intel.reviews?.average_rating || 0) >= 4.0 ? "Strong Positive Sentiment" : "Neutral Sentiment")}
+                    </Badge>
+                  </div>
+
+                  {intel.reviews?.ai_summary?.summary && (
+                    <div className="rounded-lg bg-muted/20 border border-border/60 p-3.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Sparkles className="size-3.5 text-blue-500" />
+                        <span>AI Executive Customer Feedback Summary</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {intel.reviews.ai_summary.summary}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Praise & Caution Bento */}
+              {((intel.reviews?.ai_summary?.pros && intel.reviews.ai_summary.pros.length > 0) ||
+                (intel.reviews?.ai_summary?.cons && intel.reviews.ai_summary.cons.length > 0)) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Praise Highlights */}
+                  <Card className="bg-card border-emerald-500/30 shadow-2xs">
+                    <CardHeader className="py-3 px-5 border-b border-emerald-500/20 bg-emerald-500/5">
+                      <CardTitle className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                        <ThumbsUp className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Praise Highlights &amp; Strengths</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <ul className="space-y-2 text-xs text-foreground/90">
+                        {intel.reviews?.ai_summary?.pros?.map((pro, idx) => (
+                          <li key={idx} className="flex items-start gap-2 leading-relaxed">
+                            <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                            <span>{pro}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  {/* Points of Caution */}
+                  <Card className="bg-card border-amber-500/30 shadow-2xs">
+                    <CardHeader className="py-3 px-5 border-b border-amber-500/20 bg-amber-500/5">
+                      <CardTitle className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                        <ThumbsDown className="size-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Points of Caution &amp; Alerts</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      {intel.reviews?.ai_summary?.cons && intel.reviews.ai_summary.cons.length > 0 ? (
+                        <ul className="space-y-2 text-xs text-foreground/90">
+                          {intel.reviews.ai_summary.cons.map((con, idx) => (
+                            <li key={idx} className="flex items-start gap-2 leading-relaxed">
+                              <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                              <span>{con}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          No recurring complaints or critical negative patterns detected.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Review Feed */}
+              <Card className="bg-card border-border/80 shadow-2xs">
+                <CardHeader className="py-3 px-5 border-b border-border/50 flex flex-row items-center justify-between">
+                  <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <MessageSquare className="size-3.5" />
+                    <span>Archived Customer Reviews ({intel.reviews?.recent_reviews?.length || 0})</span>
+                  </CardTitle>
+                  <span className="text-[10px] text-muted-foreground font-mono">Verified Citations</span>
+                </CardHeader>
+                <CardContent className="p-5 space-y-3">
+                  {intel.reviews?.recent_reviews && intel.reviews.recent_reviews.length > 0 ? (
+                    intel.reviews.recent_reviews.map((rev, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-xl border border-border/60 bg-muted/10 space-y-2 hover:bg-muted/20 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="size-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {(rev.author || "C").charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-semibold text-foreground text-xs">{rev.author || "Verified Reviewer"}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {rev.published_at || "Archived"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-amber-500">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              className={cn(
+                                "size-3",
+                                s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"
+                              )}
+                            />
+                          ))}
+                        </div>
+
+                        {rev.text && (
+                          <p className="text-xs text-muted-foreground leading-relaxed italic">
+                            &ldquo;{rev.text}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground space-y-1">
+                      <p className="text-xs font-medium">No Customer Reviews Linked</p>
+                      <p className="text-[11px]">No reviews archived for this domain yet.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <>
+              {/* Row 1: FIRMOGRAPHICS + ONLINE */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Firmographics Card (Spans 7 cols on large) */}
             <Card className="lg:col-span-7 bg-card border-border/80 shadow-2xs hover:border-border transition-all">
@@ -559,6 +743,75 @@ export function CompanyDetail({
             </CardContent>
           </Card>
 
+          {/* Row 5: CUSTOMER REVIEWS & SENTIMENT (Overview Card) */}
+          <Card className="bg-card border-border/80 shadow-2xs hover:border-border transition-all">
+            <CardHeader className="py-3 px-5 border-b border-border/50 flex flex-row items-center justify-between">
+              <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+                <span>Customer Reviews &amp; Sentiment (Google Places)</span>
+              </CardTitle>
+              <button
+                onClick={() => setActiveTab("reviews")}
+                className="text-[11px] text-primary hover:underline font-medium inline-flex items-center gap-1"
+              >
+                <span>View all ({intel.reviews?.total_scraped || 0})</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </CardHeader>
+            <CardContent className="p-5 space-y-3">
+              {(intel.reviews?.total_scraped || 0) > 0 ? (
+                <div className="space-y-3 text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold font-mono text-foreground">
+                        {Number(intel.reviews?.average_rating || 0).toFixed(1)}
+                      </span>
+                      <span className="text-muted-foreground">/ 5.0</span>
+                      <div className="flex items-center text-amber-500 ml-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            className={cn(
+                              "size-3.5",
+                              s <= Math.round(Number(intel.reviews?.average_rating || 0))
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-muted-foreground/30"
+                            )}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-muted-foreground ml-1">
+                        ({intel.reviews?.total_scraped} verified citations)
+                      </span>
+                    </div>
+
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs px-2.5 py-0.5 font-semibold",
+                        (intel.reviews?.ai_summary?.sentiment || "").toLowerCase().includes("positive") || (intel.reviews?.average_rating || 0) >= 4.0
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                      )}
+                    >
+                      {intel.reviews?.ai_summary?.sentiment || (Number(intel.reviews?.average_rating || 0) >= 4.0 ? "Positive Sentiment" : "Neutral")}
+                    </Badge>
+                  </div>
+
+                  {intel.reviews?.ai_summary?.summary && (
+                    <p className="text-muted-foreground leading-relaxed pt-1">
+                      {intel.reviews.ai_summary.summary}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">
+                  No public customer reviews currently indexed for this domain.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Row 6: RECENT ACTIVITY */}
           <Card className="bg-card border-border/80 shadow-2xs hover:border-border transition-all">
             <CardHeader className="py-3 px-5 border-b border-border/50 flex flex-row items-center justify-between">
@@ -577,6 +830,8 @@ export function CompanyDetail({
               <p>Nothing has happened with anyone at this company yet.</p>
             </CardContent>
           </Card>
+            </>
+          )}
         </motion.div>
       </div>
     </motion.div>

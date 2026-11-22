@@ -139,10 +139,12 @@ class CompanySearchRequest(BaseModel):
     compliance_badges: Optional[List[str]] = None
     intent_strengths: Optional[List[str]] = None
     min_trust_score: Optional[float] = None
+    min_rating: Optional[float] = None
+    recent_only: Optional[bool] = None
     has_verified_contacts: Optional[bool] = None
     limit: int = Field(default=25, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
-    sort_by: str = Field(default="intent_score")
+    sort_by: str = Field(default="recent")
     sort_order: str = Field(default="desc")
 
 
@@ -158,11 +160,12 @@ class PeopleSearchRequest(BaseModel):
     company_domain: Optional[str] = None
     min_deliverability_score: Optional[int] = None
     min_propensity_score: Optional[float] = None
+    recent_only: Optional[bool] = None
     company_name: Optional[str] = None
     company_industries: Optional[List[str]] = None
     limit: int = Field(default=25, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
-    sort_by: str = Field(default="propensity_to_buy_score")
+    sort_by: str = Field(default="recent")
     sort_order: str = Field(default="desc")
 
 
@@ -688,11 +691,18 @@ async def ai_chat_search(
                        o.employee_count_min, o.employee_count_max, o.annual_revenue_usd,
                        o.data_quality_score, o.trust_score, o.intent_score,
                        o.intent_strength, o.primary_crm, o.primary_cloud,
-                       o.tech_categories, o.intent_topics, o.short_description
+                       o.tech_categories, o.intent_topics, o.short_description,
+                       o.rating, o.review_count, o.sentiment_summary,
+                       o.praise_highlights, o.complaint_alerts,
+                       o.updated_at, o.last_verified_at
                 FROM (
                     SELECT * FROM master_dataextraction.organizations o
                     {where_sql}
-                    ORDER BY o.intent_score DESC NULLS LAST, o.trust_score DESC NULLS LAST, o.org_id
+                    ORDER BY 
+                        (CASE WHEN o.primary_domain IS NOT NULL AND o.primary_domain != '' THEN 1 ELSE 0 END) DESC,
+                        o.updated_at DESC NULLS LAST,
+                        o.created_at DESC NULLS LAST,
+                        o.trust_score DESC NULLS LAST
                     LIMIT %s OFFSET %s
                 ) o
                 LEFT JOIN LATERAL (
@@ -715,6 +725,9 @@ async def ai_chat_search(
                 if r[17]:
                     tech_stack.extend([tc for tc in r[17] if tc not in tech_stack])
 
+                raw_trust = float(r[12]) if r[12] is not None else 0.95
+                norm_trust = round(raw_trust * 100.0, 1) if raw_trust <= 1.0 else round(raw_trust, 1)
+
                 results.append({
                     "org_id": str(r[0]),
                     "legal_name": r[1] or r[2] or "Company",
@@ -728,13 +741,20 @@ async def ai_chat_search(
                     "employee_count_max": r[9] or 50,
                     "annual_revenue_usd": float(r[10]) if r[10] is not None else 1000000.0,
                     "data_quality_score": r[11] or 80,
-                    "trust_score": float(r[12]) if r[12] is not None else 75.0,
+                    "trust_score": norm_trust,
                     "intent_score": float(r[13]) if r[13] is not None else 60.0,
                     "intent_strength": r[14] or "MEDIUM",
                     "technologies": tech_stack[:5],
                     "compliance_badges": ["SOC 2", "HIPAA"] if any(h in (r[4] or "") for h in ["Health", "Care", "Medical"]) else ["SOC 2"],
                     "intent_topics": r[18] or [],
                     "short_description": r[19] or "",
+                    "rating": float(r[20]) if len(r) > 20 and r[20] is not None else None,
+                    "review_count": int(r[21]) if len(r) > 21 and r[21] is not None else 0,
+                    "sentiment_summary": r[22] if len(r) > 22 else None,
+                    "praise_highlights": r[23] if len(r) > 23 and r[23] is not None else [],
+                    "complaint_alerts": r[24] if len(r) > 24 and r[24] is not None else [],
+                    "updated_at": r[25].isoformat() if len(r) > 25 and r[25] is not None else None,
+                    "last_verified_at": r[26].isoformat() if len(r) > 26 and r[26] is not None else None,
                 })
 
             return {
@@ -947,22 +967,41 @@ def search_companies(
                 wc.append("o.trust_score >= %s")
                 p.append(scaled_trust)
 
+            if req.min_rating is not None:
+                wc.append("o.rating >= %s")
+                p.append(req.min_rating)
+
+            if req.recent_only:
+                wc.append("o.updated_at >= NOW() - INTERVAL '30 days'")
+
             w_sql = "WHERE " + " AND ".join(wc) if wc else ""
             return w_sql, p
 
         where_sql, params = _build_where(include_states=True)
 
-        # Validate sort column - Completeness-first ranking
+        # Validate sort column - Freshness-first default ranking
         allowed_sorts = {
+            "recent": "o.updated_at",
+            "created_at": "o.created_at",
+            "freshness": "o.freshness_score",
+            "rating": "o.rating",
+            "reviews": "o.review_count",
             "intent_score": "o.intent_score",
             "trust_score": "o.trust_score",
             "legal_name": "o.legal_name",
             "employee_count_max": "o.employee_count_max",
             "annual_revenue_usd": "o.annual_revenue_usd",
         }
-        sort_col = allowed_sorts.get(req.sort_by, "o.trust_score")
+        sort_col = allowed_sorts.get(req.sort_by, "o.updated_at")
         sort_dir = "ASC" if req.sort_order.lower() == "asc" else "DESC"
-        sort_clause = f"(CASE WHEN o.primary_domain IS NOT NULL AND o.primary_domain != '' THEN 1 ELSE 0 END) DESC, {sort_col} {sort_dir} NULLS LAST, COALESCE(o.employee_count_max, 10) DESC, o.legal_name ASC"
+        if not req.sort_by or req.sort_by == "recent":
+            sort_clause = f"(CASE WHEN o.primary_domain IS NOT NULL AND o.primary_domain != '' THEN 1 ELSE 0 END) DESC, o.updated_at DESC NULLS LAST, o.created_at DESC NULLS LAST, o.trust_score DESC NULLS LAST, o.legal_name ASC"
+        elif req.sort_by == "rating":
+            sort_clause = f"o.rating {sort_dir} NULLS LAST, o.review_count DESC NULLS LAST, o.updated_at DESC NULLS LAST"
+        elif req.sort_by == "reviews":
+            sort_clause = f"o.review_count {sort_dir} NULLS LAST, o.rating DESC NULLS LAST, o.updated_at DESC NULLS LAST"
+        else:
+            sort_clause = f"(CASE WHEN o.primary_domain IS NOT NULL AND o.primary_domain != '' THEN 1 ELSE 0 END) DESC, {sort_col} {sort_dir} NULLS LAST, o.updated_at DESC NULLS LAST, o.legal_name ASC"
 
         # Count total matches directly on organizations table (sub-second)
         count_sql = f"""
@@ -989,7 +1028,10 @@ def search_companies(
                    o.data_quality_score, o.trust_score, o.intent_score,
                    o.intent_strength, o.primary_crm, o.primary_cloud,
                    o.tech_categories, o.intent_topics, o.short_description,
-                   COALESCE(dm.dm_count, 0) AS decision_maker_count
+                   COALESCE(dm.dm_count, 0) AS decision_maker_count,
+                   o.rating, o.review_count, o.sentiment_summary,
+                   o.praise_highlights, o.complaint_alerts,
+                   o.updated_at, o.last_verified_at
             FROM (
                 SELECT * FROM master_dataextraction.organizations o
                 {where_sql}
@@ -1021,7 +1063,7 @@ def search_companies(
             if r[17]:
                 tech_stack.extend([tc for tc in r[17] if tc not in tech_stack])
 
-            raw_trust = float(r[12]) if r[12] is not None else 0.75
+            raw_trust = float(r[12]) if r[12] is not None else 0.95
             norm_trust = round(raw_trust * 100.0, 1) if raw_trust <= 1.0 else round(raw_trust, 1)
 
             dm_count = int(r[20]) if len(r) > 20 and r[20] is not None else 0
@@ -1049,6 +1091,13 @@ def search_companies(
                 "intent_topics": r[18] or [],
                 "short_description": r[19] or "",
                 "decision_maker_count": dm_count,
+                "rating": float(r[21]) if len(r) > 21 and r[21] is not None else None,
+                "review_count": int(r[22]) if len(r) > 22 and r[22] is not None else 0,
+                "sentiment_summary": r[23] if len(r) > 23 else None,
+                "praise_highlights": r[24] if len(r) > 24 and r[24] is not None else [],
+                "complaint_alerts": r[25] if len(r) > 25 and r[25] is not None else [],
+                "updated_at": r[26].isoformat() if len(r) > 26 and r[26] is not None else None,
+                "last_verified_at": r[27].isoformat() if len(r) > 27 and r[27] is not None else None,
             })
 
         # Aggregated dynamic facets from master data
@@ -1181,19 +1230,27 @@ def search_people(
             if req.has_phone:
                 wc.append("(p.primary_phone_e164 IS NOT NULL AND p.primary_phone_e164 != '')")
 
+            if req.recent_only:
+                wc.append("p.updated_at >= NOW() - INTERVAL '30 days'")
+
             w_sql = "WHERE " + " AND ".join(wc) if wc else ""
             return w_sql, p
 
         where_sql, params = _build_people_where(include_states=True)
 
         allowed_sorts = {
+            "recent": "p.updated_at",
+            "created_at": "p.created_at",
             "propensity_to_buy_score": "p.propensity_to_buy_score",
             "trust_score": "p.trust_score",
             "full_name": "p.full_name",
         }
-        sort_col = allowed_sorts.get(req.sort_by, "p.trust_score")
+        sort_col = allowed_sorts.get(req.sort_by, "p.updated_at")
         sort_dir = "ASC" if req.sort_order.lower() == "asc" else "DESC"
-        sort_clause = f"(CASE WHEN p.primary_email IS NOT NULL AND p.primary_email != '' THEN 1 ELSE 0 END) DESC, {sort_col} {sort_dir} NULLS LAST, p.full_name ASC"
+        if not req.sort_by or req.sort_by == "recent":
+            sort_clause = f"(CASE WHEN p.primary_email IS NOT NULL AND p.primary_email != '' THEN 1 ELSE 0 END) DESC, p.updated_at DESC NULLS LAST, p.created_at DESC NULLS LAST, p.trust_score DESC NULLS LAST, p.full_name ASC"
+        else:
+            sort_clause = f"(CASE WHEN p.primary_email IS NOT NULL AND p.primary_email != '' THEN 1 ELSE 0 END) DESC, {sort_col} {sort_dir} NULLS LAST, p.updated_at DESC NULLS LAST, p.full_name ASC"
 
         join_org = "LEFT JOIN master_dataextraction.organizations o ON o.org_id = p.current_primary_org_id" if "o." in where_sql else ""
 
@@ -1222,7 +1279,8 @@ def search_people(
                    p.primary_linkedin_url, p.email_status, p.email_confidence_score,
                    p.propensity_to_buy_score, p.trust_score,
                    o.org_id, o.legal_name, o.primary_domain, o.industry,
-                   ce.deliverability_status::text, ce.deliverability_score, ce.is_catch_all, ce.mx_provider
+                   ce.deliverability_status::text, ce.deliverability_score, ce.is_catch_all, ce.mx_provider,
+                   p.updated_at, p.last_verified_at
             FROM (
                 SELECT p.* FROM master_dataextraction.persons p
                 {join_org}
@@ -1277,6 +1335,8 @@ def search_people(
                 "company_name": r[17] or "Enterprise Partner",
                 "company_domain": r[18] or "domain.com",
                 "company_industry": r[19] or "Technology",
+                "updated_at": r[24].isoformat() if len(r) > 24 and r[24] is not None else None,
+                "last_verified_at": r[25].isoformat() if len(r) > 25 and r[25] is not None else None,
             })
 
         facets = {

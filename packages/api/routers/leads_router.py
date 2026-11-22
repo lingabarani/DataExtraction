@@ -624,7 +624,8 @@ def get_company_intelligence(
             cur.execute(
                 """
                 SELECT org_id, display_name, legal_name, primary_domain, industry,
-                       employee_count_min, employee_count_max, incorporation_date, short_description
+                       employee_count_min, employee_count_max, incorporation_date, short_description,
+                       linked_place_id, rating, review_count, sentiment_summary, praise_highlights, complaint_alerts
                 FROM master_dataextraction.organizations
                 WHERE org_id::text = %s OR primary_domain ILIKE %s OR display_name ILIKE %s
                 LIMIT 1
@@ -638,6 +639,7 @@ def get_company_intelligence(
                 target_industry = r[4]
                 emp_str = f"{r[5]}-{r[6]}" if r[5] and r[6] else (str(r[5]) if r[5] else None)
                 founded_str = str(r[7].year) if r[7] else None
+                target_place_id = r[9]
                 existing_org = {
                     "company_name": target_name,
                     "domain": target_domain,
@@ -645,6 +647,12 @@ def get_company_intelligence(
                     "employee_count": emp_str,
                     "founded": founded_str,
                     "short_description": r[8],
+                    "linked_place_id": r[9],
+                    "rating": float(r[10]) if r[10] is not None else None,
+                    "review_count": r[11] or 0,
+                    "sentiment_summary": r[12],
+                    "praise_highlights": r[13] or [],
+                    "complaint_alerts": r[14] or [],
                 }
         else:
             # Check selected leads table, then fallback to other table
@@ -673,11 +681,12 @@ def get_company_intelligence(
                         "location": loc_str or None,
                     }
                     break
-            if not existing_org:
+            if not existing_org or not target_place_id:
                 cur.execute(
                     """
                     SELECT org_id, display_name, legal_name, primary_domain, industry,
-                           employee_count_min, employee_count_max, incorporation_date, short_description
+                           employee_count_min, employee_count_max, incorporation_date, short_description,
+                           linked_place_id, rating, review_count, sentiment_summary, praise_highlights, complaint_alerts
                     FROM master_dataextraction.organizations
                     WHERE org_id::text = %s OR primary_domain ILIKE %s OR display_name ILIKE %s
                     LIMIT 1
@@ -686,19 +695,26 @@ def get_company_intelligence(
                 )
                 r = cur.fetchone()
                 if r:
-                    target_name = r[1] or r[2]
+                    target_name = target_name or r[1] or r[2]
                     target_domain = target_domain or r[3]
-                    target_industry = r[4]
+                    target_industry = target_industry or r[4]
                     emp_str = f"{r[5]}-{r[6]}" if r[5] and r[6] else (str(r[5]) if r[5] else None)
                     founded_str = str(r[7].year) if r[7] else None
-                    existing_org = {
+                    target_place_id = r[9] or target_place_id
+                    existing_org.update({
                         "company_name": target_name,
                         "domain": target_domain,
                         "industry": target_industry,
                         "employee_count": emp_str,
                         "founded": founded_str,
                         "short_description": r[8],
-                    }
+                        "linked_place_id": target_place_id,
+                        "rating": float(r[10]) if r[10] is not None else existing_org.get("rating"),
+                        "review_count": r[11] or existing_org.get("review_count", 0),
+                        "sentiment_summary": r[12] or existing_org.get("sentiment_summary"),
+                        "praise_highlights": r[13] or existing_org.get("praise_highlights", []),
+                        "complaint_alerts": r[14] or existing_org.get("complaint_alerts", []),
+                    })
     except Exception as exc:
         logger.warning("DB lookup for company intelligence failed: %s", exc)
     finally:
