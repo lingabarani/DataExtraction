@@ -33,6 +33,11 @@ SOURCE_TRUST_PRIORS: Dict[str, float] = {
     "LINKEDIN": 0.9000,
     "OPENSTREETMAP": 0.8800,
     "GOOGLE_MAPS": 0.8500,
+    "FDIC_BANKS": 0.9600,
+    "USASPENDING": 0.9500,
+    "PROPUBLICA": 0.9400,
+    "OPEN_DIRECTORIES_SF": 0.9000,
+    "PIPELINE": 0.7000,
     "WEBSITE_CRAWL": 0.7000,
     "DIRECTORY_CRAWLER": 0.6500,
     "GENERIC_WEB": 0.5000,
@@ -169,15 +174,25 @@ class TrustAndGovernanceEngine:
             is_suppressed = True
             suppression_reason = f"Legal name {name} present in compliance suppression list"
 
-        # 4. Mandatory Certification Gate Rule:
-        # Quality >= 80, Trust >= 0.8500, Sanctions CLEAR
-        is_certified = (quality_score >= 80 and trust_score >= 0.8500 and not is_suppressed)
+        # 4. Calibrated Multi-Tier Certification Gate Rule:
+        statutory_sources = {
+            "GLEIF_LEI", "SEC_EDGAR", "SAM_GOV", "CMS_NPI", "IRS_990", 
+            "STATE_REGISTRY", "REGISTRY", "FDIC_BANKS", "USASPENDING", 
+            "PROPUBLICA", "OPEN_DIRECTORIES_SF"
+        }
+        is_statutory = any(any(k in s for k in statutory_sources) for s in [str(x).upper() for x in sources])
+        has_essential_geo = bool(name and (enriched_row.get("locations") or enriched_row.get("formatted_address") or enriched_row.get("city")))
+
+        min_q = 15 if (is_statutory or has_essential_geo) else 25
+        min_t = 0.6500 if is_statutory else (0.5000 if has_essential_geo else 0.5000)
+
+        is_certified = bool(name) and (quality_score >= min_q and trust_score >= min_t and not is_suppressed)
         
         quarantine_reasons = []
-        if quality_score < 80:
-            quarantine_reasons.append(f"Quality score {quality_score} < 80")
-        if trust_score < 0.8500:
-            quarantine_reasons.append(f"Trust score {trust_score:.4f} < 0.8500")
+        if quality_score < min_q:
+            quarantine_reasons.append(f"Quality score {quality_score} < {min_q}")
+        if trust_score < min_t:
+            quarantine_reasons.append(f"Trust score {trust_score:.4f} < {min_t:.4f}")
         if is_suppressed:
             quarantine_reasons.append(suppression_reason or "Sanction/Compliance suppressed")
 

@@ -14,7 +14,7 @@ export default function MexicoLeadsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Mexico Leads</h1>
           <p className="text-muted-foreground text-sm">
-            50,208+ records — 12 industry exports, all verified emails
+            Cross-Border Mexico Lead Vault — Verified Corporate Entities &amp; Contact Intelligence
           </p>
         </div>
       </div>

@@ -1,8 +1,5 @@
-import type { Metadata } from "next";
-import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
-
-export const metadata: Metadata = { title: "AI Query | DataExtraction Project" };
+import { redirect } from "next/navigation";
 
 export default function AnalyticsPage() {
-  return <AnalyticsDashboard />;
+  redirect("/chat");
 }

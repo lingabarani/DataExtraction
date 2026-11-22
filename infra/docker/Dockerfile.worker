@@ -8,9 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY packages/infrastructure/requirements.txt ./requirements-infra.txt
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-infra.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Temporal SDK
 RUN pip install --no-cache-dir temporalio==1.7.1
@@ -23,3 +22,5 @@ ENV PYTHONUNBUFFERED=1
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD python -c "from temporalio.client import Client; print('worker-ok')"
+
+CMD ["python", "-m", "packages.temporal.workers.worker_registry"]

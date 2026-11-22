@@ -60,6 +60,16 @@ const DAG_NODES: DAGNodeDef[] = [
     description: "OSM Quadtrees, Google Places, Logos",
   },
   {
+    id: "WEBSITE_INTELLIGENCE",
+    stageKey: "WEBSITE_INTELLIGENCE",
+    name: "Website Intelligence",
+    agentLabel: "Agent 8",
+    agentNum: 8,
+    outputLayer: "website_verifications",
+    icon: Globe2,
+    description: "SSRF/SSL Crawl, Tech Stack, Evidence",
+  },
+  {
     id: "IDENTITY_RESOLUTION",
     stageKey: "IDENTITY_RESOLUTION",
     name: "Identity Resolution",

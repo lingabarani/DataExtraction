@@ -119,40 +119,55 @@ def get_connection(row_factory: bool = False):
     if DATABASE_TYPE == "postgresql":
         if _PG_POOL is None:
             _init_pool()
-        try:
-            conn = _PG_POOL.getconn()
-            if getattr(conn, "closed", 0) != 0:
-                _PG_POOL.putconn(conn, close=True)
-                conn = _PG_POOL.getconn()
-            # Test-on-borrow fast ping to ensure connection is live
+        # Enterprise resilient retry loop to wait for in-flight pooled connection release
+        max_retries = int(os.getenv("POSTGRES_POOL_ACQUIRE_RETRIES", "15"))
+        retry_delay = float(os.getenv("POSTGRES_POOL_ACQUIRE_RETRY_DELAY", "0.2"))
+        max_delay = float(os.getenv("POSTGRES_POOL_MAX_RETRY_DELAY", "1.0"))
+        last_err = None
+        for attempt in range(max_retries):
             try:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1")
-                conn.commit()
-            except Exception:
-                try:
-                    _PG_POOL.putconn(conn, close=True)
-                except Exception:
-                    pass
                 conn = _PG_POOL.getconn()
-            if getattr(conn, "autocommit", None) is not False:
-                conn.autocommit = False
-            return conn
-        except Exception as e:
-            logger.error("Error acquiring connection from pool: %s", e)
-            # Direct fallback if pool is saturated
-            import psycopg2
-            is_dev = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "test")
-            connect_timeout = int(os.getenv("POSTGRES_POOL_CONNECT_TIMEOUT", "2" if is_dev else "5"))
-            return psycopg2.connect(
-                host=DB_HOST,
-                port=DB_PORT,
-                dbname=DB_NAME,
-                user=DB_USER,
-                password=DB_PASS,
-                connect_timeout=connect_timeout,
-                options="-c search_path=staging_dataextraction,master_dataextraction,identity_resolution,raw_dataextraction,search_dataextraction,public",
-            )
+                if getattr(conn, "closed", 0) != 0:
+                    _PG_POOL.putconn(conn, close=True)
+                    conn = _PG_POOL.getconn()
+                # Test-on-borrow fast ping to ensure connection is live
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1")
+                    conn.commit()
+                except Exception:
+                    try:
+                        _PG_POOL.putconn(conn, close=True)
+                    except Exception:
+                        pass
+                    conn = _PG_POOL.getconn()
+                if getattr(conn, "autocommit", None) is not False:
+                    conn.autocommit = False
+                return conn
+            except Exception as e:
+                last_err = e
+                # Suppress noisy warnings on initial retries during brief concurrent spikes
+                if attempt >= 5:
+                    logger.warning(
+                        "Attempt %d/%d: Connection pool busy (%s), retrying in %.2fs...",
+                        attempt + 1, max_retries, e, retry_delay
+                    )
+                else:
+                    logger.debug(
+                        "Attempt %d/%d: Connection pool busy, retrying in %.2fs...",
+                        attempt + 1, max_retries, retry_delay
+                    )
+                time.sleep(retry_delay)
+                retry_delay = min(max_delay, retry_delay * 1.3)
+
+        logger.error(
+            "Database connection pool saturated after %d retries: %s. Shedding load.",
+            max_retries, last_err
+        )
+        raise RuntimeError(
+            f"Database connection pool saturated (max {DB_POOL_MAX} connections). "
+            "Request shed to prevent cluster-wide PostgreSQL cascading exhaustion."
+        ) from last_err
     else:
         raise RuntimeError(
             f"Unsupported DATABASE_TYPE='{DATABASE_TYPE}'. "

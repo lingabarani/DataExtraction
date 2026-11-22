@@ -10,7 +10,7 @@ from packages.api.dependencies import UserPrincipal, get_current_user, require_a
 from packages.infrastructure.db_connector import get_db_cursor
 from packages.temporal.config import QUEUE_GEOSPATIAL
 
-router = APIRouter(prefix="/api/v1/places", tags=["Places"])
+router = APIRouter(tags=["Places"])
 
 
 class ExtractRequest(BaseModel):
@@ -64,30 +64,7 @@ def get_place(place_id: str, _user: UserPrincipal = Depends(get_current_user)) -
                     "FROM staging_dataextraction.place_people WHERE place_id = %s "
                     "ORDER BY full_name", (place_id,))
         people = _rows(cur)
-        cur.execute("SELECT COUNT(*), AVG(rating) FROM staging_dataextraction.place_reviews WHERE place_id = %s",
-                    (place_id,))
-        n, avg = cur.fetchone()
-    return {"place": details, "services": services, "contacts": contacts, "people": people,
-            "reviews_summary": {"stored": int(n or 0), "average_rating": float(avg) if avg is not None else None}}
-
-
-@router.get("/{place_id}/reviews")
-def get_reviews(place_id: str, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0),
-                _user: UserPrincipal = Depends(get_current_user)) -> Dict[str, Any]:
-    with get_db_cursor() as (_c, cur):
-        cur.execute("SELECT COUNT(*) FROM staging_dataextraction.place_reviews WHERE place_id = %s", (place_id,))
-        total = int(cur.fetchone()[0])
-        cur.execute(
-            """
-            SELECT review_id, reviewer_name, LEFT(COALESCE(reviewer_name_hash, ''), 8) AS reviewer_hash_prefix,
-                   rating, review_text, language, published_at, owner_response_text, sentiment, topics
-            FROM staging_dataextraction.place_reviews
-            WHERE place_id = %s
-            ORDER BY published_at DESC NULLS LAST, id DESC
-            LIMIT %s OFFSET %s
-            """, (place_id, limit, offset))
-        reviews = _rows(cur)
-    return {"total": total, "limit": limit, "offset": offset, "reviews": reviews}
+    return {"place": details, "services": services, "contacts": contacts, "people": people}
 
 
 @router.post("/extract", status_code=status.HTTP_202_ACCEPTED)

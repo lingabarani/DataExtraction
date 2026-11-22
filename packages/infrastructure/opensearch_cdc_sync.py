@@ -73,6 +73,14 @@ COMPANY_INDEX_MAPPING = {
             "employee_count": {"type": "integer"},
             "annual_revenue_usd": {"type": "double"},
             "technologies": {"type": "keyword"},
+            "tech_categories": {"type": "keyword"},
+            "primary_crm": {"type": "keyword"},
+            "primary_cloud": {"type": "keyword"},
+            "intent_score": {"type": "float"},
+            "intent_strength": {"type": "keyword"},
+            "intent_topics": {"type": "keyword"},
+            "buying_stage": {"type": "keyword"},
+            "recent_hiring_velocity": {"type": "integer"},
             "location": {"type": "geo_point"},
             "quality_score": {"type": "short"},
             "sync_version": {"type": "long"},
@@ -101,6 +109,10 @@ PERSON_INDEX_MAPPING = {
             "current_primary_title": {"type": "text", "fields": {"raw": {"type": "keyword"}}},
             "seniority_level": {"type": "keyword"},
             "department": {"type": "keyword"},
+            "buying_role": {"type": "keyword"},
+            "management_level": {"type": "keyword"},
+            "propensity_to_buy_score": {"type": "float"},
+            "lead_grade": {"type": "keyword"},
             "quality_score": {"type": "short"},
             "sync_version": {"type": "long"},
             "last_projected_at": {"type": "date"},
@@ -144,16 +156,35 @@ class OpenSearchCDCSyncClient:
         return s
 
     def ping(self) -> bool:
-        """Checks if OpenSearch cluster is reachable and healthy."""
+        """Checks if OpenSearch cluster is reachable and healthy with fast socket test and 15s cache."""
+        now = time.monotonic()
+        if hasattr(self, "_last_ping_time") and (now - self._last_ping_time) < 15.0:
+            return getattr(self, "_last_ping_result", False)
+
+        self._last_ping_time = now
         try:
+            import socket
+            raw_target = self.base_url.split("://")[-1].split("/")[0]
+            host = raw_target.split(":")[0]
+            port = int(raw_target.split(":")[1]) if ":" in raw_target else 9200
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.2)
+            res = s.connect_ex((host, port))
+            s.close()
+            if res != 0:
+                self._last_ping_result = False
+                return False
+
             resp = self.session.get(
                 f"{self.base_url}/_cluster/health",
                 auth=self.auth,
                 verify=self.verify,
-                timeout=3,
+                timeout=1.0,
             )
-            return resp.status_code == 200
+            self._last_ping_result = (resp.status_code == 200)
+            return self._last_ping_result
         except Exception:
+            self._last_ping_result = False
             return False
 
     def ensure_indices(self) -> Dict[str, str]:

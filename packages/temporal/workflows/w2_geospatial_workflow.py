@@ -360,9 +360,9 @@ class Agent2GeospatialWorkflow:
             for r in osm_out
         ]
 
-        # ── Step 2: Google Maps Reviews & Services Extraction ────────────────
+        # ── Step 2: Google Maps Services Extraction (Reviews Module Removed) ─
         await workflow.wait_condition(lambda: not self._paused)
-        if run_gmaps and not config.get("skip_reviews_extraction", False):
+        if run_gmaps and not config.get("skip_reviews_extraction", True):
             reviews_limit = int(config.get("reviews_place_limit") or 50)
             max_rev = config.get("max_reviews_per_place")
             try:
@@ -393,7 +393,7 @@ class Agent2GeospatialWorkflow:
             except Exception as exc:
                 self._results["services"] = {"status": "FAILED", "error": str(exc), "services_saved": 0}
 
-        # ── Step 2b: Domain Verification & Website Contact Crawl (Optional/Legacy) ────
+        # ── Step 2b: Domain Verification & Website Contact Crawl (Optional/Explicit) ────
         if not config.get("skip_website_enrichment", False):
             verify_limit = int(
                 config.get("website_verification_limit")

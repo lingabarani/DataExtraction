@@ -54,7 +54,7 @@ from packages.temporal.activities.discovery_activities import (
 from packages.temporal.workflows.discovery_workflow import DiscoverySearchWorkflow
 from packages.temporal.workflows.w2_place_deep_workflow import PlaceDeepExtractionWorkflow
 from packages.temporal.workflows.w2_geospatial_workflow import Agent2GeospatialWorkflow
-from packages.temporal.workflows.gmaps_extraction_workflow import GMapsExtractionWorkflow
+from packages.temporal.workflows.gmaps_extraction_workflow import GMapsExtractionWorkflow, GMapsRegionWorkflow
 from packages.temporal.workflows.osm_state_workflow import OSMStateWorkflow, OSMSingleStateWorkflow
 
 logging.basicConfig(
@@ -97,6 +97,7 @@ async def run_worker():
         PlaceDeepExtractionWorkflow,
         Agent2GeospatialWorkflow,
         GMapsExtractionWorkflow,
+        GMapsRegionWorkflow,
         OSMStateWorkflow,
         OSMSingleStateWorkflow,
     ]

@@ -70,7 +70,7 @@ function TH({ children, className }: { children?: React.ReactNode; className?: s
   return (
     <th className={cn(
       "px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest",
-      "text-muted-foreground whitespace-nowrap bg-muted/50 border-b border-border",
+      "text-muted-foreground whitespace-nowrap bg-card/95 border-b border-border sticky top-0 z-10 backdrop-blur-xs shadow-2xs",
       className
     )}>
       {children}
@@ -141,7 +141,7 @@ export function LeadsTable({ leads, loading, table = "us_leads" }: Props) {
 
   // ── Table ─────────────────────────────────────────────────────────────────
   return (
-    <table className="w-full min-w-[920px] border-collapse">
+    <table className="w-full min-w-[960px] border-collapse">
       <thead>
         <tr>
           <TH className="pl-4 sticky left-0 z-10">Person</TH>
@@ -153,8 +153,8 @@ export function LeadsTable({ leads, loading, table = "us_leads" }: Props) {
           <TH>Phone</TH>
           <TH>Location</TH>
           <TH className="text-right pr-3">Score</TH>
-          <TH>Src</TH>
-          <TH className="w-8" />
+          <TH className="min-w-[54px]">Src</TH>
+          <TH className="w-10 pr-4" />
         </tr>
       </thead>
       <tbody className="divide-y divide-border/60">
@@ -165,14 +165,17 @@ export function LeadsTable({ leads, loading, table = "us_leads" }: Props) {
           >
             {/* Person */}
             <TD className="pl-4 sticky left-0 bg-background group-hover:bg-muted/40 transition-colors z-10 min-w-[160px]">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-semibold text-muted-foreground flex-shrink-0 uppercase">
+              <Link
+                href={`/leads/${lead.id}?table=${table}`}
+                className="flex items-center gap-2 group/person"
+              >
+                <div className="w-6 h-6 rounded-full bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-center text-[10px] font-semibold flex-shrink-0 uppercase shadow-2xs">
                   {(lead.full_name ?? lead.company_name ?? "?").charAt(0)}
                 </div>
-                <span className="truncate max-w-[130px] font-medium text-foreground" title={lead.full_name ?? ""}>
+                <span className="truncate max-w-[130px] font-medium text-foreground group-hover/person:text-primary group-hover/person:underline transition-colors" title={lead.full_name ?? ""}>
                   {lead.full_name ?? <span className="text-muted-foreground italic font-normal">No name</span>}
                 </span>
-              </div>
+              </Link>
             </TD>
 
             {/* Seniority badge */}
@@ -199,9 +202,13 @@ export function LeadsTable({ leads, loading, table = "us_leads" }: Props) {
             {/* Company */}
             <TD className="min-w-[160px]">
               <div>
-                <p className="font-medium truncate max-w-[150px]" title={lead.company_name ?? ""}>
+                <Link
+                  href={`/company/${encodeURIComponent(lead.company_id || lead.id)}?domain=${encodeURIComponent(lead.domain || lead.company_name || "")}&table=${table}`}
+                  className="font-medium truncate max-w-[150px] block hover:text-primary hover:underline transition-colors"
+                  title={lead.company_name ?? ""}
+                >
                   {lead.company_name ?? "—"}
-                </p>
+                </Link>
                 {lead.domain && (
                   <a
                     href={`https://${lead.domain}`}
@@ -264,17 +271,17 @@ export function LeadsTable({ leads, loading, table = "us_leads" }: Props) {
             </TD>
 
             {/* Source */}
-            <TD className="min-w-[48px]">
+            <TD className="min-w-[54px]">
               <span className="text-[10px] font-mono text-muted-foreground tabnum">
                 {SRC[lead.api_source ?? ""] ?? (lead.api_source?.slice(0, 4) ?? "—")}
               </span>
             </TD>
 
             {/* Detail arrow */}
-            <TD className="pr-3 w-8">
+            <TD className="pr-4 w-10 text-right">
               <Link
                 href={`/leads/${lead.id}?table=${table}`}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center"
+                className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center"
               >
                 <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
               </Link>

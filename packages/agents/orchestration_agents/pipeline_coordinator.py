@@ -79,20 +79,24 @@ class PipelineCoordinatorAgent(BaseAgent):
                     requires_human_approval=self.config.get("require_human_approval", False),
                 )
 
-        # Check for untriggered gmaps extractions
+        # Check for untriggered gmaps extractions (only if auto_enrich_scrapes is explicitly enabled)
         completed_gmaps = observations.get("completed_gmaps_ids", [])
-        for wf_id in completed_gmaps:
-            if wf_id not in self._processed_runs:
+        if self.config.get("auto_enrich_scrapes", False):
+            for wf_id in completed_gmaps:
+                if wf_id not in self._processed_runs:
+                    self._processed_runs.add(wf_id)
+                    return AgentDecision(
+                        action="start_workflow",
+                        workflow_type="LeadEnrichmentWorkflow",
+                        workflow_task_queue="data-pipeline",
+                        payload={"trigger_source": wf_id, "mode": "gmaps_enrichment"},
+                        rationale=f"Triggering lead enrichment for completed gmaps run: {wf_id}",
+                        confidence=0.95,
+                        requires_human_approval=self.config.get("require_human_approval", False),
+                    )
+        elif completed_gmaps:
+            for wf_id in completed_gmaps:
                 self._processed_runs.add(wf_id)
-                return AgentDecision(
-                    action="start_workflow",
-                    workflow_type="LeadEnrichmentWorkflow",
-                    workflow_task_queue="data-pipeline",
-                    payload={"trigger_source": wf_id, "mode": "gmaps_enrichment"},
-                    rationale=f"Triggering lead enrichment for completed gmaps run: {wf_id}",
-                    confidence=0.95,
-                    requires_human_approval=self.config.get("require_human_approval", False),
-                )
 
         return AgentDecision(
             action="noop",

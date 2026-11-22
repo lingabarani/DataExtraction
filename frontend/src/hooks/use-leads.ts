@@ -144,6 +144,18 @@ export interface Lead {
   // Timestamps
   created_at:             string;
   updated_at:             string;
+  // B2B Predictive Intelligence & Buying Committee
+  buying_role?:           string | null;
+  management_level?:      string | null;
+  reports_to_person_id?:  string | null;
+  propensity_to_buy_score?: number | null;
+  lead_grade?:            string | null;
+  intent_score?:          number | null;
+  intent_strength?:       string | null;
+  intent_topics?:         string[] | null;
+  tech_categories?:       string[] | null;
+  primary_crm?:           string | null;
+  primary_cloud?:         string | null;
   // UI helpers (computed on backend)
   table:                  "us_leads" | "mexico_leads";
 }
@@ -156,7 +168,7 @@ export interface PaginatedLeads {
 }
 
 export interface LeadFilter {
-  table?:          "us_leads" | "mexico_leads";
+  table?:          "us_leads" | "mexico_leads" | "companies" | "people" | "master_organizations";
   q?:              string;         // natural-language or keyword
   nl_query?:       string;         // full AI natural-language query
   campaignId?:     string;         // campaign ID filter
@@ -167,26 +179,40 @@ export interface LeadFilter {
   api_source?:     string;
   country?:        string;
   min_score?:      number;
+  buying_role?:    string;
+  intent_strength?: string;
+  tech_category?:  string;
+  primary_crm?:    string;
+  lead_grade?:     string;
   page?:           number;
   limit?:          number;
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
-export function useLeads(filter: LeadFilter = {}) {
-  const [leads,   setLeads]   = useState<Lead[]>([]);
-  const [total,   setTotal]   = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+const LEADS_MEM_CACHE = new Map<string, { data: Lead[]; total: number; timestamp: number }>();
+const CACHE_TTL_MS = 60_000; // 60s client cache
 
+export function useLeads(filter: LeadFilter = {}) {
   const {
     table = "us_leads", q, nl_query, seniority, industry,
     state_code, email_status, api_source, country,
-    min_score, page = 1, limit = 50,
+    min_score, buying_role, intent_strength, tech_category, primary_crm, lead_grade,
+    page = 1, limit = 50,
   } = filter;
 
+  const cacheKey = `${table}:${page}:${limit}:${q || ""}:${nl_query || ""}:${seniority || ""}:${industry || ""}:${state_code || ""}:${email_status || ""}:${api_source || ""}:${country || ""}:${min_score ?? ""}:${buying_role || ""}:${intent_strength || ""}:${tech_category || ""}:${primary_crm || ""}:${lead_grade || ""}`;
+  const initialCache = LEADS_MEM_CACHE.get(cacheKey);
+
+  const [leads,   setLeads]   = useState<Lead[]>(initialCache ? initialCache.data : []);
+  const [total,   setTotal]   = useState<number>(initialCache ? initialCache.total : (table === "mexico_leads" ? 50208 : (table === "people" || table === "us_leads" ? 65029 : 213129)));
+  const [loading, setLoading] = useState<boolean>(!initialCache);
+  const [error,   setError]   = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!LEADS_MEM_CACHE.has(cacheKey)) {
+      setLoading(true);
+    }
     try {
       const params = new URLSearchParams();
       params.set("table",  table);
@@ -201,8 +227,14 @@ export function useLeads(filter: LeadFilter = {}) {
       if (api_source)   params.set("api_source",   api_source);
       if (country)      params.set("country",      country);
       if (min_score)    params.set("min_score",     String(min_score));
+      if (buying_role)  params.set("buying_role",  buying_role);
+      if (intent_strength) params.set("intent_strength", intent_strength);
+      if (tech_category) params.set("tech_category", tech_category);
+      if (primary_crm)  params.set("primary_crm",  primary_crm);
+      if (lead_grade)   params.set("lead_grade",   lead_grade);
 
       const result = await api.get<PaginatedLeads>(`/leads?${params}`);
+      LEADS_MEM_CACHE.set(cacheKey, { data: result.data, total: result.total, timestamp: Date.now() });
       setLeads(result.data);
       setTotal(result.total);
       setError(null);
@@ -211,10 +243,12 @@ export function useLeads(filter: LeadFilter = {}) {
     } finally {
       setLoading(false);
     }
-  }, [table, q, nl_query, seniority, industry, state_code,
+  }, [cacheKey, table, q, nl_query, seniority, industry, state_code,
       email_status, api_source, country, min_score, page, limit]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
   return { leads, total, loading, error, refresh };
 }
 
@@ -236,8 +270,107 @@ export function useLead(id: string, table: "us_leads" | "mexico_leads" = "us_lea
     }
   }, [id, table]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
   return { lead, loading, error, refresh };
+}
+
+// ── Company Intelligence type & hook ──────────────────────────────────────────
+
+export interface CompanyIntelligence {
+  domain: string;
+  company_name: string;
+  tagline: string;
+  company_type: string;
+  overview: string;
+  services_provided: string[];
+  founded: string;
+  revenue: string;
+  employees: string;
+  linkedin_url: string;
+  recent_activity: string;
+  product_catalog: Array<{
+    name: string;
+    description: string;
+    price?: string;
+  }>;
+  trust_and_compliance: {
+    soc2: boolean;
+    iso27001: boolean;
+    gdpr_banner: boolean;
+    hipaa: boolean;
+    partnerships: string[];
+    ssl_valid: boolean;
+    ssl_expires_in_days: number;
+    ssl_issuer?: string;
+    compliance_hook: string;
+  };
+  reviews: {
+    source?: string;
+    total_scraped: number;
+    average_rating: number;
+    ai_summary: {
+      sentiment: string;
+      pros: string[];
+      cons: string[];
+      summary: string;
+    };
+    recent_reviews: Array<{
+      author: string;
+      rating: number;
+      text: string;
+      published_at?: string;
+      reactions?: number;
+    }>;
+  };
+}
+
+const COMPANY_INTEL_CACHE = new Map<string, CompanyIntelligence>();
+
+export function useCompanyIntelligence(
+  companyId: string,
+  domain?: string | null,
+  table: "us_leads" | "mexico_leads" = "us_leads"
+) {
+  const cacheKey = `${table}:${companyId}:${domain || ""}`;
+  const [intel, setIntel] = useState<CompanyIntelligence | null>(() => COMPANY_INTEL_CACHE.get(cacheKey) || null);
+  const [loading, setLoading] = useState(!intel);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!companyId) return;
+    setLoading(true);
+    try {
+      const q = new URLSearchParams();
+      if (domain) q.set("domain", domain);
+      q.set("table", table);
+      const data = await api.get<CompanyIntelligence>(
+        `/leads/company/${encodeURIComponent(companyId)}/intelligence?${q.toString()}`
+      );
+      if (data) {
+        COMPANY_INTEL_CACHE.set(cacheKey, data);
+        setIntel(data);
+        setError(null);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, domain, table, cacheKey]);
+
+  useEffect(() => {
+    const inCache = COMPANY_INTEL_CACHE.get(cacheKey);
+    if (inCache) {
+      setIntel(inCache);
+      setLoading(false);
+    } else {
+      void refresh();
+    }
+  }, [refresh, cacheKey]);
+
+  return { intel, loading, error, refresh };
 }
 
 // ── DB Stats hook ─────────────────────────────────────────────────────────────
@@ -245,6 +378,9 @@ export function useLead(id: string, table: "us_leads" | "mexico_leads" = "us_lea
 export interface DbStats {
   us_total:           number;
   mx_total:           number;
+  org_total?:         number;
+  organizations_total?: number;
+  persons_total?:     number;
   us_with_phone:      number;
   us_with_email:      number;
   us_verified_email:  number;
@@ -257,54 +393,11 @@ export interface DbStats {
   by_state:           Array<{ state_code: string; count: number }>;
 }
 
-export const GLOBAL_STATS_CACHE: DbStats = {
-  us_total: 210450,
-  mx_total: 50208,
-  us_with_phone: 198240,
-  us_with_email: 185196,
-  us_verified_email: 168360,
-  mx_with_phone: 42676,
-  mx_with_email: 38158,
-  mx_verified_email: 32635,
-  by_source: [
-    { source: "SEC_EDGAR", count: 68420, avg_score: 96.4 },
-    { source: "CMS_NPI", count: 52180, avg_score: 98.1 },
-    { source: "FDIC", count: 34920, avg_score: 99.2 },
-    { source: "SAM_GOV", count: 28140, avg_score: 95.0 },
-    { source: "OPENSTREETMAP", count: 15640, avg_score: 91.8 },
-    { source: "GOOGLE_MAPS", count: 11150, avg_score: 92.5 },
-  ],
-  by_industry: [
-    { industry: "Healthcare & Life Sciences", count: 52180 },
-    { industry: "Financial Services & Banking", count: 44520 },
-    { industry: "Professional & Business Services", count: 38910 },
-    { industry: "Manufacturing & Industrial", count: 31450 },
-    { industry: "Technology, Cloud & Software", count: 24190 },
-    { industry: "Construction & Real Estate", count: 19200 },
-  ],
-  by_seniority: [
-    { seniority: "C-Level Executive", count: 64759 },
-    { seniority: "Vice President", count: 48210 },
-    { seniority: "Director", count: 89450 },
-    { seniority: "Senior Manager", count: 72180 },
-    { seniority: "Staff Specialist", count: 65501 },
-  ],
-  by_state: [
-    { state_code: "CA", count: 38420 },
-    { state_code: "TX", count: 28910 },
-    { state_code: "NY", count: 24560 },
-    { state_code: "FL", count: 21340 },
-    { state_code: "IL", count: 16820 },
-    { state_code: "PA", count: 13940 },
-    { state_code: "OH", count: 11250 },
-  ],
-};
-
-let cachedStats: DbStats = GLOBAL_STATS_CACHE;
+let cachedStats: DbStats | null = null;
 
 export function useDbStats() {
-  const [stats, setStats] = useState<DbStats>(cachedStats);
-  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<DbStats | null>(cachedStats);
+  const [loading, setLoading] = useState(!cachedStats);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async (forceRefresh = false) => {
@@ -325,7 +418,7 @@ export function useDbStats() {
   }, []);
 
   useEffect(() => {
-    fetchStats(false);
+    void fetchStats(false);
   }, [fetchStats]);
 
   return { stats, loading, error, refresh: () => fetchStats(true) };

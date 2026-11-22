@@ -82,7 +82,11 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    load();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) load();
+    });
+    return () => { active = false; };
   }, [load]);
 
   const login = async (email: string, password: string) => {

@@ -9,7 +9,9 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => setMounted(true), []);
+  React.useEffect(() => {
+    void Promise.resolve().then(() => setMounted(true));
+  }, []);
 
   if (!mounted) {
     return <Button variant="ghost" size="icon" aria-hidden className="opacity-0" />;

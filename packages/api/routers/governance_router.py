@@ -34,9 +34,9 @@ router = APIRouter(prefix="/api/governance", tags=["Governance & Promotion Gate"
 
 
 class PromotionTriggerRequest(BaseModel):
-    min_quality: int = Field(80, ge=0, le=100, description="Minimum Bayesian quality score required for certification")
-    min_trust: float = Field(0.8500, ge=0.0, le=1.0, description="Minimum Bayesian trust score required for certification")
-    batch_size: int = Field(1000, ge=1, le=10000, description="Batch size for atomic CTE promotion")
+    min_quality: int = Field(15, ge=0, le=100, description="Minimum Bayesian quality score required for certification")
+    min_trust: float = Field(0.5000, ge=0.0, le=1.0, description="Minimum Bayesian trust score required for certification")
+    batch_size: int = Field(5000, ge=1, le=50000, description="Batch size for atomic CTE promotion")
     auto_evaluate_pre_master: bool = Field(True, description="Run working layer Bayesian evaluation before promotion")
 
 

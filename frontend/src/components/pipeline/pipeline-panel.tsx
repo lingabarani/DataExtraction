@@ -299,7 +299,11 @@ export function PipelinePanel() {
 
   useEffect(() => {
     if (activeTab === "orchestration") {
-      fetchOrchHealth();
+      let active = true;
+      void Promise.resolve().then(() => {
+        if (active) void fetchOrchHealth();
+      });
+      return () => { active = false; };
     }
   }, [activeTab, fetchOrchHealth]);
 
@@ -359,8 +363,14 @@ export function PipelinePanel() {
 
   // Initial load & Polling
   useEffect(() => {
-    fetchHealth();
-    fetchDLQ();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) {
+        void fetchHealth();
+        void fetchDLQ();
+      }
+    });
+    return () => { active = false; };
   }, [fetchHealth, fetchDLQ]);
 
   useEffect(() => {

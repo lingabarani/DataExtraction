@@ -1,0 +1,3 @@
+"""
+Routes package compatibility shim
+"""

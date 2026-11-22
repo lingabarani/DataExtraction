@@ -124,11 +124,21 @@ export function GovernancePanel() {
   }, []);
 
   useEffect(() => {
-    fetchStats();
-    fetchOverdue();
-    fetchQuarantine();
-    const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) {
+        void fetchStats();
+        void fetchOverdue();
+        void fetchQuarantine();
+      }
+    });
+    const interval = setInterval(() => {
+      if (active) void fetchStats();
+    }, 10000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [fetchStats, fetchOverdue, fetchQuarantine]);
 
   // ── Execute Promotion Gate ─────────────────────────────────────────────────

@@ -141,8 +141,8 @@ class Agent5GovernanceWorkflow:
         self._step = "PROMOTION_GATE"
         await workflow.wait_condition(lambda: not self._paused)
         try:
-            min_q = config.get("min_quality", 80)
-            min_t = config.get("min_trust", 0.85)
+            min_q = config.get("min_quality", 15)
+            min_t = config.get("min_trust", 0.50)
             batch_sz = config.get("batch_limit", 1000)
             promo_res = await workflow.execute_activity(
                 promote_certified_to_master_activity,

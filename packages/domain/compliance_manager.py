@@ -21,6 +21,31 @@ if not logger.handlers:
 class ComplianceManager:
     """Enterprise compliance manager enforcing GDPR/CCPA suppression and automated purging."""
 
+    _suppression_cache: Optional[set] = None
+    _cache_timestamp: float = 0.0
+    _CACHE_TTL: float = 60.0  # 60 seconds
+
+    @classmethod
+    def _refresh_cache_if_needed(cls):
+        import time
+        now = time.time()
+        if cls._suppression_cache is not None and (now - cls._cache_timestamp) < cls._CACHE_TTL:
+            return
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            table_name = "kg_audit.suppression_lists" if DATABASE_TYPE == "postgresql" else "suppression_lists"
+            cur.execute(f"SELECT hashed_identifier FROM {table_name} WHERE is_active = TRUE")
+            cls._suppression_cache = {row[0] for row in cur.fetchall()}
+            cls._cache_timestamp = now
+            cur.close()
+        except Exception as exc:
+            logger.warning("Error refreshing suppression cache: %s", exc)
+            if cls._suppression_cache is None:
+                cls._suppression_cache = set()
+        finally:
+            release_connection(conn)
+
     @staticmethod
     def hash_identifier(identifier: str) -> str:
         """Standardized SHA-256 cryptographic hash of normalized identifier."""
@@ -82,6 +107,7 @@ class ComplianceManager:
                 )
             conn.commit()
             cur.close()
+            cls._suppression_cache = None
 
             AuditTrailRepository.record_access_event(
                 user_id="compliance_engine",
@@ -112,25 +138,10 @@ class ComplianceManager:
 
     @classmethod
     def is_suppressed(cls, identifier: str) -> bool:
-        """Checks if identifier hash exists in the active suppression list."""
+        """Checks if identifier hash exists in the active suppression list (O(1) memory cached)."""
+        cls._refresh_cache_if_needed()
         hashed = cls.hash_identifier(identifier)
-        conn = get_connection()
-        try:
-            cur = conn.cursor()
-            table_name = "kg_audit.suppression_lists" if DATABASE_TYPE == "postgresql" else "suppression_lists"
-            ph = "%s" if DATABASE_TYPE == "postgresql" else "?"
-            cur.execute(
-                f"SELECT 1 FROM {table_name} WHERE hashed_identifier = {ph} AND is_active = TRUE",
-                (hashed,),
-            )
-            found = cur.fetchone() is not None
-            cur.close()
-            return found
-        except Exception as exc:
-            logger.warning("Error checking suppression status: %s", exc)
-            return False
-        finally:
-            release_connection(conn)
+        return hashed in cls._suppression_cache
 
     @classmethod
     def execute_purge(

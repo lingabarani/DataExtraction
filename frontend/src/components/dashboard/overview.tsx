@@ -27,18 +27,22 @@ import { toast } from "sonner";
 // ── Colour map for sources ────────────────────────────────────────────────────
 
 const SRC_COLOUR: Record<string, string> = {
-  CMS_NPI:        "#0f766e",  // teal-700
-  SEC_EDGAR:      "#374151",  // gray-700
-  FDIC:           "#92400e",  // amber-800
-  NCUA:           "#b45309",  // amber-700
-  USASPENDING:    "#6d28d9",  // violet-700
-  PROPUBLICA_990: "#0e7490",  // cyan-700
-  SAM_GOV:        "#166534",  // green-800
-  OPENSTREETMAP:  "#0284c7",  // sky-600
-  GOOGLE_MAPS:    "#ea580c",  // orange-600
-  CSV:            "#1d4ed8",  // blue-700
-  INTERNAL_JSON:  "#4b5563",  // gray-600
-  DB:             "#6b7280",  // gray-500
+  CMS_NPI:             "#0f766e",  // teal-700
+  SEC_EDGAR:           "#374151",  // gray-700
+  FDIC:                "#92400e",  // amber-800
+  FDIC_BANKS:          "#92400e",  // amber-800
+  NCUA:                "#b45309",  // amber-700
+  USASPENDING:         "#6d28d9",  // violet-700
+  PROPUBLICA:          "#0e7490",  // cyan-700
+  PROPUBLICA_990:      "#0e7490",  // cyan-700
+  SAM_GOV:             "#166534",  // green-800
+  OPENSTREETMAP:       "#0284c7",  // sky-600
+  GOOGLE_MAPS:         "#ea580c",  // orange-600
+  OPEN_DIRECTORIES_SF: "#0d9488",  // teal-600
+  "100K_LOAD_BENCHMARK": "#6366f1", // indigo-500
+  CSV:                 "#1d4ed8",  // blue-700
+  INTERNAL_JSON:       "#4b5563",  // gray-600
+  DB:                  "#6b7280",  // gray-500
 };
 
 // ── Enhanced metric card ──────────────────────────────────────────────────────
@@ -147,6 +151,10 @@ function fmtSource(s: string) {
     .replace("_NPI", "")
     .replace("_EDGAR", "")
     .replace("PROPUBLICA_990", "ProPublica")
+    .replace("PROPUBLICA", "ProPublica")
+    .replace("FDIC_BANKS", "FDIC")
+    .replace("OPEN_DIRECTORIES_SF", "Open Directories")
+    .replace("100K_LOAD_BENCHMARK", "Benchmark")
     .replace("USASPENDING", "USASpend")
     .replace("OPENSTREETMAP", "OpenStreetMap")
     .replace("GOOGLE_MAPS", "Google Maps")
@@ -229,7 +237,11 @@ export function DashboardOverview() {
             <h1 className="text-lg font-bold text-foreground tracking-tight">Overview</h1>
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              210,450 Certified Golden Records
+              {loading && !stats ? (
+                "Loading Master Vault..."
+              ) : (
+                `${(usTotal + mxTotal).toLocaleString("en-US")} Certified Golden Records`
+              )}
             </span>
           </div>
           <p className="text-[12px] text-muted-foreground mt-0.5">
@@ -248,8 +260,8 @@ export function DashboardOverview() {
             Refresh
           </Button>
           <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5 font-medium border-border/80">
-            <Link href="/scraper">
-              <Radio className="w-3.5 h-3.5 text-primary" /> Scrapers
+            <Link href="/orchestration">
+              <Radio className="w-3.5 h-3.5 text-primary" /> Scrapers &amp; Sagas
             </Link>
           </Button>
           <Button asChild size="sm" className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm">

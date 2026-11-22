@@ -158,8 +158,8 @@ class ChatbotOrchestrator:
                         evt_type = disc_event.get("type")
                         if evt_type == "source_status":
                             yield {"event": "discovery_progress", "data": disc_event}
-                        elif evt_type in ("snapshot", "answer"):
-                            raw_results = disc_event.get("results") or disc_event.get("cards") or []
+                        elif evt_type in ("snapshot", "answer", "result", "cards_snapshot"):
+                            raw_results = disc_event.get("cards") or disc_event.get("results") or disc_event.get("preview") or []
                             if raw_results:
                                 discovered_orgs = raw_results
                                 yield {"event": "discovery_results", "data": {"count": len(discovered_orgs), "results": discovered_orgs[:5]}}

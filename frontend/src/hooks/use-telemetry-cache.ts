@@ -151,7 +151,9 @@ export function useTelemetryCache(refreshIntervalMs = 10000) {
     isMountedRef.current = true;
     // Immediate background revalidation if cache is older than 5 seconds
     if (Date.now() - GLOBAL_TELEMETRY_CACHE.lastFetched > 5000) {
-      revalidate();
+      void Promise.resolve().then(() => {
+        if (isMountedRef.current) void revalidate();
+      });
     }
 
     const interval = setInterval(revalidate, refreshIntervalMs);

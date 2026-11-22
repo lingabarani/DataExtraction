@@ -39,6 +39,7 @@ from packages.api.routers.planner_router import router as planner_router
 from packages.api.routers.places_router import router as places_router
 from packages.api.routers.discovery_router import router as discovery_router
 from packages.chatbot.api.chat_router import router as chat_router
+from packages.api.routers.prospecting_router import router as prospecting_router
 
 logger = get_structured_logger("api.gateway")
 
@@ -179,12 +180,17 @@ def create_app() -> FastAPI:
             return response
         except Exception as exc:
             duration_sec = time.monotonic() - start
-            record_request_metrics(request.method, request.url.path, 500, duration_sec)
-            logger.error(
-                "Unhandled exception: method=%s path=%s duration=%.2fms error=%s",
-                request.method, request.url.path, duration_sec * 1000, exc,
-                exc_info=True,
-            )
+            err_str = str(exc)
+            is_uuid_err = "invalid input syntax for type uuid" in err_str or "InvalidTextRepresentation" in type(exc).__name__
+            status_code = 400 if is_uuid_err else 500
+            error_title = "Bad Request" if is_uuid_err else "Internal Server Error"
+            record_request_metrics(request.method, request.url.path, status_code, duration_sec)
+            if not is_uuid_err:
+                logger.error(
+                    "Unhandled exception: method=%s path=%s duration=%.2fms error=%s",
+                    request.method, request.url.path, duration_sec * 1000, exc,
+                    exc_info=True,
+                )
             origin = request.headers.get("origin")
             allowed_origins = set(config_manager.get_cors_origins() or [])
             headers = {"X-Process-Time-Ms": f"{duration_sec * 1000:.2f}"}
@@ -196,8 +202,8 @@ def create_app() -> FastAPI:
                     "Access-Control-Allow-Methods": "*",
                 })
             return JSONResponse(
-                status_code=500,
-                content={"error": "Internal Server Error", "detail": str(exc)},
+                status_code=status_code,
+                content={"error": error_title, "detail": "Invalid identifier syntax (expected valid UUID format)" if is_uuid_err else err_str},
                 headers=headers,
             )
 
@@ -212,15 +218,18 @@ def create_app() -> FastAPI:
     app.include_router(secrets_router)
     app.include_router(llm_router)
     app.include_router(planner_router)
-    app.include_router(places_router)
+    app.include_router(places_router, prefix="/api/places")
+    app.include_router(places_router, prefix="/api/v1/places")
     app.include_router(discovery_router)
     app.include_router(chat_router)
+    app.include_router(prospecting_router, prefix="/api")
 
     # ── Legacy routers (each registered exactly once with /api prefix) ─────────
     for router_obj, prefix, _tags in _legacy_routers:
         app.include_router(router_obj, prefix=prefix)
 
     # ── Health probes ─────────────────────────────────────────────────────────
+    @app.get("/health/live", tags=["Health"], include_in_schema=False)
     @app.get("/healthz", tags=["Health"], include_in_schema=False)
     def liveness() -> Dict[str, Any]:
         return {"status": "ok", "service": "dataextraction-api", "timestamp": time.time()}
@@ -239,13 +248,19 @@ def create_app() -> FastAPI:
             "timestamp": time.time(),
         }
 
+    @app.get("/health/ready", tags=["Health"], include_in_schema=False)
     @app.get("/readyz", tags=["Health"], include_in_schema=False)
-    def readiness() -> Dict[str, Any]:
+    def readiness() -> JSONResponse:
         pool = get_db_pool_status()
-        return {
-            "status": "ready" if pool.get("initialized") else "degraded",
-            "database_pool": pool,
-        }
+        is_ready = bool(pool.get("initialized"))
+        status_code = 200 if is_ready else 503
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "status": "ready" if is_ready else "degraded",
+                "database_pool": pool,
+            },
+        )
 
     # ── Prometheus metrics ────────────────────────────────────────────────────
     @app.get("/metrics", tags=["Observability"], include_in_schema=True)

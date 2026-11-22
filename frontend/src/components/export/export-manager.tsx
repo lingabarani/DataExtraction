@@ -112,20 +112,25 @@ export function ExportManager() {
 
   // ── Fetch record estimate when filters change ─────────────────────────────
   useEffect(() => {
-    setEstimating(true);
-    const params = new URLSearchParams();
-    params.set("table", filters.table);
-    params.set("limit", "1");
-    if (filters.seniority    !== "all") params.set("seniority",    filters.seniority);
-    if (filters.industry     !== "all") params.set("industry",     filters.industry);
-    if (filters.state_code   !== "all") params.set("state_code",   filters.state_code);
-    if (filters.email_status !== "all") params.set("email_status", filters.email_status);
-    if (filters.api_source   !== "all") params.set("api_source",   filters.api_source);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setEstimating(true);
+      const params = new URLSearchParams();
+      params.set("table", filters.table);
+      params.set("limit", "1");
+      if (filters.seniority    !== "all") params.set("seniority",    filters.seniority);
+      if (filters.industry     !== "all") params.set("industry",     filters.industry);
+      if (filters.state_code   !== "all") params.set("state_code",   filters.state_code);
+      if (filters.email_status !== "all") params.set("email_status", filters.email_status);
+      if (filters.api_source   !== "all") params.set("api_source",   filters.api_source);
 
-    api.get<{ total: number }>(`/leads/count?${params}`)
-      .then(r => setEstimate(r.total))
-      .catch(() => setEstimate(null))
-      .finally(() => setEstimating(false));
+      api.get<{ total: number }>(`/leads/count?${params}`)
+        .then(r => { if (active) setEstimate(r.total); })
+        .catch(() => { if (active) setEstimate(null); })
+        .finally(() => { if (active) setEstimating(false); });
+    });
+    return () => { active = false; };
   }, [filters]);
 
   // ── Column toggles ────────────────────────────────────────────────────────

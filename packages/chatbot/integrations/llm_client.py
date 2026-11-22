@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel
 
 from packages.chatbot.models import ChatIntent
-from packages.infrastructure.llm.base import parse_with_schema, schema_instruction
+from packages.infrastructure.llm.base import LLMProvider, parse_with_schema, schema_instruction
+from packages.infrastructure.llm import get_llm
 from packages.infrastructure.llm.ollama_provider import OllamaProvider
 
 logger = logging.getLogger("dataextraction.chatbot.llm_client")
@@ -88,37 +89,43 @@ FIELD_PATTERNS = {
 
 
 class ChatbotLLMClient:
-    def __init__(self, provider: Optional[OllamaProvider] = None) -> None:
-        self.provider = provider or OllamaProvider()
+    def __init__(self, provider: Optional[LLMProvider] = None) -> None:
+        if provider is not None:
+            self.provider = provider
+        else:
+            try:
+                self.provider = get_llm()
+            except Exception as exc:
+                logger.warning("Could not initialize routed LLM: %s. Using fallback.", exc)
+                self.provider = None
 
     def parse_intent(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> ChatIntent:
         """
-        Parses user message into structured ChatIntent using Ollama LLM,
-        seamlessly falling back to deterministic heuristic parsing if Ollama is unavailable.
+        Parses user message into structured ChatIntent using routed LLM (Groq),
+        seamlessly falling back to deterministic heuristic parsing if LLM is unavailable.
         """
         prompt_lower = prompt.lower().strip()
         context = context or {}
 
-        # 1. Attempt Local Ollama Structured Inference
-        try:
-            health = self.provider.healthcheck()
-            if health.get("ok"):
+        # 1. Attempt Routed LLM (Groq / Bedrock / Ollama) Structured Inference
+        if self.provider is not None:
+            try:
                 system_msg = (
-                    "You are the Conversational Intelligence Parser for a B2B DataExtraction platform.\n"
-                    "Extract user intent into structured JSON matching the provided schema.\n"
-                    "Identify company name, industry, geography (country, state, city), requested company/contact fields, "
-                    "result limits, verification requirements, and whether this is a follow-up refinement.\n"
+                    "You are the Enterprise Conversational Intelligence Parser for a B2B DataExtraction platform.\n"
+                    "Extract user intent into structured JSON matching the provided ChatIntent schema.\n"
+                    "Identify company name, industry, geography (country, state, city), Apollo.io filters (seniority_levels, departments, has_verified_email, has_phone), "
+                    "requested company/contact fields, result limits, verification requirements, and whether this is a follow-up refinement.\n"
                     f"Previous Conversation Context: {json.dumps(context)}"
                 )
                 messages = [
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": prompt},
                 ]
-                res = self.provider.chat(messages, schema=ChatIntent, temperature=0.1, max_tokens=1024)
+                res = self.provider.chat(messages, schema=ChatIntent, temperature=0.1, max_tokens=1024, purpose="chatbot_intent")
                 if res.parsed and isinstance(res.parsed, ChatIntent):
                     return res.parsed
-        except Exception as exc:
-            logger.debug("Local Ollama parse failed, engaging deterministic fallback: %s", exc)
+            except Exception as exc:
+                logger.debug("Routed LLM parse failed, engaging deterministic fallback: %s", exc)
 
         # 2. Deterministic Heuristic Semantic Fallback
         return self._heuristic_parse(prompt, context)
@@ -211,6 +218,36 @@ class ChatbotLLMClient:
         elif is_follow_up:
             intent_type = "refine_filter"
 
+        # Apollo.io Filters extraction
+        seniority_levels = []
+        if any(w in prompt_lower for w in ["c-suite", "c suite", "csuite", "ceo", "cto", "cfo", "coo", "cmo", "executive", "executives"]):
+            seniority_levels.append("C-Suite")
+        if any(w in prompt_lower for w in ["founder", "co-founder", "owner"]):
+            seniority_levels.append("Founder")
+        if any(w in prompt_lower for w in ["vp", "vice president"]):
+            seniority_levels.append("VP")
+        if any(w in prompt_lower for w in ["director"]):
+            seniority_levels.append("Director")
+        if any(w in prompt_lower for w in ["manager"]):
+            seniority_levels.append("Manager")
+
+        departments = []
+        if any(w in prompt_lower for w in ["engineering", "tech", "developer", "software"]):
+            departments.append("Engineering")
+        if any(w in prompt_lower for w in ["sales", "business development"]):
+            departments.append("Sales")
+        if any(w in prompt_lower for w in ["marketing"]):
+            departments.append("Marketing")
+        if any(w in prompt_lower for w in ["finance", "accounting"]):
+            departments.append("Finance")
+        if any(w in prompt_lower for w in ["hr", "human resources"]):
+            departments.append("Human Resources")
+        if any(w in prompt_lower for w in ["operations", "ops"]):
+            departments.append("Operations")
+
+        has_verified_email = True if (verification_required or "verified email" in prompt_lower) else None
+        has_phone = True if ("phone" in requested_fields or "phone" in prompt_lower) else None
+
         explanation = f"Structured search for {industry or 'companies'} in {geo.get('city') or geo.get('state') or 'target area'}"
         if verification_required:
             explanation += " (verified emails required)"
@@ -228,6 +265,10 @@ class ChatbotLLMClient:
             is_follow_up=is_follow_up,
             explanation=explanation,
             confidence=85,
+            seniority_levels=seniority_levels,
+            departments=departments,
+            has_verified_email=has_verified_email,
+            has_phone=has_phone,
         )
 
     def generate_conversational_response(

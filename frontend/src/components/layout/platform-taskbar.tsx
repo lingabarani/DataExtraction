@@ -7,12 +7,12 @@ import {
   LayoutDashboard,
   Cpu,
   Layers,
-  Activity,
-  Send,
-  Clock,
   Settings,
   Search,
   Bot,
+  Building2,
+  Users,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,14 +26,14 @@ interface PlatformNavTab {
 
 const PLATFORM_TABS: PlatformNavTab[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Live Discovery", href: "/search", icon: Search, badge: "NEW", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  { label: "AI Chatbot", href: "/chat", icon: Sparkles, badge: "AI", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  { label: "Company Data", href: "/companies", icon: Building2, badge: "213K", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  { label: "People Data", href: "/people", icon: Users, badge: "65K", badgeColor: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30" },
+  { label: "Live Discovery", href: "/search", icon: Search, badge: "LIVE", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
   { label: "Orchestration", href: "/orchestration", icon: Cpu, badge: "LIVE", badgeColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
   { label: "Data Pipeline", href: "/pipeline", icon: Layers },
   { label: "Autonomy", href: "/autonomy", icon: Bot },
-  { label: "Observability", href: "/orchestration#observability", icon: Activity },
-  { label: "OneReach", href: "/orchestration#onereach", icon: Send },
-  { label: "Freshness", href: "/orchestration#freshness", icon: Clock },
-  { label: "Administration", href: "/settings", icon: Settings },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function PlatformTaskbar() {
@@ -41,7 +41,9 @@ export function PlatformTaskbar() {
   const [currentHash, setCurrentHash] = useState<string>("");
 
   useEffect(() => {
-    setCurrentHash(typeof window !== "undefined" ? window.location.hash : "");
+    void Promise.resolve().then(() => {
+      setCurrentHash(typeof window !== "undefined" ? window.location.hash : "");
+    });
     const onHashChange = () => {
       setCurrentHash(window.location.hash);
     };
@@ -50,8 +52,8 @@ export function PlatformTaskbar() {
   }, []);
 
   return (
-    <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex-shrink-0 z-20">
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none px-4 sm:px-6 h-[44px]">
+    <div className="border-b border-border bg-card/90 backdrop-blur-xs flex-shrink-0 z-10 shadow-2xs">
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin px-3 sm:px-4 h-[42px]">
         {PLATFORM_TABS.map((tab) => {
           let isActive = false;
           if (tab.href.includes("#")) {
@@ -83,7 +85,7 @@ export function PlatformTaskbar() {
                 }
               }}
               className={cn(
-                "group relative flex items-center gap-2 px-3 py-2 text-[12.5px] font-medium transition-all duration-150 whitespace-nowrap rounded-md active:scale-[0.98]",
+                "group relative flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium transition-all duration-150 whitespace-nowrap rounded-md active:scale-[0.98]",
                 isActive
                   ? "text-foreground font-semibold bg-accent/20"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/10"
@@ -101,7 +103,7 @@ export function PlatformTaskbar() {
 
               {tab.badge && (
                 <span className={cn(
-                  "text-[9px] font-mono px-1.5 py-0.2 rounded border font-semibold tracking-wider flex items-center gap-1",
+                  "text-[9px] font-mono px-1 py-0.2 rounded border font-semibold tracking-wider flex items-center gap-0.5",
                   tab.badgeColor || "bg-muted text-muted-foreground"
                 )}>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -110,7 +112,7 @@ export function PlatformTaskbar() {
               )}
 
               {isActive && (
-                <span className="absolute inset-x-2 bottom-0 h-[2px] bg-primary rounded-t-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
+                <span className="absolute inset-x-1.5 bottom-0 h-[2px] bg-primary rounded-t-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
               )}
             </Link>
           );

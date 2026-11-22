@@ -211,10 +211,18 @@ export function MapExtractionPanel() {
   }, [selectedFieldForPreview]);
 
   useEffect(() => {
-    loadData();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void loadData();
+    });
     // Poll telemetry every 6 seconds
-    const interval = setInterval(() => loadData(true), 6000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (active) void loadData(true);
+    }, 6000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [loadData]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────

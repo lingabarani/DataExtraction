@@ -33,16 +33,18 @@ interface Pill {
 }
 
 const PILLS: Pill[] = [
+  { label: "Economic Buyer",  filter: { buying_role: "ECONOMIC_BUYER" } },
+  { label: "Tech Evaluator",  filter: { buying_role: "TECHNICAL_EVALUATOR" } },
+  { label: "Champion",        filter: { buying_role: "CHAMPION" } },
+  { label: "Surging Intent",  filter: { intent_strength: "SURGING" } },
+  { label: "High Intent",     filter: { intent_strength: "HIGH" } },
   { label: "C-Suite",         filter: { seniority: "C_SUITE" } },
   { label: "VP",              filter: { seniority: "VP" } },
   { label: "Director",        filter: { seniority: "DIRECTOR" } },
-  { label: "Founder",         filter: { seniority: "FOUNDER" } },
   { label: "Verified Email",  filter: { email_status: "VERIFIED" } },
-  { label: "Healthcare",      filter: { industry: "Healthcare" } },
   { label: "Technology",      filter: { industry: "Computer Software" } },
+  { label: "Healthcare",      filter: { industry: "Healthcare" } },
   { label: "Banking",         filter: { industry: "Banking and Finance" } },
-  { label: "Federal",         filter: { api_source: "USASPENDING" } },
-  { label: "Nonprofits",      filter: { industry: "Nonprofits and Associations" } },
 ];
 
 // ── AI example queries ────────────────────────────────────────────────────────
@@ -111,12 +113,14 @@ export function LeadsList({ table = "us_leads" }: Props) {
     table,
     page,
     limit: 50,
-    nl_query:     nlQuery      || undefined,
-    seniority:    pillFilter.seniority    || (seniority    !== "all" ? seniority    : undefined),
-    industry:     pillFilter.industry     || (industry     !== "all" ? industry     : undefined),
-    state_code:   stateCode    !== "all"  ? stateCode    : undefined,
-    email_status: pillFilter.email_status || (emailStatus  !== "all" ? emailStatus  : undefined),
-    api_source:   pillFilter.api_source   || undefined,
+    nl_query:        nlQuery      || undefined,
+    seniority:       pillFilter.seniority       || (seniority    !== "all" ? seniority    : undefined),
+    industry:        pillFilter.industry        || (industry     !== "all" ? industry     : undefined),
+    state_code:      stateCode    !== "all"     ? stateCode    : undefined,
+    email_status:    pillFilter.email_status    || (emailStatus  !== "all" ? emailStatus  : undefined),
+    api_source:      pillFilter.api_source      || undefined,
+    buying_role:     pillFilter.buying_role     || undefined,
+    intent_strength: pillFilter.intent_strength || undefined,
   };
 
   const { leads, total, loading } = useLeads(filter);
@@ -156,226 +160,231 @@ export function LeadsList({ table = "us_leads" }: Props) {
   const totalPages = Math.ceil(total / 50);
 
   return (
-    <div className="flex flex-col h-full gap-0">
+    <div className="flex flex-col h-full space-y-3">
 
-      {/* ── Primary toolbar ─────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-0 py-2 flex-wrap border-b border-border pb-3">
+      {/* ── Control Console (Elevated Card) ────────────────────── */}
+      <div className="bg-card rounded-xl border border-border/80 shadow-xs p-3 space-y-2.5">
+        {/* ── Primary toolbar ─────────────────────────────────────── */}
+        <div className="flex items-center gap-2 flex-wrap">
 
-        {/* Search input */}
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
-          {isThinking
-            ? <Loader2 className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground animate-spin" />
-            : <Search   className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
-          }
-          <Input
-            value={inputValue}
-            onChange={e => handleInput(e.target.value)}
-            placeholder="Search or ask in plain English..."
-            className="pl-8 h-8 text-[12px] bg-muted/40 border-border focus:bg-background"
-          />
-          {inputValue && (
-            <button
-              onClick={() => { setInputValue(""); setNlQuery(""); }}
-              className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Filter toggle */}
-        <Button
-          variant="outline"
-          size="sm"
-          className={`h-8 text-[12px] gap-1.5 ${showFilters ? "bg-muted" : ""}`}
-          onClick={() => setShowFilters(s => !s)}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          Filters
-          {hasFilter && (
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-          )}
-        </Button>
-
-        {/* Clear */}
-        {hasFilter && (
-          <Button variant="ghost" size="sm" className="h-8 text-[12px] text-muted-foreground" onClick={clearAll}>
-            <X className="w-3 h-3 mr-1" /> Clear
-          </Button>
-        )}
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Record count */}
-        <span className="text-[12px] font-mono tabnum text-muted-foreground whitespace-nowrap">
-          {loading ? "..." : `${total.toLocaleString()} records`}
-        </span>
-
-        {/* View Toggle */}
-        <div className="flex items-center border border-border rounded-md p-0.5 bg-muted/30">
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 px-2 text-[12px] gap-1"
-            onClick={() => setViewMode("table")}
-          >
-            <TableIcon className="w-3.5 h-3.5" /> Table
-          </Button>
-          <Button
-            variant={viewMode === "map" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 px-2 text-[12px] gap-1"
-            onClick={() => setViewMode("map")}
-          >
-            <MapPin className="w-3.5 h-3.5" /> Map
-          </Button>
-        </div>
-
-        {/* Export */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-[12px] gap-1.5"
-          onClick={() =>
-            api.download(
-              `/export/leads/csv?table=${table}`,
-              `${table}-${new Date().toISOString().slice(0, 10)}.csv`
-            )
-          }
-        >
-          <Download className="w-3.5 h-3.5" /> Export
-        </Button>
-      </div>
-
-      {/* ── Expanded filter row ──────────────────────────────────── */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="overflow-hidden"
-          >
-            <div className="flex flex-wrap items-center gap-2 py-2.5 border-b border-border">
-              <FilterSelect label="Seniority" value={seniority} onValueChange={v => { setSeniority(v); setPage(1); }}>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="C_SUITE">C-Suite</SelectItem>
-                <SelectItem value="VP">VP</SelectItem>
-                <SelectItem value="DIRECTOR">Director</SelectItem>
-                <SelectItem value="MANAGER">Manager</SelectItem>
-                <SelectItem value="FOUNDER">Founder</SelectItem>
-              </FilterSelect>
-
-              <FilterSelect label="Industry" value={industry} onValueChange={v => { setIndustry(v); setPage(1); }}>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="Healthcare">Healthcare</SelectItem>
-                <SelectItem value="Banking and Finance">Banking</SelectItem>
-                <SelectItem value="Computer Software">Technology</SelectItem>
-                <SelectItem value="Federal Contractor">Federal</SelectItem>
-                <SelectItem value="Nonprofits and Associations">Nonprofits</SelectItem>
-                {table === "mexico_leads" && (
-                  <SelectItem value="Industrial Manufacturing & Transformation">Manufacturing</SelectItem>
-                )}
-              </FilterSelect>
-
-              <FilterSelect label="State" value={stateCode} onValueChange={v => { setStateCode(v); setPage(1); }}>
-                <SelectItem value="all">All</SelectItem>
-                {["CA","TX","NY","FL","IL","PA","OH","GA","WA","AZ","NC","MA"].map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </FilterSelect>
-
-              <FilterSelect label="Email" value={emailStatus} onValueChange={v => { setEmailStatus(v); setPage(1); }}>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="VERIFIED">Verified</SelectItem>
-                <SelectItem value="VALID">Valid</SelectItem>
-                <SelectItem value="GUESSED">Guessed</SelectItem>
-                <SelectItem value="MISSING">Missing</SelectItem>
-              </FilterSelect>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Quick pill row ───────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 py-2 border-b border-border overflow-x-auto scrollbar-enterprise flex-nowrap">
-        <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium flex-shrink-0 pr-1">
-          Quick
-        </span>
-        {PILLS.map((pill, idx) => {
-          const active = activePills.includes(idx);
-          return (
-            <button
-              key={idx}
-              onClick={() => togglePill(idx)}
-              className={`
-                flex-shrink-0 px-2.5 py-1 rounded text-[11px] font-medium border transition-all
-                ${active
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
-                }
-              `}
-            >
-              {pill.label}
-            </button>
-          );
-        })}
-
-        {/* AI example queries */}
-        <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium flex-shrink-0 pl-3 pr-1">
-          AI
-        </span>
-        {AI_EXAMPLES.map(q => (
-          <button
-            key={q}
-            onClick={() => { setInputValue(q); setNlQuery(q); setPage(1); }}
-            className="flex-shrink-0 px-2.5 py-1 rounded text-[11px] text-muted-foreground border border-dashed border-border hover:border-foreground/40 hover:text-foreground transition-all"
-          >
-            {q}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Active filter tags ───────────────────────────────────── */}
-      <AnimatePresence>
-        {nlQuery && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center gap-2 py-2 border-b border-border"
-          >
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Query</span>
-            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-muted border border-border text-[12px]">
-              {nlQuery}
-              <button onClick={() => { setNlQuery(""); setInputValue(""); }}>
-                <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+          {/* Search input */}
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            {isThinking
+              ? <Loader2 className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground animate-spin" />
+              : <Search   className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+            }
+            <Input
+              value={inputValue}
+              onChange={e => handleInput(e.target.value)}
+              placeholder="Search or ask in plain English..."
+              className="pl-8 h-8 text-[12px] bg-muted/40 border-border focus:bg-background focus:ring-1 focus:ring-ring"
+            />
+            {inputValue && (
+              <button
+                onClick={() => { setInputValue(""); setNlQuery(""); }}
+                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            )}
+          </div>
 
-      {/* ── Table or Map View ─────────────────────────────────── */}
-      {viewMode === "table" ? (
-        <div className="flex-1 overflow-auto scrollbar-enterprise rounded-md border border-border mt-3">
-          <LeadsTable leads={leads} loading={loading} table={table} />
+          {/* Filter toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            className={`h-8 text-[12px] gap-1.5 ${showFilters ? "bg-muted font-medium" : ""}`}
+            onClick={() => setShowFilters(s => !s)}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filters
+            {hasFilter && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+            )}
+          </Button>
+
+          {/* Clear */}
+          {hasFilter && (
+            <Button variant="ghost" size="sm" className="h-8 text-[12px] text-muted-foreground hover:text-foreground" onClick={clearAll}>
+              <X className="w-3 h-3 mr-1" /> Clear
+            </Button>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Record count */}
+          <span className="text-[12px] font-mono tabnum text-muted-foreground whitespace-nowrap bg-muted/40 px-2.5 py-1 rounded border border-border/60">
+            {loading ? "..." : `${total.toLocaleString("en-US")} records`}
+          </span>
+
+          {/* View Toggle */}
+          <div className="flex items-center border border-border rounded-md p-0.5 bg-muted/30">
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-[12px] gap-1"
+              onClick={() => setViewMode("table")}
+            >
+              <TableIcon className="w-3.5 h-3.5" /> Table
+            </Button>
+            <Button
+              variant={viewMode === "map" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-[12px] gap-1"
+              onClick={() => setViewMode("map")}
+            >
+              <MapPin className="w-3.5 h-3.5" /> Map
+            </Button>
+          </div>
+
+          {/* Export */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-[12px] gap-1.5"
+            onClick={() =>
+              api.download(
+                `/export/leads/csv?table=${table}`,
+                `${table}-${new Date().toISOString().slice(0, 10)}.csv`
+              )
+            }
+          >
+            <Download className="w-3.5 h-3.5" /> Export
+          </Button>
         </div>
-      ) : (
-        <div className="flex-1 rounded-md border border-border mt-3 overflow-hidden min-h-[500px]">
-          <LeadsMap leads={leads} className="h-full w-full min-h-[500px]" />
+
+        {/* ── Expanded filter row ──────────────────────────────────── */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="overflow-hidden pt-2 border-t border-border/60"
+            >
+              <div className="flex flex-wrap items-center gap-2 py-1">
+                <FilterSelect label="Seniority" value={seniority} onValueChange={v => { setSeniority(v); setPage(1); }}>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="C_SUITE">C-Suite</SelectItem>
+                  <SelectItem value="VP">VP</SelectItem>
+                  <SelectItem value="DIRECTOR">Director</SelectItem>
+                  <SelectItem value="MANAGER">Manager</SelectItem>
+                  <SelectItem value="FOUNDER">Founder</SelectItem>
+                </FilterSelect>
+
+                <FilterSelect label="Industry" value={industry} onValueChange={v => { setIndustry(v); setPage(1); }}>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Healthcare">Healthcare</SelectItem>
+                  <SelectItem value="Banking and Finance">Banking</SelectItem>
+                  <SelectItem value="Computer Software">Technology</SelectItem>
+                  <SelectItem value="Federal Contractor">Federal</SelectItem>
+                  <SelectItem value="Nonprofits and Associations">Nonprofits</SelectItem>
+                  {table === "mexico_leads" && (
+                    <SelectItem value="Industrial Manufacturing & Transformation">Manufacturing</SelectItem>
+                  )}
+                </FilterSelect>
+
+                <FilterSelect label="State" value={stateCode} onValueChange={v => { setStateCode(v); setPage(1); }}>
+                  <SelectItem value="all">All</SelectItem>
+                  {["CA","TX","NY","FL","IL","PA","OH","GA","WA","AZ","NC","MA"].map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </FilterSelect>
+
+                <FilterSelect label="Email" value={emailStatus} onValueChange={v => { setEmailStatus(v); setPage(1); }}>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="VERIFIED">Verified</SelectItem>
+                  <SelectItem value="VALID">Valid</SelectItem>
+                  <SelectItem value="GUESSED">Guessed</SelectItem>
+                  <SelectItem value="MISSING">Missing</SelectItem>
+                </FilterSelect>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Quick pill row ───────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 pt-2 border-t border-border/60 overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap">
+          <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold flex-shrink-0 pr-1">
+            Quick
+          </span>
+          {PILLS.map((pill, idx) => {
+            const active = activePills.includes(idx);
+            return (
+              <button
+                key={idx}
+                onClick={() => togglePill(idx)}
+                className={`
+                  flex-shrink-0 px-2.5 py-1 rounded text-[11px] font-medium border transition-all
+                  ${active
+                    ? "bg-foreground text-background border-foreground shadow-2xs font-semibold"
+                    : "bg-muted/30 text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground hover:bg-muted/60"
+                  }
+                `}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
+
+          {/* AI example queries */}
+          <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold flex-shrink-0 pl-3 pr-1">
+            AI
+          </span>
+          {AI_EXAMPLES.map(q => (
+            <button
+              key={q}
+              onClick={() => { setInputValue(q); setNlQuery(q); setPage(1); }}
+              className="flex-shrink-0 px-2.5 py-1 rounded text-[11px] text-muted-foreground border border-dashed border-border hover:border-foreground/40 hover:text-foreground bg-muted/20 hover:bg-muted/50 transition-all"
+            >
+              {q}
+            </button>
+          ))}
         </div>
-      )}
+
+        {/* ── Active filter tags ───────────────────────────────────── */}
+        <AnimatePresence>
+          {nlQuery && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-2 pt-2 border-t border-border/60"
+            >
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Query</span>
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-muted border border-border text-[12px] font-medium">
+                {nlQuery}
+                <button onClick={() => { setNlQuery(""); setInputValue(""); }}>
+                  <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                </button>
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Table or Map View Card ─────────────────────────────────── */}
+      <div className="flex-1 bg-card rounded-xl border border-border/80 shadow-xs overflow-hidden flex flex-col min-h-0">
+        {viewMode === "table" ? (
+          <div className="flex-1 overflow-x-auto overflow-y-visible scrollbar-enterprise">
+            <LeadsTable leads={leads} loading={loading} table={table} />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-hidden min-h-[500px]">
+            <LeadsMap leads={leads} className="h-full w-full min-h-[500px]" />
+          </div>
+        )}
+      </div>
 
       {/* ── Pagination ──────────────────────────────────────────── */}
       {total > 50 && (
         <div className="flex items-center justify-between pt-3 border-t border-border mt-1">
           <span className="text-[12px] font-mono text-muted-foreground tabnum">
-            Page {page} / {totalPages.toLocaleString()}
+            Page {page} / {totalPages.toLocaleString("en-US")}
             <span className="ml-2 text-muted-foreground/50">
-              ({((page - 1) * 50 + 1).toLocaleString()}–{Math.min(page * 50, total).toLocaleString()} of {total.toLocaleString()})
+              ({((page - 1) * 50 + 1).toLocaleString("en-US")}–{Math.min(page * 50, total).toLocaleString("en-US")} of {total.toLocaleString("en-US")})
             </span>
           </span>
           <div className="flex items-center gap-1">

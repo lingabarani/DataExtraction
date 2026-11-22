@@ -44,6 +44,7 @@ class TestConfigManagerSecurity(unittest.TestCase):
 
     def setUp(self):
         self.original_env = os.environ.copy()
+        os.environ.pop("JWT_SECRET_KEY", None)
 
     def tearDown(self):
         os.environ.clear()
@@ -128,6 +129,7 @@ class TestSECUserAgentCompliance(unittest.TestCase):
 
     def setUp(self):
         self.original_env = os.environ.copy()
+        os.environ.pop("JWT_SECRET_KEY", None)
 
     def tearDown(self):
         os.environ.clear()
@@ -186,6 +188,7 @@ class TestAWSSecretsManagerIntegration(unittest.TestCase):
 
     def setUp(self):
         self.original_env = os.environ.copy()
+        os.environ.pop("JWT_SECRET_KEY", None)
 
     def tearDown(self):
         os.environ.clear()
@@ -201,8 +204,10 @@ class TestAWSSecretsManagerIntegration(unittest.TestCase):
         mock_boto_client.return_value = mock_sm
 
         os.environ["AWS_SECRETS_NAME"] = "oneextraction/prod-secrets"
+        os.environ["USE_AWS_SECRETS"] = "true"
         os.environ["ENVIRONMENT"] = "production"
         os.environ.pop("JWT_SECRET", None)
+        os.environ.pop("JWT_SECRET_KEY", None)
 
         cfg = ConfigManager()
         secret = cfg.get_jwt_secret()

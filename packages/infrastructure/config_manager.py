@@ -525,7 +525,7 @@ class ConfigManager:
         and domain tech stack analysis.
         """
         return {
-            "rate_limit_per_second": float(self.get("EMAIL_ENRICHMENT_RATE_LIMIT", 50.0)),
+            "rate_limit_per_second": float(self.get("EMAIL_ENRICHMENT_RATE_LIMIT", 20.0)),
             "per_host_limit": int(self.get("EMAIL_ENRICHMENT_PER_HOST_LIMIT", 2)),
             "total_timeout": float(self.get("EMAIL_ENRICHMENT_TIMEOUT_SECONDS", 10.0)),
             "connect_timeout": float(self.get("EMAIL_ENRICHMENT_CONNECT_TIMEOUT", 3.0)),
@@ -600,8 +600,8 @@ class ConfigManager:
         Eliminates hardcoded governance and certification parameters.
         """
         return {
-            "min_quality_score": int(self.get("PROMOTION_MIN_QUALITY_SCORE", 80)),
-            "min_trust_score": float(self.get("PROMOTION_MIN_TRUST_SCORE", 0.8500)),
+            "min_quality_score": int(self.get("PROMOTION_MIN_QUALITY_SCORE", 15)),
+            "min_trust_score": float(self.get("PROMOTION_MIN_TRUST_SCORE", 0.5000)),
             "batch_chunk_size": int(self.get("PROMOTION_BATCH_CHUNK_SIZE", 5000)),
             "freshness_initial_score": float(self.get("PROMOTION_INITIAL_FRESHNESS", 1.0000)),
             "revalidation_interval_days": int(self.get("PROMOTION_REVALIDATION_INTERVAL_DAYS", 90)),

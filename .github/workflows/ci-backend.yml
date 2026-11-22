@@ -7,6 +7,8 @@ on:
       - "packages/**/*.py"
       - "tests/**/*.py"
       - "requirements.txt"
+      - "packages/infrastructure/migrations/**"
+      - "scripts/db/**"
       - ".github/workflows/ci-backend.yml"
   pull_request:
     branches: [main]

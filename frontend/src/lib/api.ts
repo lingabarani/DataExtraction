@@ -4,7 +4,13 @@
  * and memory-safe streaming file downloads.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+function resolveApiUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+}
+
+const API_URL = resolveApiUrl();
 
 const TOKEN_KEY = "dataextraction_token";
 const USER_KEY = "dataextraction_user";
@@ -411,28 +417,6 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export interface ChatReviewItem {
-  id: string;
-  session_id: string;
-  run_id?: string;
-  company_id: string;
-  company_name: string;
-  field_name: string;
-  existing_value?: any;
-  discovered_value: any;
-  source_url?: string;
-  source_type: string;
-  evidence?: string;
-  field_confidence: number;
-  verification_status: "UNVERIFIED" | "VERIFIED" | "CONFLICTING";
-  conflict_details?: Record<string, any>;
-  review_status: "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_INVESTIGATION";
-  reviewed_by?: string;
-  reviewed_at?: string;
-  rejection_reason?: string;
-  created_at: string;
-}
-
 export const chatApi = {
   createSession: (title?: string) =>
     api.post<ChatSession>("/v1/chat/sessions", { title: title || "New Conversation" }),
@@ -454,24 +438,6 @@ export const chatApi = {
 
   cancelExecution: (sessionId: string) =>
     api.post<any>(`/v1/chat/sessions/${sessionId}/cancel`, {}),
-
-  listReviews: (params?: { status?: string; session_id?: string; company_id?: string; limit?: number }) => {
-    const q = new URLSearchParams();
-    if (params?.status) q.set("status", params.status);
-    if (params?.session_id) q.set("session_id", params.session_id);
-    if (params?.company_id) q.set("company_id", params.company_id);
-    if (params?.limit) q.set("limit", String(params.limit));
-    return api.get<ChatReviewItem[]>(`/v1/chat/reviews?${q.toString()}`);
-  },
-
-  getReview: (id: string) =>
-    api.get<ChatReviewItem>(`/v1/chat/reviews/${id}`),
-
-  approveReview: (id: string, notes?: string) =>
-    api.post<any>(`/v1/chat/reviews/${id}/approve`, { notes }),
-
-  rejectReview: (id: string, reason?: string) =>
-    api.post<any>(`/v1/chat/reviews/${id}/reject`, { reason }),
 
   getStreamUrl: (sessionId: string, prompt: string) => {
     const rawUrl = `${API_URL}/v1/chat/sessions/${sessionId}/stream?prompt=${encodeURIComponent(prompt)}`;

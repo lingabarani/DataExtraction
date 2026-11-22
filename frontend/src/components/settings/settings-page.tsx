@@ -73,7 +73,13 @@ export function SettingsPage() {
     }
   }, []);
 
-  useEffect(() => { loadApiKeys(); }, [loadApiKeys]);
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void loadApiKeys();
+    });
+    return () => { active = false; };
+  }, [loadApiKeys]);
 
   useEffect(() => {
     api.get<Workspace>("/workspace")

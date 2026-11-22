@@ -25,6 +25,10 @@ def search_organizations(
     ein: Optional[str] = Query(None, description="US Employer Identification Number"),
     domain: Optional[str] = Query(None, description="Corporate apex domain"),
     state: Optional[str] = Query(None, description="2-letter state code"),
+    intent_strength: Optional[str] = Query(None, description="Filter by intent strength: 'SURGING', 'HIGH', 'MEDIUM'"),
+    tech_category: Optional[str] = Query(None, description="Filter by tech category: 'CRM', 'Cloud Infrastructure', etc."),
+    primary_crm: Optional[str] = Query(None, description="Filter by primary CRM: 'Salesforce', 'HubSpot', etc."),
+    primary_cloud: Optional[str] = Query(None, description="Filter by cloud: 'AWS', 'Google Cloud', etc."),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     current_user: UserPrincipal = Depends(get_current_user),
@@ -32,6 +36,7 @@ def search_organizations(
     """
     Search canonical organizations across OpenSearch 2.x cluster with resilient
     pg_trgm fallback to PostgreSQL Knowledge Graph.
+    Includes B2B technographics, buyer intent signals, and hiring velocity.
     """
     # Tier 1: OpenSearch 2.x Primary Query (when full-text term 'q' is provided)
     if q and opensearch_client.ping():
@@ -92,12 +97,30 @@ def search_organizations(
             conditions.append("(state = %s OR state_code = %s)")
             params.extend([state.strip().upper(), state.strip().upper()])
 
+        if intent_strength:
+            conditions.append("intent_strength = %s")
+            params.append(intent_strength.strip().upper())
+
+        if tech_category:
+            conditions.append("%s = ANY(tech_categories)")
+            params.append(tech_category.strip())
+
+        if primary_crm:
+            conditions.append("primary_crm ILIKE %s")
+            params.append(f"%{primary_crm.strip()}%")
+
+        if primary_cloud:
+            conditions.append("primary_cloud ILIKE %s")
+            params.append(f"%{primary_cloud.strip()}%")
+
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
         sql = f"""
-            SELECT id, name, normalized_name, domain, ein, state_code, city, industry
+            SELECT id, name, normalized_name, domain, ein, state_code, city, industry,
+                   intent_score, intent_strength, intent_topics, tech_categories,
+                   primary_crm, primary_cloud, recent_hiring_velocity, company_scoops
             FROM companies
             {where_clause}
-            ORDER BY id
+            ORDER BY intent_score DESC, id
             LIMIT %s OFFSET %s
         """
         params.extend([limit, offset])
@@ -116,6 +139,14 @@ def search_organizations(
                 "state": r[5],
                 "city": r[6],
                 "industry": r[7],
+                "intent_score": float(r[8]) if r[8] is not None else 0.0,
+                "intent_strength": r[9] or "NONE",
+                "intent_topics": r[10] or [],
+                "tech_categories": r[11] or [],
+                "primary_crm": r[12],
+                "primary_cloud": r[13],
+                "recent_hiring_velocity": r[14] or 0,
+                "company_scoops": r[15] or [],
             })
 
         response.headers["X-Search-Engine"] = "PostgreSQL-Fallback"
@@ -139,18 +170,24 @@ def search_organizations(
 @router.get("/autocomplete")
 def autocomplete_organizations(
     response: Response,
-    prefix: str = Query(..., min_length=2, description="Prefix characters to match"),
+    prefix: Optional[str] = Query(None, description="Prefix characters to match"),
+    q: Optional[str] = Query(None, description="Alternative prefix alias"),
+    query: Optional[str] = Query(None, description="Alternative prefix alias"),
     limit: int = Query(10, ge=1, le=25),
     current_user: UserPrincipal = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Fast edge n-gram autocomplete proxy with OpenSearch and PostgreSQL fallback."""
+    search_prefix = (prefix or q or query or "").strip()
+    if len(search_prefix) < 1:
+        return {"prefix": "", "source": "Empty", "suggestions": []}
+
     # 1. Primary: OpenSearch prefix edge n-gram
     try:
-        suggestions = opensearch_client.autocomplete(prefix=prefix, limit=limit)
+        suggestions = opensearch_client.autocomplete(prefix=search_prefix, limit=limit)
         if suggestions:
             response.headers["X-Search-Engine"] = "OpenSearch-2.x"
             return {
-                "prefix": prefix,
+                "prefix": search_prefix,
                 "source": "OpenSearch-2.x",
                 "suggestions": suggestions,
             }
@@ -169,7 +206,7 @@ def autocomplete_organizations(
                     SELECT name, domain FROM companies
                     WHERE name ILIKE %s OR domain ILIKE %s
                     LIMIT %s
-                """, (f"{prefix}%", f"{prefix}%", limit))
+                """, (f"{search_prefix}%", f"{search_prefix}%", limit))
                 rows = cur.fetchall()
                 if rows:
                     suggestions = [{"name": r[0], "domain": r[1]} for r in rows]
@@ -187,13 +224,13 @@ def autocomplete_organizations(
     # 3. Fallback: Edge mock suggestions
     if not suggestions:
         suggestions = [
-            {"name": f"{prefix.upper()} CORP", "domain": f"{prefix.lower()}.com"},
-            {"name": f"{prefix.upper()} INDUSTRIES", "domain": f"{prefix.lower()}-ind.com"},
+            {"name": f"{search_prefix.upper()} CORP", "domain": f"{search_prefix.lower()}.com"},
+            {"name": f"{search_prefix.upper()} INDUSTRIES", "domain": f"{search_prefix.lower()}-ind.com"},
         ][:limit]
 
     response.headers["X-Search-Engine"] = "PostgreSQL-Fallback"
     return {
-        "prefix": prefix,
+        "prefix": search_prefix,
         "source": "PostgreSQL-Fallback",
         "suggestions": suggestions,
     }

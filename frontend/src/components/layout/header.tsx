@@ -19,12 +19,14 @@ import { cn } from "@/lib/utils";
 
 const LABELS: Record<string, string> = {
   dashboard:      "Dashboard",
+  companies:      "Company Data",
+  company:        "Company Intelligence",
+  people:         "People Data",
   orchestration:  "Temporal Orchestration",
   pipeline:       "Pipeline & DLQ",
   search:         "Live Discovery",
   leads:          "US Leads",
   mexico:         "MX Leads",
-  analytics:      "AI Query",
   autonomy:       "Autonomy Planner",
   "map-extraction": "Map Extraction",
   duplicates:     "Duplicates",
@@ -33,6 +35,8 @@ const LABELS: Record<string, string> = {
   org:            "Organization Profile",
   "ai-keys":      "AI Keys",
   settings:       "Settings",
+  chat:           "AI Chatbot & Search Engine",
+  reviews:        "Review Queue",
 };
 
 function Breadcrumb() {
@@ -42,15 +46,16 @@ function Breadcrumb() {
   if (!parts.length) return null;
 
   return (
-    <nav className="flex items-center gap-1 text-[13px]">
+    <nav className="flex items-center gap-1.5 text-[13px] pl-1 sm:pl-2">
       {parts.map((part, i) => {
         const isLast  = i === parts.length - 1;
         const label   = LABELS[part] ?? part.charAt(0).toUpperCase() + part.slice(1);
         return (
-          <span key={i} className="flex items-center gap-1">
-            {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground/40" />}
+          <span key={i} className="flex items-center gap-1.5">
+            {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />}
             <span className={cn(
-              isLast ? "font-medium text-foreground" : "text-muted-foreground"
+              "tracking-tight",
+              isLast ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground transition-colors"
             )}>
               {label}
             </span>
@@ -75,7 +80,7 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="h-[52px] border-b border-border flex items-center gap-4 px-4 sm:px-5 bg-background flex-shrink-0 sticky top-0 z-30">
+    <header className="h-[52px] border-b border-border flex items-center gap-4 px-4 sm:px-6 lg:px-8 bg-card/95 backdrop-blur-xs flex-shrink-0 sticky top-0 z-20 shadow-2xs">
 
       {/* Mobile hamburger - isolated from desktop portal layer */}
       <div className="md:hidden">

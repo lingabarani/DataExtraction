@@ -975,17 +975,24 @@ async def evaluate_working_governance_activity(config: Any = None, *args) -> dic
                         approved += 1
                     else:
                         quarantined += 1
-                        try:
-                            enqueue_dead_letter(
-                                conn=conn,
-                                source_name="GOVERNANCE_CERTIFICATION_GATE",
-                                entity_type="working_organization",
-                                raw_payload=org_dict,
-                                error_reason=f"QUARANTINED_GOVERNANCE_GATE: {q_reason}",
-                                run_id="agent5_governance",
-                            )
-                        except Exception as dlq_err:
-                            activity.logger.debug("DLQ enqueue notice: %s", dlq_err)
+                        # Enterprise Pipeline Resilience:
+                        # Only enqueue into the Dead-Letter Queue if the entity is actively suppressed
+                        # by compliance/sanctions (OFAC, CCPA suppression, bad domain) or suffers fatal corruption.
+                        # Normal uncertified POIs remain in working_organizations staging buffer for downstream
+                        # enrichment (Agent 4 / Agent 8 / Agent 7) rather than flooding the DLQ and halting jobs.
+                        is_suppressed = eval_res.get("is_suppressed", False)
+                        if is_suppressed:
+                            try:
+                                enqueue_dead_letter(
+                                    conn=conn,
+                                    source_name="GOVERNANCE_CERTIFICATION_GATE",
+                                    entity_type="working_organization",
+                                    raw_payload=org_dict,
+                                    error_reason=f"COMPLIANCE_SUPPRESSED: {q_reason}",
+                                    run_id="agent5_governance",
+                                )
+                            except Exception as dlq_err:
+                                activity.logger.debug("DLQ enqueue notice: %s", dlq_err)
 
                     evaluated += 1
 
@@ -1061,7 +1068,6 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                         WHERE governance_status = 'APPROVED'
                           AND data_quality_score >= %s
                           AND trust_score >= %s
-                          AND org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                           AND (%s::text IS NULL OR org_id = %s::text)
                         ORDER BY org_id ASC
                         LIMIT %s
@@ -1079,7 +1085,10 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                             created_at, updated_at
                         )
                         SELECT
-                            w.org_id::uuid,
+                            CASE 
+                                WHEN w.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN w.org_id::uuid
+                                ELSE md5(w.org_id)::uuid
+                            END,
                             CASE 
                                 WHEN UPPER(w.jurisdiction) IN ('US', 'MX', 'CA', 'GLOBAL') THEN UPPER(w.jurisdiction)::kg_core.jurisdiction_code
                                 ELSE 'US'::kg_core.jurisdiction_code
@@ -1132,8 +1141,8 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                     )
                     UPDATE staging_dataextraction.working_organizations w
                     SET governance_status = 'PROMOTED', updated_at = NOW()
-                    FROM promoted p
-                    WHERE w.org_id = p.org_id::text;
+                    FROM locked_batch b
+                    WHERE w.org_id = b.org_id;
                 """, (min_quality, min_trust, target_org_id, target_org_id, batch_size, init_freshness, str(revalidation_days), init_freshness, str(revalidation_days)))
                 promoted_orgs = cur.rowcount
 
@@ -1148,8 +1157,14 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                             created_at, updated_at
                         )
                         SELECT
-                            wp.person_id::uuid,
-                            wp.org_id::uuid,
+                            CASE 
+                                WHEN wp.person_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN wp.person_id::uuid
+                                ELSE md5(wp.person_id)::uuid
+                            END,
+                            CASE 
+                                WHEN wp.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN wp.org_id::uuid
+                                ELSE md5(wp.org_id)::uuid
+                            END,
                             wp.full_name,
                             wp.first_name,
                             wp.last_name,
@@ -1170,7 +1185,6 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                         JOIN staging_dataextraction.working_organizations wo ON wp.org_id = wo.org_id
                         WHERE wo.governance_status = 'PROMOTED'
                           AND wp.governance_status != 'PROMOTED'
-                          AND wp.person_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                         ON CONFLICT (person_id) DO UPDATE SET
                             full_name = EXCLUDED.full_name,
                             current_primary_title = COALESCE(EXCLUDED.current_primary_title, master_dataextraction.persons.current_primary_title),
@@ -1187,7 +1201,8 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                     UPDATE staging_dataextraction.working_persons wp
                     SET governance_status = 'PROMOTED'
                     FROM promoted_persons_cte pp
-                    WHERE wp.person_id = pp.person_id::text;
+                    WHERE wp.person_id = pp.person_id::text
+                       OR md5(wp.person_id)::uuid = pp.person_id;
                 """, (str(revalidation_days), str(revalidation_days)))
                 promoted_persons = cur.rowcount
 
@@ -1202,7 +1217,10 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                         gen_random_uuid(),
                         we.email_address,
                         we.email_domain,
-                        we.org_id::uuid,
+                        CASE 
+                            WHEN we.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN we.org_id::uuid
+                            ELSE md5(we.org_id)::uuid
+                        END,
                         'work_direct'::kg_core.email_type,
                         CASE 
                             WHEN UPPER(we.deliverability_status) IN ('DELIVERABLE', 'VERIFIED_DELIVERABLE') THEN 'verified_deliverable'::kg_core.deliverability_status
@@ -1220,7 +1238,6 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                     FROM staging_dataextraction.working_emails we
                     JOIN staging_dataextraction.working_organizations wo ON we.org_id = wo.org_id
                     WHERE wo.governance_status = 'PROMOTED'
-                      AND we.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                     ON CONFLICT (email_address) DO UPDATE SET
                         org_id = COALESCE(master_dataextraction.contact_emails.org_id, EXCLUDED.org_id),
                         deliverability_status = EXCLUDED.deliverability_status,

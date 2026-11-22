@@ -77,7 +77,11 @@ export function AiKeysPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void load();
+    });
+    return () => { active = false; };
   }, [load]);
 
   async function addKey(e: React.FormEvent) {

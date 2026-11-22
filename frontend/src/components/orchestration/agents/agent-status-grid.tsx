@@ -51,6 +51,14 @@ const DEFAULT_AGENTS: DefaultAgentConfig[] = [
     icon: Globe2,
   },
   {
+    id: "agent_8",
+    agentNum: 8,
+    name: "Agent 8: Website Intelligence",
+    role: "SSRF/SSL Crawler, Tech Stack & Evidence Audit",
+    queueName: "website-intelligence",
+    icon: Globe2,
+  },
+  {
     id: "agent_3",
     agentNum: 3,
     name: "Agent 3: Identity Resolution",

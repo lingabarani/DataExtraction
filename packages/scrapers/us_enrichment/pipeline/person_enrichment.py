@@ -190,13 +190,9 @@ class USPersonEnrichmentEngine:
                 seen_names.add(name)
                 unique_candidates.append(c)
 
-        # Fallback to key C-Suite roles if no explicit filing candidates exist
-        if not unique_candidates and (domain or company.legal_name):
-            comp_clean = (company.legal_name or "Company").title()
-            unique_candidates = [
-                {"name": f"Executive Lead", "title": "Chief Executive Officer (CEO)", "phone": company.phone},
-                {"name": f"Finance Lead", "title": "Chief Financial Officer (CFO)", "phone": company.phone},
-            ]
+        # Strict zero-synthesis: do not invent fake executives if no candidates exist in filings
+        if not unique_candidates:
+            return []
 
         # Mail provider detection
         mail_provider = detect_mail_provider(domain or "") if domain else "UNKNOWN"

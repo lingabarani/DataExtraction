@@ -14,7 +14,7 @@ export default function USLeadsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">US Leads</h1>
           <p className="text-muted-foreground text-sm">
-            906,579+ records — CMS NPI, SEC EDGAR, FDIC, USASpending, ProPublica
+            Enterprise Master Vault — Verified Corporate Entities, Decision-Makers &amp; Deliverable Contacts
           </p>
         </div>
       </div>

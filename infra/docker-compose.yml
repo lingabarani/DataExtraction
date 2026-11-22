@@ -27,9 +27,9 @@ volumes:
 
 services:
 
-  # ── PostgreSQL 15 + PostGIS ──────────────────────────────────────────────
+  # ── PostgreSQL 16 + PostGIS ──────────────────────────────────────────────
   postgres:
-    image: postgis/postgis:15-3.4
+    image: postgis/postgis:16-3.4
     container_name: dex-postgres
     restart: unless-stopped
     environment:
@@ -520,6 +520,32 @@ services:
       - POSTGRES_HOST=postgres
       - WORKER_TYPE=email_enrichment
     command: ["python", "-m", "packages.temporal.workers.worker_email_enrichment"]
+    volumes:
+      - ../packages:/app/packages
+    networks:
+      - dataextraction
+
+  # ── Temporal Worker: Agent 8 — Website Intelligence & Candidate Resolution ─
+  worker-website-intelligence:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: dex-worker-website-intelligence
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+      temporal-namespace-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - WORKER_TYPE=website_intelligence
+    command: ["python", "-m", "packages.temporal.workers.worker_website_intelligence"]
     volumes:
       - ../packages:/app/packages
     networks:

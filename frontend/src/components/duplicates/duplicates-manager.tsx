@@ -257,7 +257,13 @@ export function DuplicatesManager() {
     }
   }, []);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void fetchStats();
+    });
+    return () => { active = false; };
+  }, [fetchStats]);
 
   // ── Clean duplicates ──────────────────────────────────────────────────────
   const handleClean = async (checkKey: string, table: "us_leads" | "mexico_leads") => {

@@ -5,6 +5,8 @@ Applies `001_knowledge_graph_schema.sql` to PostgreSQL 16/18.
 Sets up schemas, enums, declarative partitions, indexes, and tables.
 """
 
+import hashlib
+import time
 import os
 import sys
 from pathlib import Path
@@ -16,8 +18,10 @@ if hasattr(sys.stderr, "reconfigure"):
 
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(REPO_ROOT / ".env")
 MIGRATIONS_DIR = REPO_ROOT / "packages" / "infrastructure" / "migrations"
 
 DB_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
@@ -97,12 +101,82 @@ def apply_migration():
     conn.autocommit = True
     cur = conn.cursor()
 
+    # Ensure ops_dataextraction schema and schema_migrations tracking table exist
+    cur.execute("CREATE SCHEMA IF NOT EXISTS ops_dataextraction;")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ops_dataextraction.schema_migrations (
+            migration_name VARCHAR(255) PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            checksum VARCHAR(64) NOT NULL,
+            execution_time_ms INTEGER NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS'
+        );
+    """)
+
+    # Query currently applied migrations
+    cur.execute("SELECT migration_name, checksum FROM ops_dataextraction.schema_migrations WHERE status = 'SUCCESS';")
+    applied_migrations = dict(cur.fetchall())
+
+    # If this is an existing database being upgraded to schema version tracking,
+    # auto-baseline migrations that are already present in the database.
+    if not applied_migrations:
+        cur.execute("""
+            SELECT count(*) FROM information_schema.tables 
+            WHERE table_schema = 'master_dataextraction' AND table_name = 'organizations';
+        """)
+        has_existing_schema = cur.fetchone()[0] > 0
+        if has_existing_schema:
+            print("==> Existing schema detected. Baselining existing migrations in ops_dataextraction.schema_migrations...")
+            for m_file in migration_files:
+                sql_script = m_file.read_text(encoding="utf-8")
+                checksum = hashlib.sha256(sql_script.encode("utf-8")).hexdigest()
+                cur.execute("""
+                    INSERT INTO ops_dataextraction.schema_migrations (migration_name, checksum, execution_time_ms, status)
+                    VALUES (%s, %s, 0, 'SUCCESS')
+                    ON CONFLICT (migration_name) DO NOTHING;
+                """, (m_file.name, checksum))
+                print(f"  📌 [BASELINED] {m_file.name} (checksum: {checksum[:8]}...)")
+            cur.execute("SELECT migration_name, checksum FROM ops_dataextraction.schema_migrations WHERE status = 'SUCCESS';")
+            applied_migrations = dict(cur.fetchall())
+            print(f"✅ Successfully baselined {len(applied_migrations)} migrations.")
+
+    conn.autocommit = False  # Enforce transactional execution for each migration file
+
+    applied_count = 0
+    skipped_count = 0
+
     for m_file in migration_files:
-        print(f"\n==> Reading migration: {m_file.name} ({m_file.stat().st_size} bytes)")
         sql_script = m_file.read_text(encoding="utf-8")
-        print(f"==> Executing {m_file.name} DDL statements...")
-        cur.execute(sql_script)
-        print(f"✅ {m_file.name} executed successfully.")
+        checksum = hashlib.sha256(sql_script.encode("utf-8")).hexdigest()
+
+        if m_file.name in applied_migrations:
+            print(f"  ⏭️ [SKIPPED] {m_file.name} (already applied with checksum {checksum[:8]}...)")
+            skipped_count += 1
+            continue
+
+        print(f"\n==> Applying migration: {m_file.name} ({m_file.stat().st_size} bytes)")
+        start_time = time.monotonic()
+        try:
+            cur.execute(sql_script)
+            exec_time_ms = int((time.monotonic() - start_time) * 1000)
+            cur.execute("""
+                INSERT INTO ops_dataextraction.schema_migrations (migration_name, checksum, execution_time_ms, status)
+                VALUES (%s, %s, %s, 'SUCCESS')
+                ON CONFLICT (migration_name) DO UPDATE
+                SET applied_at = clock_timestamp(), checksum = EXCLUDED.checksum, execution_time_ms = EXCLUDED.execution_time_ms, status = 'SUCCESS';
+            """, (m_file.name, checksum, exec_time_ms))
+            conn.commit()
+            applied_count += 1
+            print(f"✅ {m_file.name} executed and recorded in {exec_time_ms}ms.")
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ Failed to execute {m_file.name}: {e}")
+            cur.close()
+            conn.close()
+            sys.exit(1)
+
+    print(f"\nMigration Run Complete: {applied_count} applied, {skipped_count} skipped.")
+    conn.autocommit = True
 
     # Verification Query
     print("\n" + "=" * 70)

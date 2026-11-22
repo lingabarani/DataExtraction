@@ -12,6 +12,7 @@ Validates:
 
 import asyncio
 import json
+import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -28,11 +29,19 @@ class TestEntityResolutionAdjudicator(unittest.IsolatedAsyncioTestCase):
     """Test suite for Agent 3 Entity Resolution Semantic Adjudicator."""
 
     async def asyncSetUp(self):
+        self.original_llm_provider = os.environ.get("LLM_PROVIDER")
+        os.environ["LLM_PROVIDER"] = "ollama"
         self.resolver = LLMEntityResolver(config={
             "entity_adjudication_enabled": True,
             "entity_adjudication_timeout": 2.0,
             "batch_concurrency": 3,
         })
+
+    async def asyncTearDown(self):
+        if self.original_llm_provider is not None:
+            os.environ["LLM_PROVIDER"] = self.original_llm_provider
+        else:
+            os.environ.pop("LLM_PROVIDER", None)
 
     def test_statutory_precedence_matching_ein(self):
         """Verifies deterministic merge when statutory EINs match identically."""

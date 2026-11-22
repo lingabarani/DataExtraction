@@ -60,6 +60,7 @@ class OllamaClient:
 
         # Shared client instance
         self._client: Optional[httpx.AsyncClient] = None
+        self._semaphore: asyncio.Semaphore = asyncio.Semaphore(2)
 
     async def get_http_client(self) -> httpx.AsyncClient:
         """Returns or initializes the shared, connection-pooled httpx.AsyncClient."""
@@ -223,7 +224,8 @@ class OllamaClient:
         prompt: str,
         system: Optional[str] = None,
         timeout: Optional[float] = None,
-        temperature: float = 0.1,
+        temperature: float = 0.0,
+        num_ctx: int = 2048,
     ) -> Optional[Dict[str, Any]]:
         """
         Executes a prompt against the Ollama model with strict JSON formatting.
@@ -233,7 +235,8 @@ class OllamaClient:
             prompt: User-provided text prompt.
             system: Optional system instructions/schema guidelines.
             timeout: Optional SLA timeout override (seconds).
-            temperature: Sampling temperature (default 0.1 for deterministic extraction).
+            temperature: Sampling temperature (default 0.0 for deterministic extraction).
+            num_ctx: Context window size (default 2048).
 
         Returns:
             Parsed JSON dictionary, or None if the request failed or circuit breaker is open.
@@ -252,16 +255,18 @@ class OllamaClient:
             "keep_alive": self.keep_alive,
             "options": {
                 "temperature": temperature,
-                "num_predict": 256,
+                "num_ctx": num_ctx,
+                "num_predict": 512,
             },
         }
         if system:
             payload["system"] = system
 
         try:
-            client = await self.get_http_client()
-            resp = await client.post("/api/generate", json=payload, timeout=req_timeout)
-            resp.raise_for_status()
+            async with self._semaphore:
+                client = await self.get_http_client()
+                resp = await client.post("/api/generate", json=payload, timeout=req_timeout)
+                resp.raise_for_status()
 
             duration_ms = (time.time() - t0) * 1000
             data = resp.json()

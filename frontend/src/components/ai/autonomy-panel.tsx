@@ -70,7 +70,11 @@ export function AutonomyPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void load();
+    });
+    return () => { active = false; };
   }, [load]);
 
   async function runNow() {

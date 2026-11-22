@@ -40,11 +40,14 @@ class CleanRequest(BaseModel):
 # ── Analysis Helpers ──────────────────────────────────────────────────────────
 
 def _count_dup_email(cur, table: str) -> tuple[int, int, list]:
+    target = "master_dataextraction.persons" if table == "us_leads" else f'"{table}"'
+    col = "primary_email" if table == "us_leads" else "email"
+    src_expr = "'MDM_GOLDEN_RECORD'" if table == "us_leads" else "api_source"
     cur.execute(f"""
-        SELECT email, COUNT(1) AS cnt, ARRAY_AGG(DISTINCT api_source) AS srcs
-        FROM "{table}"
-        WHERE email IS NOT NULL AND email != ''
-        GROUP BY email HAVING COUNT(1) > 1
+        SELECT {col}, COUNT(1) AS cnt, ARRAY_AGG(DISTINCT {src_expr}) AS srcs
+        FROM {target}
+        WHERE {col} IS NOT NULL AND {col} != ''
+        GROUP BY {col} HAVING COUNT(1) > 1
         ORDER BY cnt DESC LIMIT 5
     """)
     rows = cur.fetchall()
@@ -52,9 +55,9 @@ def _count_dup_email(cur, table: str) -> tuple[int, int, list]:
 
     cur.execute(f"""
         SELECT COUNT(1) FROM (
-            SELECT email FROM "{table}"
-            WHERE email IS NOT NULL AND email != ''
-            GROUP BY email HAVING COUNT(1) > 1
+            SELECT {col} FROM {target}
+            WHERE {col} IS NOT NULL AND {col} != ''
+            GROUP BY {col} HAVING COUNT(1) > 1
             LIMIT 5000
         ) t
     """)
@@ -67,11 +70,14 @@ def _count_dup_email(cur, table: str) -> tuple[int, int, list]:
 
 
 def _count_dup_phone(cur, table: str) -> tuple[int, int, list]:
+    target = "master_dataextraction.persons" if table == "us_leads" else f'"{table}"'
+    col = "primary_phone_e164" if table == "us_leads" else "phone"
+    src_expr = "'MDM_GOLDEN_RECORD'" if table == "us_leads" else "api_source"
     cur.execute(f"""
-        SELECT phone, COUNT(1) AS cnt, ARRAY_AGG(DISTINCT api_source) AS srcs
-        FROM "{table}"
-        WHERE phone IS NOT NULL AND phone != ''
-        GROUP BY phone HAVING COUNT(1) > 1
+        SELECT {col}, COUNT(1) AS cnt, ARRAY_AGG(DISTINCT {src_expr}) AS srcs
+        FROM {target}
+        WHERE {col} IS NOT NULL AND {col} != ''
+        GROUP BY {col} HAVING COUNT(1) > 1
         ORDER BY cnt DESC LIMIT 5
     """)
     rows = cur.fetchall()
@@ -79,9 +85,9 @@ def _count_dup_phone(cur, table: str) -> tuple[int, int, list]:
 
     cur.execute(f"""
         SELECT COUNT(1) FROM (
-            SELECT phone FROM "{table}"
-            WHERE phone IS NOT NULL AND phone != ''
-            GROUP BY phone HAVING COUNT(1) > 1
+            SELECT {col} FROM {target}
+            WHERE {col} IS NOT NULL AND {col} != ''
+            GROUP BY {col} HAVING COUNT(1) > 1
             LIMIT 5000
         ) t
     """)
@@ -133,8 +139,9 @@ def _count_cross_source(cur, table: str) -> tuple[int, int, list]:
         return 0, 0, []
 
 
-# ── GET /api/duplicates/analyse ───────────────────────────────────────────────
+# ── GET /api/duplicates & /api/duplicates/analyse ──────────────────────────────
 
+@router.get("/duplicates")
 @router.get("/duplicates/analyse")
 def analyse_duplicates(user: UserPrincipal = Depends(get_current_user)):
     """Analyzes duplicate concentrations across US and Mexico lead datasets."""
@@ -170,7 +177,7 @@ def analyse_duplicates(user: UserPrincipal = Depends(get_current_user)):
                     "sample": sample,
                 })
 
-        cur.execute('SELECT COUNT(1) FROM "us_leads"')
+        cur.execute('SELECT COUNT(1) FROM master_dataextraction.persons')
         us_total = cur.fetchone()[0]
         if not us_total or us_total == 0:
             try:

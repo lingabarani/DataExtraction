@@ -72,6 +72,15 @@ class ChatIntent(BaseModel):
     is_follow_up: bool = False
     explanation: str = ""
     confidence: int = 85
+    # Apollo.io Enterprise Filters
+    seniority_levels: List[str] = Field(default_factory=list)
+    departments: List[str] = Field(default_factory=list)
+    has_verified_email: Optional[bool] = None
+    has_phone: Optional[bool] = None
+    employee_band: Optional[str] = None
+    revenue_band: Optional[str] = None
+    technologies: List[str] = Field(default_factory=list)
+    min_quality_score: Optional[int] = None
 
 
 class ChatSessionCreate(BaseModel):

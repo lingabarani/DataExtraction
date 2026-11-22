@@ -96,8 +96,9 @@ async def run_website_candidate_resolution_activity(
             # Gather candidates from staging_companies across both Agent 1 and Agent 2
             cur.execute(
                 """
-                SELECT id, name, website, phone, email, address, city, state, zip_code,
-                       source, raw_payload->>'cid' as cid
+                SELECT id, name, website, phone, email,
+                       COALESCE(raw_payload->>'formatted_address', raw_payload->>'address', '') as address,
+                       city, state, zip_code, source, raw_payload->>'cid' as cid
                 FROM staging_dataextraction.staging_companies
                 WHERE website IS NOT NULL
                   AND LENGTH(TRIM(website)) > 3

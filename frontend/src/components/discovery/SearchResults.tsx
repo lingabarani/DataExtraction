@@ -45,7 +45,9 @@ export function SearchResults(props: SearchResultsProps) {
   const [view, setView] = useState<"cards" | "table">("cards");
   const [visible, setVisible] = useState(PAGE);
 
-  useEffect(() => setVisible(PAGE), [text, needs, sort]);
+  useEffect(() => {
+    void Promise.resolve().then(() => setVisible(PAGE));
+  }, [text, needs, sort]);
 
   // Only offer filters that at least one result can satisfy
   const availableNeeds = useMemo(() => NEEDS.filter((n) => cards.some(n.test)), [cards]);

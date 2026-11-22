@@ -297,9 +297,7 @@ async def get_person(person_id: str, current_user: UserPrincipal = Depends(get_c
     return found
 
 
-@router.api_route("/search/{search_id}/export", methods=["GET", "POST"], summary="Export a finished search as CSV or JSONL")
-async def export_search_results(search_id: str, format: str = Query("jsonl", pattern="^(csv|jsonl)$"),
-                                current_user: UserPrincipal = Depends(get_current_user)) -> StreamingResponse:
+async def _do_export_search_results(search_id: str, format: str) -> StreamingResponse:
     search_id = _valid_uuid(search_id)
     session = _active_searches.get(search_id)
     run = (session or {}).get("answer") or await asyncio.to_thread(get_search_run, search_id)
@@ -336,6 +334,18 @@ async def export_search_results(search_id: str, format: str = Query("jsonl", pat
 
     return StreamingResponse(lines(), media_type="application/x-ndjson",
                              headers={"Content-Disposition": f"attachment; filename=discovery_{search_id[:8]}.jsonl"})
+
+
+@router.get("/search/{search_id}/export", summary="Export a finished search as CSV or JSONL (GET)", operation_id="export_search_results_get")
+async def export_search_results_get(search_id: str, format: str = Query("jsonl", pattern="^(csv|jsonl)$"),
+                                    current_user: UserPrincipal = Depends(get_current_user)) -> StreamingResponse:
+    return await _do_export_search_results(search_id, format)
+
+
+@router.post("/search/{search_id}/export", summary="Export a finished search as CSV or JSONL (POST)", operation_id="export_search_results_post")
+async def export_search_results_post(search_id: str, format: str = Query("jsonl", pattern="^(csv|jsonl)$"),
+                                     current_user: UserPrincipal = Depends(get_current_user)) -> StreamingResponse:
+    return await _do_export_search_results(search_id, format)
 
 
 @router.get("/sources/status", summary="Discovery source health (admin)")

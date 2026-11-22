@@ -159,13 +159,15 @@ def bootstrap():
             except Exception as e:
                 logger.warning("Notice on %s: %s", apply_module, e)
 
-        # Phase 6: AI Stack, Deep Places, Discovery & Agent 8 Website Intelligence (015-019)
+        # Phase 6: AI Stack, Deep Places, Discovery & Agent 8 Website Intelligence (015-021)
         for m_name in [
             "015_secrets_llm_planner.sql",
             "016_place_deep_data.sql",
             "017_discovery_schema.sql",
             "018_discovery_answer_store.sql",
             "019_website_intelligence.sql",
+            "020_b2b_chatbot_schema.sql",
+            "021_b2b_intelligence_extensions.sql",
         ]:
             sql_file = MIGRATIONS_DIR / m_name
             try:
@@ -189,7 +191,7 @@ def bootstrap():
                 WHERE table_schema IN (
                     'master_dataextraction', 'staging_dataextraction', 'identity_resolution',
                     'raw_dataextraction', 'search_dataextraction', 'discovery_dataextraction',
-                    'ops_dataextraction', 'public'
+                    'chat_dataextraction', 'ops_dataextraction', 'public'
                 )
                 GROUP BY table_schema
                 ORDER BY table_schema;

@@ -258,9 +258,17 @@ export function OrchestrationCommandCenter() {
 
   // Initial load
   useEffect(() => {
-    fetchHeaderStatus();
-    const interval = setInterval(fetchHeaderStatus, 15000);
-    return () => clearInterval(interval);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void fetchHeaderStatus();
+    });
+    const interval = setInterval(() => {
+      if (active) void fetchHeaderStatus();
+    }, 15000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [fetchHeaderStatus]);
 
   // ── Start Workflow Handler ────────────────────────────────────────────────
