@@ -19,6 +19,7 @@ import { useLead } from "@/hooks/use-leads";
 import type { Lead } from "@/hooks/use-leads";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ContextualChatDrawer } from "./contextual-chat-drawer";
 
 // ── Motion variants ───────────────────────────────────────────────────────────
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -124,6 +125,7 @@ export function LeadDetail({ id, table = "us_leads" }: {
   const { lead, loading, error } = useLead(id, table);
   const [activeTab, setActiveTab] = useState("overview");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const handleCopy = (val: string, key: string, label: string) => {
     copyToClipboard(val, label);
@@ -225,7 +227,7 @@ export function LeadDetail({ id, table = "us_leads" }: {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => toast.info("Opening AI Chatbot with person context")}
+              onClick={() => setIsChatOpen(true)}
               className="h-8 gap-2 text-xs font-medium text-foreground hover:bg-muted"
             >
               <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-[10px] text-white font-bold">
@@ -634,6 +636,13 @@ export function LeadDetail({ id, table = "us_leads" }: {
           </Card>
         </motion.div>
       </div>
+
+      <ContextualChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        companyName={lead?.company_name || undefined}
+        domain={lead?.domain || undefined}
+      />
     </motion.div>
   );
 }

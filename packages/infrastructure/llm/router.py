@@ -44,11 +44,12 @@ def _build(name: str) -> LLMProvider:
 def configured_chain() -> List[str]:
     primary = os.getenv("LLM_PROVIDER", "groq").strip().lower()
     chain = [primary]
-    for item in os.getenv("LLM_FALLBACK_CHAIN", "").split(","):
+    fallback_raw = os.getenv("LLM_FALLBACK_CHAIN", "ollama")
+    for item in fallback_raw.split(","):
         name = item.strip().lower()
         if name and name not in chain:
             chain.append(name)
-    return [n for n in chain if n in KNOWN_PROVIDERS] or ["groq"]
+    return [n for n in chain if n in KNOWN_PROVIDERS] or ["groq", "ollama"]
 
 
 class RoutedLLM(LLMProvider):

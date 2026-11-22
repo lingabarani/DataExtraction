@@ -13,11 +13,12 @@ import {
   Building2, ExternalLink, Calendar, Hash, Sparkles,
   Tag, ChevronDown, Clock, FileText, CheckSquare,
   Send, MessageSquare, History, Layers, CheckCircle2,
-  ChevronRight, Quote, Check, RefreshCw,
+  ChevronRight, Quote, Check, RefreshCw, Radar,
   Lock, AlertTriangle, Users, Star, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import { useCompanyIntelligence } from "@/hooks/use-leads";
 import type { CompanyIntelligence } from "@/hooks/use-leads";
+import { ContextualChatDrawer } from "./contextual-chat-drawer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -52,10 +53,13 @@ export function CompanyDetail({
   domain?: string | null;
   table?: "us_leads" | "mexico_leads";
 }) {
-  const { intel, loading, error, refresh } = useCompanyIntelligence(companyId, domain, table);
+  const { intel, loading, error, refresh, crawl, crawlAll } = useCompanyIntelligence(companyId, domain, table);
   const [activeTab, setActiveTab] = useState("overview");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCrawling, setIsCrawling] = useState(false);
+  const [isOverallCrawling, setIsOverallCrawling] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const handleCopy = (val: string, key: string, label: string) => {
     copyToClipboard(val, label);
@@ -69,6 +73,32 @@ export function CompanyDetail({
     await refresh();
     setIsRefreshing(false);
     toast.success("Intelligence updated with live SSL & registry data");
+  };
+
+  const handleLiveDeepCrawl = async () => {
+    setIsCrawling(true);
+    toast.info("Connecting to live website and scraping verified About summary...");
+    try {
+      await crawl();
+      toast.success("Live crawl completed: verified About profile updated in database!");
+    } catch (e: any) {
+      toast.error(e?.message || "Live crawl failed to reach target domain.");
+    } finally {
+      setIsCrawling(false);
+    }
+  };
+
+  const handleOverallCrawl = async () => {
+    setIsOverallCrawling(true);
+    toast.info("Dispatching multi-source crawlers (Website + Google Maps RPC + SERP + DNS)...");
+    try {
+      await crawlAll();
+      toast.success("Overall multi-source crawl finished: all intelligence updated!");
+    } catch (e: any) {
+      toast.error(e?.message || "Multi-source crawl encountered an error.");
+    } finally {
+      setIsOverallCrawling(false);
+    }
   };
 
   const backHref = table === "mexico_leads" ? "/leads/mexico" : "/leads";
@@ -150,7 +180,7 @@ export function CompanyDetail({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => toast.info("Opening AI Chatbot with company context")}
+              onClick={() => setIsChatOpen(true)}
               className="h-8 gap-2 text-xs font-medium text-foreground hover:bg-muted"
             >
               <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-[10px] text-white font-bold">
@@ -161,8 +191,18 @@ export function CompanyDetail({
             <Button
               variant="outline"
               size="sm"
+              onClick={handleOverallCrawl}
+              disabled={isOverallCrawling || isCrawling || isRefreshing}
+              className="h-8 gap-1.5 text-xs font-medium bg-card hover:bg-muted border-border/80 text-foreground"
+            >
+              <Radar className={cn("w-3.5 h-3.5 text-indigo-500", isOverallCrawling && "animate-spin")} />
+              <span>Overall Deep Crawl</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleRefresh}
-              disabled={isRefreshing}
+              disabled={isRefreshing || isCrawling || isOverallCrawling}
               className="h-8 gap-1.5 text-xs font-medium bg-card hover:bg-muted border-border/80"
             >
               <RefreshCw className={cn("w-3.5 h-3.5 text-primary", isRefreshing && "animate-spin")} />
@@ -457,7 +497,19 @@ export function CompanyDetail({
 
                 {/* About block */}
                 <div className="pt-2 border-t border-border/40">
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">About</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">About</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLiveDeepCrawl}
+                      disabled={isCrawling || isRefreshing}
+                      className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <RefreshCw className={cn("w-2.5 h-2.5 text-primary", isCrawling && "animate-spin")} />
+                      <span>{intel.overview ? "Re-crawl website" : "Run Live Deep Crawl"}</span>
+                    </Button>
+                  </div>
                   {intel.overview ? (
                     <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-line">
                       {intel.overview}
@@ -470,11 +522,11 @@ export function CompanyDetail({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleRefresh}
-                        disabled={isRefreshing}
+                        onClick={handleLiveDeepCrawl}
+                        disabled={isCrawling || isRefreshing}
                         className="w-fit h-7 text-[11px] gap-1.5"
                       >
-                        <RefreshCw className={cn("w-3 h-3 text-primary", isRefreshing && "animate-spin")} />
+                        <RefreshCw className={cn("w-3 h-3 text-primary", isCrawling && "animate-spin")} />
                         <span>Run Live Deep Crawl</span>
                       </Button>
                     </div>
@@ -834,6 +886,15 @@ export function CompanyDetail({
           )}
         </motion.div>
       </div>
+
+      <ContextualChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        company={intel}
+        companyName={intel?.company_name}
+        companyId={companyId}
+        domain={intel?.domain}
+      />
     </motion.div>
   );
 }

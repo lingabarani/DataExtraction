@@ -269,14 +269,14 @@ def get_place_reviews(
     Supports dynamic fallback by domain or company name if place_id is not directly supplied.
     """
     default_res = {
-        "source": "Google Maps",
+        "source": "Google Maps Verified",
         "total_scraped": 0,
-        "average_rating": 4.5,
+        "average_rating": None,
         "ai_summary": {
-            "sentiment": "Mostly Positive",
-            "pros": ["Accurate deliverables", "Professional communication", "High technical depth"],
-            "cons": ["Enterprise onboarding timeline", "Custom exports require consultation"],
-            "summary": "Verified clients consistently commend the team's operational accuracy, responsiveness, and technical domain execution.",
+            "sentiment": "No Public Reviews",
+            "pros": [],
+            "cons": [],
+            "summary": "No verified Google Maps customer reviews recorded yet for this entity.",
         },
         "recent_reviews": [],
     }
@@ -406,9 +406,9 @@ def get_place_reviews(
         "average_rating": avg_rating,
         "ai_summary": {
             "sentiment": sentiment,
-            "pros": all_pros[:4] if all_pros else ["Prompt response times", "High service accuracy", "Professional team"],
-            "cons": all_cons[:3] if all_cons else ["Enterprise SLA scheduling", "Custom reporting onboarding"],
-            "summary": f"Based on {total_ratings} verified Google reviews, client sentiment is {sentiment.lower()} with an average score of {avg_rating}/5.0.",
+            "pros": all_pros[:4],
+            "cons": all_cons[:3],
+            "summary": f"Based on {total_ratings} verified Google reviews, client sentiment is {sentiment.lower()} with an average score of {avg_rating}/5.0." if total_ratings else "No verified Google Maps reviews recorded yet.",
         },
         "recent_reviews": reviews[:10],
     }

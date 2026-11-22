@@ -85,6 +85,7 @@ class ChatIntent(BaseModel):
 
 class ChatSessionCreate(BaseModel):
     title: Optional[str] = "New Conversation"
+    company_context: Optional[Dict[str, Any]] = None
 
 
 class ChatSessionResponse(BaseModel):
@@ -98,6 +99,7 @@ class ChatSessionResponse(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     content: str
+    company_context: Optional[Dict[str, Any]] = None
 
 
 class ChatMessageResponse(BaseModel):

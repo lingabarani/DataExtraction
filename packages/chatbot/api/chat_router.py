@@ -45,9 +45,11 @@ def create_session(
     user: UserPrincipal = Depends(get_current_user),
 ):
     """Creates a new persistent conversation session."""
+    initial_ctx = {"company_context": body.company_context} if body.company_context else {}
     sess = _chat_repo.create_session(
         user_id=user.id,
         title=body.title or "New Conversation",
+        context=initial_ctx,
     )
     return sess
 
@@ -114,6 +116,11 @@ async def send_message(
     if not sess:
         raise HTTPException(status_code=404, detail="Conversation session not found")
 
+    if body.company_context:
+        ctx = sess.get("context") or {}
+        ctx["company_context"] = body.company_context
+        _chat_repo.update_session_context(session_id, ctx)
+
     final_answer = None
     async for event in _orchestrator.execute_chat_stream(session_id, user.id, body.content):
         if event.get("event") == "answer":
@@ -126,6 +133,7 @@ async def send_message(
 async def stream_chat(
     session_id: str,
     prompt: str = Query(..., description="User query prompt"),
+    company_context: Optional[str] = Query(None, description="Optional JSON-encoded company context"),
     user: UserPrincipal = Depends(get_current_user),
 ):
     """
@@ -137,6 +145,15 @@ async def stream_chat(
     sess = _chat_repo.get_session(session_id, user_id=user.id)
     if not sess:
         raise HTTPException(status_code=404, detail="Conversation session not found")
+
+    if company_context:
+        try:
+            parsed_ctx = json.loads(company_context)
+            ctx = sess.get("context") or {}
+            ctx["company_context"] = parsed_ctx
+            _chat_repo.update_session_context(session_id, ctx)
+        except Exception:
+            pass
 
     async def event_generator():
         try:

@@ -235,6 +235,7 @@ class ChatbotOrchestrator:
             discovered_results=discovered_orgs,
             completeness_report=completeness_rep.model_dump(),
             staged_reviews_count=staged_count,
+            company_context=context.get("company_context") if context else None,
         )
 
         # 8. Save Assistant Message

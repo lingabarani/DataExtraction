@@ -279,11 +279,42 @@ class ChatbotLLMClient:
         discovered_results: List[Dict[str, Any]],
         completeness_report: Dict[str, Any],
         staged_reviews_count: int = 0,
+        company_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Generates natural-language response synthesizing database results,
         discovered results, completeness stats, and pending review warnings.
+        Enforces a strict ZERO-HALLUCINATION ground-truth policy.
         """
+        # If routed LLM (Groq -> Ollama) is available and this is an analytical / company context query, attempt LLM synthesis
+        if self.provider is not None and (company_context or len(query.split()) > 4):
+            try:
+                ground_truth_context = {
+                    "user_query": query,
+                    "target_company_context": company_context,
+                    "database_results_count": len(db_results),
+                    "database_results": db_results[:5],
+                    "discovered_results_count": len(discovered_results),
+                    "discovered_results": discovered_results[:5],
+                }
+                system_prompt = (
+                    "You are the Enterprise B2B DataExtraction Intelligence Assistant.\n"
+                    "CRITICAL ZERO-HALLUCINATION POLICY:\n"
+                    "1. Answer strictly using ONLY the verified facts provided in the Ground-Truth Context.\n"
+                    "2. NEVER invent, extrapolate, or estimate emails, phone numbers, revenue, or executive names.\n"
+                    "3. If a field or detail is not present in the record, explicitly state: 'Not available in verified database record'.\n"
+                    "4. Maintain a polished, executive, professional tone suitable for B2B intelligence teams."
+                )
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Ground-Truth Context:\n{json.dumps(ground_truth_context, default=str)}\n\nUser Question:\n{query}"},
+                ]
+                res = self.provider.chat(messages, temperature=0.1, max_tokens=1500, purpose="chatbot_response")
+                if res.text and len(res.text.strip()) > 30:
+                    return res.text.strip()
+            except Exception as exc:
+                logger.debug("Routed LLM conversational synthesis failed, falling back to structured card renderer: %s", exc)
+
         total_found = len(db_results) + len(discovered_results)
         industry_label = intent.industry or "companies"
         geo_label = intent.geography.get("city") or intent.geography.get("state") or "the requested area"
@@ -300,8 +331,6 @@ class ChatbotLLMClient:
         lines.append("")
 
         # Completeness breakdown
-        comp_count = completeness_report.get("complete_count", 0)
-        incomp_count = completeness_report.get("incomplete_count", 0)
         lines.append(f"- **Database Verified Records**: {len(db_results)}")
         if discovered_results:
             lines.append(f"- **Live Discovered Records**: {len(discovered_results)} (new discoveries)")
@@ -312,28 +341,26 @@ class ChatbotLLMClient:
         lines.append("### Key Results Overview")
         lines.append("")
 
-        # Present top sample cards
+        # Present top sample cards with strict zero-hallucination
         display_items = (db_results + discovered_results)[:10]
         for idx, item in enumerate(display_items, 1):
-            name = item.get("canonical_name") or item.get("name") or item.get("company_name") or "Unknown Company"
+            name = item.get("canonical_name") or item.get("name") or item.get("company_name") or "Verified Entity"
             city = item.get("address_city") or (item.get("address") or {}).get("city") or item.get("city") or ""
             state = item.get("address_state") or (item.get("address") or {}).get("state") or item.get("state") or ""
             loc_str = f"{city}, {state}".strip(", ")
 
-            website = item.get("website") or item.get("domain") or "Not found"
-            phone = item.get("phone") or item.get("phone_number")
+            website = item.get("website") or item.get("domain") or item.get("primary_domain")
+            phone = item.get("phone") or item.get("phone_number") or item.get("primary_phone_e164")
             if not phone and item.get("phones"):
                 p_list = item["phones"]
                 if isinstance(p_list, list) and p_list:
                     phone = p_list[0].get("number") if isinstance(p_list[0], dict) else str(p_list[0])
-            phone = phone or "Not found"
 
-            email = item.get("email") or item.get("contact_email")
+            email = item.get("email") or item.get("contact_email") or item.get("primary_email")
             if not email and item.get("emails"):
                 e_list = item["emails"]
                 if isinstance(e_list, list) and e_list:
                     email = e_list[0].get("value") if isinstance(e_list[0], dict) else str(e_list[0])
-            email = email or "Not found"
 
             origin = item.get("origin", "Database")
             status_tag = f"[{origin}]"
@@ -343,9 +370,12 @@ class ChatbotLLMClient:
             lines.append(f"{idx}. **{name}** {status_tag}")
             if loc_str:
                 lines.append(f"   - **Location**: {loc_str}")
-            lines.append(f"   - **Website**: {website}")
-            lines.append(f"   - **Phone**: {phone}")
-            lines.append(f"   - **Contact Email**: {email}")
+            if website:
+                lines.append(f"   - **Website**: {website}")
+            if phone:
+                lines.append(f"   - **Phone**: {phone}")
+            if email:
+                lines.append(f"   - **Contact Email**: {email}")
             if item.get("executive") or item.get("ceo"):
                 lines.append(f"   - **Leadership**: {item.get('executive') or item.get('ceo')}")
 
@@ -357,5 +387,7 @@ class ChatbotLLMClient:
             lines.append("")
             lines.append("> [!NOTE]")
             lines.append(f"> Newly discovered attributes have been saved to the **Review Queue** ({staged_reviews_count} pending items). You can review, approve, or reject them before they are promoted into canonical records.")
+
+        return "\n".join(lines)
 
         return "\n".join(lines)

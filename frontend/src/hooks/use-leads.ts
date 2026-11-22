@@ -309,7 +309,7 @@ export interface CompanyIntelligence {
   reviews: {
     source?: string;
     total_scraped: number;
-    average_rating: number;
+    average_rating?: number | null;
     ai_summary: {
       sentiment: string;
       pros: string[];
@@ -324,6 +324,21 @@ export interface CompanyIntelligence {
       reactions?: number;
     }>;
   };
+  b2b_intelligence?: {
+    tech_categories?: string[];
+    primary_crm?: string | null;
+    primary_cloud?: string | null;
+    detected_technologies?: string[];
+    intent_score?: number;
+    intent_strength?: string;
+    intent_topics?: string[];
+    buying_stage?: string;
+    recent_hiring_velocity?: number;
+    company_scoops?: any[];
+  };
+  live_crawl_summary?: any;
+  overall_crawl?: any;
+  crawl_status?: string;
 }
 
 const COMPANY_INTEL_CACHE = new Map<string, CompanyIntelligence>();
@@ -360,6 +375,56 @@ export function useCompanyIntelligence(
     }
   }, [companyId, domain, table, cacheKey]);
 
+  const crawl = useCallback(async () => {
+    if (!companyId) return null;
+    setLoading(true);
+    try {
+      const q = new URLSearchParams();
+      if (domain) q.set("domain", domain);
+      q.set("table", table);
+      const data = await api.post<CompanyIntelligence>(
+        `/leads/company/${encodeURIComponent(companyId)}/crawl?${q.toString()}`,
+        {}
+      );
+      if (data) {
+        COMPANY_INTEL_CACHE.set(cacheKey, data);
+        setIntel(data);
+        setError(null);
+        return data;
+      }
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, domain, table, cacheKey]);
+
+  const crawlAll = useCallback(async () => {
+    if (!companyId) return null;
+    setLoading(true);
+    try {
+      const q = new URLSearchParams();
+      if (domain) q.set("domain", domain);
+      q.set("table", table);
+      const data = await api.post<CompanyIntelligence>(
+        `/leads/company/${encodeURIComponent(companyId)}/crawl-all?${q.toString()}`,
+        {}
+      );
+      if (data) {
+        COMPANY_INTEL_CACHE.set(cacheKey, data);
+        setIntel(data);
+        setError(null);
+        return data;
+      }
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, domain, table, cacheKey]);
+
   useEffect(() => {
     const inCache = COMPANY_INTEL_CACHE.get(cacheKey);
     if (inCache) {
@@ -370,7 +435,7 @@ export function useCompanyIntelligence(
     }
   }, [refresh, cacheKey]);
 
-  return { intel, loading, error, refresh };
+  return { intel, loading, error, refresh, crawl, crawlAll };
 }
 
 // ── DB Stats hook ─────────────────────────────────────────────────────────────
