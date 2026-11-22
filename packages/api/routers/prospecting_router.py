@@ -135,6 +135,12 @@ class CompanySearchRequest(BaseModel):
     naics_codes: Optional[List[str]] = None
     headcount_ranges: Optional[List[str]] = None
     revenue_ranges: Optional[List[str]] = None
+    headcount_brackets: Optional[List[str]] = None
+    revenue_brackets: Optional[List[str]] = None
+    macro_industries: Optional[List[str]] = None
+    sub_industries: Optional[List[str]] = None
+    hierarchy_types: Optional[List[str]] = None
+    is_actively_hiring: Optional[bool] = None
     technologies: Optional[List[str]] = None
     compliance_badges: Optional[List[str]] = None
     intent_strengths: Optional[List[str]] = None
@@ -951,6 +957,29 @@ def search_companies(
                 if rev_clauses:
                     wc.append(f"({' OR '.join(rev_clauses)})")
 
+            if req.headcount_brackets:
+                wc.append("o.headcount_bracket = ANY(%s)")
+                p.append(req.headcount_brackets)
+
+            if req.revenue_brackets:
+                wc.append("o.revenue_bracket = ANY(%s)")
+                p.append(req.revenue_brackets)
+
+            if req.macro_industries:
+                wc.append("(o.industry = ANY(%s) OR EXISTS (SELECT 1 FROM master_dataextraction.industry_taxonomy t WHERE t.macro_industry = ANY(%s) AND o.sub_industry = t.sub_industry))")
+                p.extend([req.macro_industries, req.macro_industries])
+
+            if req.sub_industries:
+                wc.append("o.sub_industry = ANY(%s)")
+                p.append(req.sub_industries)
+
+            if req.hierarchy_types:
+                wc.append("o.hierarchy_type = ANY(%s)")
+                p.append(req.hierarchy_types)
+
+            if req.is_actively_hiring:
+                wc.append("COALESCE(o.recent_hiring_velocity, 0) > 0")
+
             if req.technologies:
                 tech_clauses = []
                 for t in req.technologies:
@@ -1031,7 +1060,9 @@ def search_companies(
                    COALESCE(dm.dm_count, 0) AS decision_maker_count,
                    o.rating, o.review_count, o.sentiment_summary,
                    o.praise_highlights, o.complaint_alerts,
-                   o.updated_at, o.last_verified_at
+                   o.updated_at, o.last_verified_at,
+                   o.revenue_bracket, o.headcount_bracket, o.sub_industry,
+                   o.hierarchy_type, o.recent_hiring_velocity
             FROM (
                 SELECT * FROM master_dataextraction.organizations o
                 {where_sql}
@@ -1098,6 +1129,11 @@ def search_companies(
                 "complaint_alerts": r[25] if len(r) > 25 and r[25] is not None else [],
                 "updated_at": r[26].isoformat() if len(r) > 26 and r[26] is not None else None,
                 "last_verified_at": r[27].isoformat() if len(r) > 27 and r[27] is not None else None,
+                "revenue_bracket": r[28] if len(r) > 28 and r[28] is not None else "UNKNOWN",
+                "headcount_bracket": r[29] if len(r) > 29 and r[29] is not None else "UNKNOWN",
+                "sub_industry": r[30] if len(r) > 30 and r[30] is not None else (r[4] or "Commercial Services"),
+                "hierarchy_type": r[31] if len(r) > 31 and r[31] is not None else "INDEPENDENT",
+                "recent_hiring_velocity": int(r[32]) if len(r) > 32 and r[32] is not None else 0,
             })
 
         # Aggregated dynamic facets from master data
@@ -1512,6 +1548,69 @@ def get_company_decision_makers(
     except Exception as exc:
         logger.debug("Decision maker lookup note: %s", exc)
         return {"org_id": org_id, "decision_makers": []}
+    finally:
+        if conn:
+            release_connection(conn)
+
+
+# ── Endpoint 6: Standardized Apollo Industry & Micro-Vertical Taxonomy ─────
+
+@router.get("/prospecting/taxonomy")
+@router.get("/taxonomy")
+def get_industry_taxonomy(
+    macro_industry: Optional[str] = Query(None, description="Optional macro industry filter"),
+    current_user: UserPrincipal = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Returns standardized Apollo.io-grade industry taxonomy:
+    Macro industries, sub-industries, NAICS 2022 codes, and SIC codes.
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        if macro_industry:
+            cur.execute("""
+                SELECT macro_industry, sub_industry, naics_2022_code, naics_title, sic_code, sic_title, display_order
+                FROM master_dataextraction.industry_taxonomy
+                WHERE is_active = TRUE AND macro_industry ILIKE %s
+                ORDER BY display_order ASC, sub_industry ASC;
+            """, (f"%{macro_industry.strip()}%",))
+        else:
+            cur.execute("""
+                SELECT macro_industry, sub_industry, naics_2022_code, naics_title, sic_code, sic_title, display_order
+                FROM master_dataextraction.industry_taxonomy
+                WHERE is_active = TRUE
+                ORDER BY display_order ASC, sub_industry ASC;
+            """)
+        rows = cur.fetchall()
+
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for r in rows:
+            macro = r[0]
+            if macro not in grouped:
+                grouped[macro] = []
+            grouped[macro].append({
+                "sub_industry": r[1],
+                "naics_code": r[2],
+                "naics_title": r[3],
+                "sic_code": r[4],
+                "sic_title": r[5],
+                "display_order": r[6],
+            })
+
+        taxonomy_list = [
+            {"macro_industry": macro, "sub_industries_count": len(subs), "sub_industries": subs}
+            for macro, subs in grouped.items()
+        ]
+
+        return {
+            "total_macro_industries": len(taxonomy_list),
+            "total_sub_industries": len(rows),
+            "taxonomy": taxonomy_list,
+        }
+    except Exception as exc:
+        logger.error(f"Failed to fetch industry taxonomy: {exc}")
+        return {"total_macro_industries": 0, "total_sub_industries": 0, "taxonomy": []}
     finally:
         if conn:
             release_connection(conn)
