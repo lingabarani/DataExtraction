@@ -136,23 +136,35 @@ class ChatbotOrchestrator:
             "data": completeness_rep.model_dump(),
         }
 
-        # 4. Live Discovery Fallback (if 0 DB results OR missing fields)
+        # 4. Decoupled Live Discovery: Trigger only when zero DB results or explicitly requested
         discovered_orgs: List[Dict[str, Any]] = []
-        needs_discovery = len(db_companies) == 0 or bool(completeness_rep.missing_data_plan)
+        explicit_crawl_requested = any(kw in prompt.lower() for kw in ["live crawl", "deep crawl", "scrape web", "discover online", "search internet", "enrich live", "crawl all"])
+        needs_discovery = (len(db_companies) == 0) or explicit_crawl_requested
+
+        if not needs_discovery and completeness_rep.missing_data_plan:
+            # Yield enrichment notification so UI can offer one-click background crawl without blocking stream
+            yield {
+                "event": "enrichment_available",
+                "data": {
+                    "missing_count": len(completeness_rep.missing_data_plan),
+                    "can_enrich": True,
+                    "action": "Click 'Live Deep Crawl' to enrich missing fields in background",
+                },
+            }
 
         if needs_discovery:
             yield {
                 "event": "live_discovery_started",
                 "data": {
-                    "reason": "zero_db_matches" if len(db_companies) == 0 else "missing_requested_fields",
+                    "reason": "zero_db_matches" if len(db_companies) == 0 else "explicit_user_crawl_request",
                     "missing_count": len(completeness_rep.missing_data_plan),
                 },
             }
 
             try:
-                # If zero DB matches, run general federated discovery
+                # If zero DB matches, run federated discovery with strict 8.0s timeout
                 if len(db_companies) == 0:
-                    async for disc_event in self.live_discovery_client.run_discovery_stream(intent, timeout=20.0):
+                    async for disc_event in self.live_discovery_client.run_discovery_stream(intent, timeout=8.0):
                         if session_id in self._cancelled_sessions:
                             break
                         evt_type = disc_event.get("type")
@@ -164,10 +176,10 @@ class ChatbotOrchestrator:
                                 discovered_orgs = raw_results
                                 yield {"event": "discovery_results", "data": {"count": len(discovered_orgs), "results": discovered_orgs[:5]}}
                 else:
-                    # Targeted enrichment for missing fields on existing DB companies
+                    # Targeted enrichment for missing fields on existing DB companies (concurrent, max 6.0s)
                     targeted_enriched = await self.live_discovery_client.discover_missing_fields_for_companies(
                         completeness_rep.missing_data_plan,
-                        timeout=15.0,
+                        timeout=6.0,
                     )
                     for item in targeted_enriched:
                         d_data = item.get("discovered_data", {})

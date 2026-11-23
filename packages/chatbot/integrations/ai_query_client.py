@@ -346,7 +346,8 @@ class AIQueryClient:
             params.append(zip_code)
 
         if intent.has_verified_email or intent.verification_required:
-            sql.append("AND emails::text ILIKE '%verified%'")
+            sql.append("AND emails::text ILIKE %s")
+            params.append("%verified%")
 
         sql.append("ORDER BY quality_score DESC NULLS LAST LIMIT %s;")
         params.append(intent.limit)

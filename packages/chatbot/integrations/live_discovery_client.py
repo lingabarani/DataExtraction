@@ -90,9 +90,11 @@ class LiveDiscoveryClient:
         """
         enriched_results: List[Dict[str, Any]] = []
 
-        # Bound concurrent discovery to avoid flooding sources
-        batch = missing_data_plan[:10]
-        for item in batch:
+        # Bound concurrent discovery to top 3 items to avoid flooding sources and maintain sub-second SLA
+        batch = missing_data_plan[:3]
+        per_item_timeout = min(5.0, timeout)
+
+        async def _enrich_single(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             comp_id = item["company_id"]
             comp_name = item["company_name"]
             domain = item.get("domain")
@@ -100,7 +102,6 @@ class LiveDiscoveryClient:
             state = item.get("state")
             missing = item.get("missing_fields", [])
 
-            # Construct targeted query
             target_q = f"{comp_name} {city or ''} {state or ''}".strip()
             if "email" in missing:
                 target_q += " contact email"
@@ -108,24 +109,36 @@ class LiveDiscoveryClient:
                 target_q += " CEO executive"
 
             filters = {
-                "max_results": 3,
+                "max_results": 2,
                 "crawl_websites": bool(domain),
             }
 
             try:
-                answer = await self.orchestrator.search(
-                    query=target_q,
-                    filters=filters,
-                    budget_seconds=min(12.0, timeout),
+                answer = await asyncio.wait_for(
+                    self.orchestrator.search(
+                        query=target_q,
+                        filters=filters,
+                        budget_seconds=per_item_timeout,
+                    ),
+                    timeout=per_item_timeout,
                 )
                 if answer and answer.cards:
                     best_match = answer.cards[0].model_dump() if hasattr(answer.cards[0], "model_dump") else dict(answer.cards[0])
-                    enriched_results.append({
+                    return {
                         "target_company_id": comp_id,
                         "target_company_name": comp_name,
                         "discovered_data": best_match,
-                    })
+                    }
             except Exception as exc:
                 logger.debug("Targeted discovery failed for %s: %s", comp_name, exc)
+            return None
+
+        tasks = [_enrich_single(item) for item in batch]
+        gathered = await asyncio.gather(*tasks, return_exceptions=True)
+        for g in gathered:
+            if isinstance(g, dict) and g.get("target_company_id"):
+                enriched_results.append(g)
+
+        return enriched_results
 
         return enriched_results
