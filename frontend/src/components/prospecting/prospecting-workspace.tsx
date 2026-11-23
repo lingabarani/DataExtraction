@@ -133,13 +133,20 @@ export function ProspectingWorkspace() {
         setCompanies(res.results || []);
         setTotal(res.total_count || 0);
         setFacets(res.facets || {});
+        const derivedIndustries = res.applied_filters.expanded_keywords?.length
+          ? res.applied_filters.expanded_keywords.slice(0, 5)
+          : promptText
+              .toLowerCase()
+              .replace(/\b(companies|company|in|for|and|or|of|with|a|an|the|top|all|find|get|show|search|list)\b/g, "")
+              .trim()
+              .split(/\s+/)
+              .filter((w) => w.length > 2);
+
         setCompanyFilters((prev) => ({
           ...prev,
           offset: 0,
           states: res.applied_filters.states?.length ? res.applied_filters.states : undefined,
-          industries: res.applied_filters.expanded_keywords?.length
-            ? res.applied_filters.expanded_keywords.slice(0, 5)
-            : undefined,
+          industries: derivedIndustries.length ? derivedIndustries.slice(0, 5) : undefined,
           technologies: res.applied_filters.technologies?.length ? res.applied_filters.technologies : undefined,
         }));
       } else {

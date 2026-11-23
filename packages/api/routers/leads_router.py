@@ -961,8 +961,19 @@ async def live_deep_crawl_company(
 
     # Return refreshed deep intelligence
     intel = get_company_intelligence(company_id=company_id, domain=clean_dom, table=table, user=user)
+    crawl_status = "SUCCESS" if (crawled_pages_count > 0 and crawled_overview) else ("PARTIAL" if crawled_pages_count > 0 else "UNAVAILABLE")
+    status_msg = (
+        f"Live crawl completed: {crawled_pages_count} pages analyzed. Verified About narrative updated."
+        if (crawled_pages_count > 0 and crawled_overview)
+        else (
+            f"Live crawl analyzed {crawled_pages_count} pages, but no public About narrative is published on this domain."
+            if crawled_pages_count > 0
+            else "Target website unreachable or does not publish a public About narrative."
+        )
+    )
     intel["live_crawl_summary"] = {
-        "status": "SUCCESS" if crawled_pages_count > 0 else "FALLBACK",
+        "status": crawl_status,
+        "message": status_msg,
         "pages_crawled": crawled_pages_count,
         "overview_updated": bool(crawled_overview),
         "detected_technologies": discovered_techs,
@@ -1022,8 +1033,17 @@ async def crawl_all_company_sources(
     # 4. Source: Google Search & Public Registries Verification
     sources_crawled.append("Google Search & Sovereign Business Registries")
 
+    has_live_findings = bool(intel.get("live_crawl_summary", {}).get("pages_crawled", 0) > 0 or ssl_res.get("valid"))
+    overall_status = "COMPLETED" if has_live_findings else "UNAVAILABLE"
+    overall_msg = (
+        f"Multi-source crawl completed across {len(sources_crawled)} channels."
+        if has_live_findings
+        else "Multi-source crawl completed: target website and public registries currently have no live narrative for this domain."
+    )
+
     intel["overall_crawl"] = {
-        "status": "COMPLETED",
+        "status": overall_status,
+        "message": overall_msg,
         "sources_scraped": sources_crawled,
         "ssl_handshake": ssl_res,
         "timestamp": time.time(),

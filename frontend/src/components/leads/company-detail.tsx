@@ -79,8 +79,12 @@ export function CompanyDetail({
     setIsCrawling(true);
     toast.info("Connecting to live website and scraping verified About summary...");
     try {
-      await crawl();
-      toast.success("Live crawl completed: verified About profile updated in database!");
+      const res = await crawl();
+      if (res?.live_crawl_summary?.status === "UNAVAILABLE") {
+        toast.warning(res?.live_crawl_summary?.message || "Data unavailable: Target domain is unreachable or does not publish a public About narrative.");
+      } else {
+        toast.success(res?.live_crawl_summary?.message || "Live crawl completed: verified About profile updated in database!");
+      }
     } catch (e: any) {
       toast.error(e?.message || "Live crawl failed to reach target domain.");
     } finally {
@@ -92,8 +96,12 @@ export function CompanyDetail({
     setIsOverallCrawling(true);
     toast.info("Dispatching multi-source crawlers (Website + Google Maps RPC + SERP + DNS)...");
     try {
-      await crawlAll();
-      toast.success("Overall multi-source crawl finished: all intelligence updated!");
+      const res = await crawlAll();
+      if (res?.overall_crawl?.status === "UNAVAILABLE") {
+        toast.warning(res?.overall_crawl?.message || "Multi-source crawl completed: Live website and public registry data unavailable for this domain.");
+      } else {
+        toast.success(res?.overall_crawl?.message || "Overall multi-source crawl finished: all intelligence updated!");
+      }
     } catch (e: any) {
       toast.error(e?.message || "Multi-source crawl encountered an error.");
     } finally {
@@ -530,8 +538,15 @@ export function CompanyDetail({
                     </p>
                   ) : (
                     <div className="rounded-md border border-dashed border-border/80 p-3 bg-muted/10 text-muted-foreground flex flex-col gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/60">
+                          {intel.live_crawl_summary?.status === "UNAVAILABLE" ? "Data Unavailable on Live Domain" : "Unverified Narrative"}
+                        </span>
+                      </div>
                       <p className="text-[11px]">
-                        No verified About summary crawled yet. Use the crawlers below to discover verified intelligence from the website, Google Maps, or sovereign registries.
+                        {intel.live_crawl_summary?.status === "UNAVAILABLE"
+                          ? "Target website does not publish a public About narrative or domain is unreachable. Zero synthetic data generated."
+                          : "No verified About summary crawled yet. Use the crawlers below to discover verified intelligence from the website, Google Maps, or sovereign registries."}
                       </p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button

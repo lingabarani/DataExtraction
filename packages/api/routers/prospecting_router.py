@@ -102,6 +102,46 @@ INDUSTRY_NAICS_MAP = {
     "energy": ["21%", "211%", "212%"],
 }
 
+US_STATE_NAMES = {v: k.title() for k, v in US_STATE_MAP.items()}
+
+def _build_org_state_clause(states: List[str]) -> Tuple[str, List[Any]]:
+    """
+    Builds sovereign-grounded parameterized SQL for organization state matching:
+    1. Direct match on organization_locations joined with locations (state_code / state / admin level 1)
+    2. Executive state_code on associated persons
+    3. Whole-word regex on company legal_name for full state name (e.g. \\yOhio\\y),
+       strictly preventing false substring matches (e.g. 'Alcoholímetro' or 'Johnson' for 'OH').
+    """
+    st_codes = [s.strip().upper() for s in states if s.strip()]
+    st_names = [US_STATE_NAMES[s] for s in st_codes if s in US_STATE_NAMES]
+    
+    regex_clauses = []
+    regex_params = []
+    for s_name in st_names:
+        regex_clauses.append("o.legal_name ~* %s")
+        regex_params.append(rf"\y{re.escape(s_name)}\y")
+    
+    name_regex_sub = (" OR " + " OR ".join(regex_clauses)) if regex_clauses else ""
+    
+    clause = f"""(
+        EXISTS (
+            SELECT 1 FROM master_dataextraction.organization_locations ol
+            JOIN master_dataextraction.locations loc ON ol.location_id = loc.location_id
+            WHERE ol.org_id = o.org_id 
+              AND (loc.state_code = ANY(%s) OR loc.state = ANY(%s) OR loc.administrative_area_level_1 = ANY(%s))
+        )
+        OR EXISTS (
+            SELECT 1 FROM master_dataextraction.persons p 
+            WHERE p.current_primary_org_id = o.org_id 
+              AND (p.state_code = ANY(%s) OR p.state = ANY(%s))
+        )
+        {name_regex_sub}
+    )"""
+    
+    params = [st_codes, st_names or st_codes, st_codes, st_codes, st_names or st_codes] + regex_params
+    return clause, params
+
+
 
 # ── Pydantic Request / Response Models ─────────────────────────────────────
 
@@ -379,37 +419,37 @@ def _compile_company_query(
     where_clauses: List[str] = []
     params: List[Any] = []
 
-    # Keyword & NAICS clauses (OR group)
-    kw_clauses = []
-    terms = list(plan.expanded_keywords[:8])
-    if clean_query and clean_query not in terms:
-        terms.insert(0, clean_query)
-
-    for kw in terms:
-        kw_like = f"%{kw.strip()}%"
-        kw_clauses.append("(o.legal_name ILIKE %s OR o.display_name ILIKE %s OR o.primary_domain ILIKE %s OR o.industry ILIKE %s OR o.sub_industry ILIKE %s OR o.short_description ILIKE %s)")
-        params.extend([kw_like, kw_like, kw_like, kw_like, kw_like, kw_like])
-
-    for naics in plan.naics_codes:
-        kw_clauses.append("o.primary_industry_naics LIKE %s")
-        params.append(f"{naics}%")
-
-    if kw_clauses:
-        where_clauses.append(f"({' OR '.join(kw_clauses)})")
-
-    # Location constraints
+    # 1. Location constraints (placed first to leverage indexed geocoding/locations tables)
     if include_location and plan.states:
-        st_list = [s.strip().upper() for s in plan.states]
-        st_likes = [f"%{s}%" for s in st_list]
-        where_clauses.append("(o.jurisdiction::text = ANY(%s) OR EXISTS (SELECT 1 FROM master_dataextraction.persons p WHERE p.current_primary_org_id = o.org_id AND p.state_code = ANY(%s)) OR " + " OR ".join(["o.legal_name ILIKE %s" for _ in st_list]) + ")")
-        params.extend([st_list, st_list] + st_likes)
+        st_clause, st_params = _build_org_state_clause(plan.states)
+        where_clauses.append(st_clause)
+        params.extend(st_params)
 
     if include_location and plan.cities:
         city_list = [c.strip() for c in plan.cities]
         where_clauses.append("EXISTS (SELECT 1 FROM master_dataextraction.persons p WHERE p.current_primary_org_id = o.org_id AND p.city = ANY(%s))")
         params.append(city_list)
 
-    # Technologies (only filter if explicitly present in user query or plan)
+    # 2. Keyword & NAICS clauses (optimized via ILIKE ANY array matching)
+    terms = list(plan.expanded_keywords[:8])
+    if clean_query and clean_query not in terms and len(clean_query.split()) <= 4:
+        terms.insert(0, clean_query)
+
+    kw_patterns = [f"%{kw.strip()}%" for kw in terms if kw.strip()]
+    kw_clauses = []
+    if kw_patterns:
+        kw_clauses.append("(o.industry ILIKE ANY(%s) OR o.sub_industry ILIKE ANY(%s) OR o.legal_name ILIKE ANY(%s) OR o.display_name ILIKE ANY(%s) OR o.primary_domain ILIKE ANY(%s) OR o.short_description ILIKE ANY(%s))")
+        params.extend([kw_patterns, kw_patterns, kw_patterns, kw_patterns, kw_patterns, kw_patterns])
+
+    if plan.naics_codes:
+        naics_patterns = [f"{n}%" for n in plan.naics_codes]
+        kw_clauses.append("o.primary_industry_naics LIKE ANY(%s)")
+        params.append(naics_patterns)
+
+    if kw_clauses:
+        where_clauses.append(f"({' OR '.join(kw_clauses)})")
+
+    # 3. Technologies (only filter if explicitly present in user query or plan)
     if plan.technologies:
         matched_tech = [t for t in plan.technologies if t.lower() in clean_query.lower()] or plan.technologies
         # Only apply if clean_query actually mentioned tech or user provided explicit tech list
@@ -420,7 +460,7 @@ def _compile_company_query(
                 params.extend([f"%{t}%", f"%{t}%", t])
             where_clauses.append(f"({' OR '.join(tech_clauses)})")
 
-    # Email / Phone constraints
+    # 4. Email / Phone constraints
     if include_email and plan.require_verified_email:
         where_clauses.append("EXISTS (SELECT 1 FROM master_dataextraction.persons cp WHERE cp.current_primary_org_id = o.org_id AND cp.primary_email IS NOT NULL AND cp.primary_email != '')")
 
@@ -446,7 +486,7 @@ def _compile_people_query(
     text_matchers = list(plan.target_titles)
     if not text_matchers and plan.expanded_keywords:
         text_matchers.extend(plan.expanded_keywords[:6])
-    if not text_matchers and not (plan.seniority_tiers or plan.states or plan.departments) and clean_query:
+    if not text_matchers and clean_query:
         text_matchers.append(clean_query)
 
     if text_matchers:
@@ -673,53 +713,42 @@ async def ai_chat_search(
             total_count = cur.fetchone()[0]
 
             summary_note = ""
-            # 2. Progressive fallback: relax location if 0 matches
-            if total_count == 0 and plan.states:
-                where_sql, params = _compile_company_query(plan, clean_query, include_location=False, include_email=True, include_phone=True)
-                cur.execute(f"SELECT count(*) FROM master_dataextraction.organizations o {where_sql}", tuple(params))
-                total_count = cur.fetchone()[0]
-                if total_count > 0:
-                    summary_note = f" (Expanded to verified organizations nationwide matching your criteria)."
+            if total_count == 0:
+                summary_note = " (No verified organizations found in target jurisdiction matching criteria)."
 
-            # 3. Progressive fallback: relax email/phone requirements if still 0
-            if total_count == 0 and (plan.require_verified_email or plan.require_direct_phone):
-                where_sql, params = _compile_company_query(plan, clean_query, include_location=False, include_email=False, include_phone=False)
-                cur.execute(f"SELECT count(*) FROM master_dataextraction.organizations o {where_sql}", tuple(params))
-                total_count = cur.fetchone()[0]
-                if total_count > 0:
-                    summary_note = " (Displaying top matching organizations nationwide)."
-
-            data_sql = f"""
-                SELECT o.org_id, o.legal_name, o.display_name, o.primary_domain,
-                       o.industry, o.jurisdiction::text, 
-                       COALESCE(p_loc.city, '') AS city,
-                       COALESCE(p_loc.state_code, o.jurisdiction::text, 'US') AS state_code,
-                       o.employee_count_min, o.employee_count_max, o.annual_revenue_usd,
-                       o.data_quality_score, o.trust_score, o.intent_score,
-                       o.intent_strength, o.primary_crm, o.primary_cloud,
-                       o.tech_categories, o.intent_topics, o.short_description,
-                       o.rating, o.review_count, o.sentiment_summary,
-                       o.praise_highlights, o.complaint_alerts,
-                       o.updated_at, o.last_verified_at
-                FROM (
-                    SELECT * FROM master_dataextraction.organizations o
-                    {where_sql}
-                    ORDER BY 
-                        (CASE WHEN o.primary_domain IS NOT NULL AND o.primary_domain != '' THEN 1 ELSE 0 END) DESC,
-                        o.updated_at DESC NULLS LAST,
-                        o.created_at DESC NULLS LAST,
-                        o.trust_score DESC NULLS LAST
-                    LIMIT %s OFFSET %s
-                ) o
-                LEFT JOIN LATERAL (
-                    SELECT p.city, p.state_code 
-                    FROM master_dataextraction.persons p 
-                    WHERE p.current_primary_org_id = o.org_id 
-                    LIMIT 1
-                ) p_loc ON TRUE
-            """
-            cur.execute(data_sql, tuple(params + [req.limit, req.offset]))
-            rows = cur.fetchall()
+            rows = []
+            if total_count > 0:
+                data_sql = f"""
+                    SELECT o.org_id, o.legal_name, o.display_name, o.primary_domain,
+                           o.industry, o.jurisdiction::text, 
+                           COALESCE(p_loc.city, '') AS city,
+                           COALESCE(p_loc.state_code, o.jurisdiction::text, 'US') AS state_code,
+                           o.employee_count_min, o.employee_count_max, o.annual_revenue_usd,
+                           o.data_quality_score, o.trust_score, o.intent_score,
+                           o.intent_strength, o.primary_crm, o.primary_cloud,
+                           o.tech_categories, o.intent_topics, o.short_description,
+                           o.rating, o.review_count, o.sentiment_summary,
+                           o.praise_highlights, o.complaint_alerts,
+                           o.updated_at, o.last_verified_at
+                    FROM (
+                        SELECT * FROM master_dataextraction.organizations o
+                        {where_sql}
+                        ORDER BY 
+                            (CASE WHEN o.primary_domain IS NOT NULL AND o.primary_domain != '' THEN 1 ELSE 0 END) DESC,
+                            o.updated_at DESC NULLS LAST,
+                            o.created_at DESC NULLS LAST,
+                            o.trust_score DESC NULLS LAST
+                        LIMIT %s OFFSET %s
+                    ) o
+                    LEFT JOIN LATERAL (
+                        SELECT p.city, p.state_code 
+                        FROM master_dataextraction.persons p 
+                        WHERE p.current_primary_org_id = o.org_id 
+                        LIMIT 1
+                    ) p_loc ON TRUE
+                """
+                cur.execute(data_sql, tuple(params + [req.limit, req.offset]))
+                rows = cur.fetchall()
 
             results = []
             for r in rows:
@@ -889,10 +918,9 @@ def search_companies(
                 wc.append(f"({' OR '.join(topic_clauses)})")
 
             if include_states and req.states:
-                st_list = [s.strip().upper() for s in req.states]
-                st_likes = [f"%{s}%" for s in st_list]
-                wc.append("(o.jurisdiction::text = ANY(%s) OR EXISTS (SELECT 1 FROM master_dataextraction.persons p WHERE p.current_primary_org_id = o.org_id AND p.state_code = ANY(%s)) OR " + " OR ".join(["o.legal_name ILIKE %s" for _ in st_list]) + ")")
-                p.extend([st_list, st_list] + st_likes)
+                st_clause, st_params = _build_org_state_clause(req.states)
+                wc.append(st_clause)
+                p.extend(st_params)
 
             if req.cities:
                 city_list = [c.strip() for c in req.cities]

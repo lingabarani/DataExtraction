@@ -92,8 +92,7 @@ export function ContextualChatDrawer({
   // Initialize or reset session when opened with a company
   useEffect(() => {
     if (isOpen) {
-      const newSessionId = `session-${Date.now()}`;
-      setSessionId(newSessionId);
+      setSessionId(null);
       setMessages([
         {
           id: "welcome",
@@ -169,12 +168,12 @@ export function ContextualChatDrawer({
       };
 
       let currentSid = sessionId;
-      if (!currentSid || currentSid.startsWith("temp-")) {
+      if (!currentSid) {
         try {
           const sess = await api.post<{ id: string }>("/v1/chat/sessions", {
             title: `${activeName} Intelligence`,
             company_context: companyContextPayload,
-          });
+          }, { timeoutMs: 35000 });
           if (sess && sess.id) {
             currentSid = sess.id;
             setSessionId(sess.id);
@@ -185,13 +184,19 @@ export function ContextualChatDrawer({
       }
 
       let finalReply = "";
-      if (currentSid && !currentSid.startsWith("temp-")) {
-        const res = await api.post<any>(`/v1/chat/sessions/${currentSid}/messages`, {
-          content: text,
-          company_context: companyContextPayload,
-        });
-        finalReply = res?.content || res?.answer || "I have analyzed the verified data for this entity, but no additional details were found in the master record.";
-      } else {
+      if (currentSid) {
+        try {
+          const res = await api.post<any>(`/v1/chat/sessions/${currentSid}/messages`, {
+            content: text,
+            company_context: companyContextPayload,
+          }, { timeoutMs: 35000 });
+          finalReply = res?.content || res?.answer || "";
+        } catch (mErr) {
+          // Fallback to local structured generator
+        }
+      }
+
+      if (!finalReply) {
         finalReply = generateSmartContextualReply(
           text,
           activeName,

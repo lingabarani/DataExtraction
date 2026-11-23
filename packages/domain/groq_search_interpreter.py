@@ -77,11 +77,19 @@ COMMON_NAICS_VERTICALS: Dict[str, List[str]] = {
     "home care": ["621610", "624120", "623312", "623110", "624190"],
     "eldercare": ["624120", "623312", "623110", "621610"],
     "healthcare": ["621111", "621112", "621210", "621310", "621610", "622110"],
+    "medical": ["621111", "621112", "621210", "621310", "621610"],
     "software": ["511210", "518210", "541511", "541512"],
     "saas": ["511210", "518210", "541511"],
     "logistics": ["484110", "484121", "488510", "493110"],
-    "manufacturing": ["332710", "334418", "333999", "311999"],
+    "freight": ["484110", "484121", "488510"],
+    "manufacturing": ["332710", "334418", "333999", "311999", "332312"],
+    "manufacture": ["332710", "334418", "333999", "311999", "332312"],
+    "industrial": ["333120", "333999", "332710", "332999"],
+    "factory": ["311999", "332710", "334418"],
     "finance": ["522110", "522291", "523920", "523930"],
+    "banking": ["522110", "522291", "523920"],
+    "construction": ["236220", "238210", "238220"],
+    "real estate": ["531210", "531311", "531312"],
 }
 
 
@@ -488,6 +496,42 @@ class GroqSearchInterpreter:
                         "b2b saas", "cloud software", "enterprise software",
                         "information technology", "software engineering"
                     ])
+                elif term in ("manufacturing", "manufacture", "industrial", "factory"):
+                    expanded_keywords.extend([
+                        "manufacturing", "industrial manufacturing", "machinery",
+                        "fabricated metal", "production plant", "equipment manufacturer"
+                    ])
+                elif term in ("healthcare", "medical"):
+                    expanded_keywords.extend([
+                        "healthcare", "medical services", "clinic", "health system"
+                    ])
+                elif term in ("logistics", "freight"):
+                    expanded_keywords.extend([
+                        "logistics", "freight transport", "supply chain", "warehousing"
+                    ])
+                elif term in ("finance", "banking"):
+                    expanded_keywords.extend([
+                        "financial services", "banking", "wealth management", "fintech"
+                    ])
+                elif term in ("construction",):
+                    expanded_keywords.extend([
+                        "general contractor", "commercial construction", "building materials"
+                    ])
+                elif term in ("real estate",):
+                    expanded_keywords.extend([
+                        "commercial real estate", "property management", "brokerage"
+                    ])
+
+        # Dynamic query keyword token retention
+        STOP_WORDS = {
+            "companies", "company", "in", "the", "for", "and", "or", "of", "with", "a", "an",
+            "at", "by", "from", "to", "all", "top", "find", "get", "show", "search", "list"
+        }
+        for tok in re.findall(r"[a-zA-Z]{3,}", q_lower):
+            if (tok not in STOP_WORDS and tok not in US_STATE_MAP 
+                and tok not in SENIORITY_KEYWORDS and tok not in DEPARTMENT_KEYWORDS):
+                if tok not in expanded_keywords:
+                    expanded_keywords.append(tok)
 
         # Email / phone requirements
         require_verified_email = any(w in q_lower for w in ["email", "emails", "deliverable", "contact details"])
@@ -496,7 +540,8 @@ class GroqSearchInterpreter:
         # Construct assistant summary
         parts = []
         if expanded_keywords:
-            parts.append(f"{expanded_keywords[0]} industry")
+            main_term = expanded_keywords[0].title()
+            parts.append(f"{main_term} organizations" if mode == "company" else f"professionals in {main_term}")
         if states:
             parts.append(f"in {', '.join(states)}")
         if seniority_tiers:
