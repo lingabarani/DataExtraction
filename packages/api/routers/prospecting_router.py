@@ -446,7 +446,7 @@ def _compile_people_query(
     text_matchers = list(plan.target_titles)
     if not text_matchers and plan.expanded_keywords:
         text_matchers.extend(plan.expanded_keywords[:6])
-    if not text_matchers and clean_query:
+    if not text_matchers and not (plan.seniority_tiers or plan.states or plan.departments) and clean_query:
         text_matchers.append(clean_query)
 
     if text_matchers:
