@@ -35,7 +35,7 @@ const LABELS: Record<string, string> = {
   org:            "Organization Profile",
   "ai-keys":      "AI Keys",
   settings:       "Settings",
-  chat:           "AI Chatbot & Search Engine",
+  chat:           "Prospecting Grid",
   reviews:        "Review Queue",
 };
 

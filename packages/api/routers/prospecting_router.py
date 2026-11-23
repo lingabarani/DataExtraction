@@ -390,6 +390,7 @@ async def parse_search_query(
 
     # Execute via Groq semantic interpreter
     plan = await groq_search_interpreter.interpret_query(query, mode)
+    source_label = "ollama" if "ollama" in plan.source_model else ("fallback" if any(h in plan.source_model for h in ["heuristic", "fastpath", "fallback", "empty"]) else plan.source_model)
     return ParseSearchQueryResponse(
         mode=plan.mode,
         filters={
@@ -399,6 +400,7 @@ async def parse_search_query(
             "expanded_keywords": plan.expanded_keywords,
             "naics_codes": plan.naics_codes,
             "technologies": plan.technologies,
+            "compliance": [c for c in ["SOC 2", "HIPAA", "ISO 27001", "GDPR"] if c.lower() in query.lower()],
             "seniority_levels": plan.seniority_tiers,
             "departments": plan.departments,
             "target_titles": plan.target_titles,
@@ -408,7 +410,7 @@ async def parse_search_query(
             "max_headcount": plan.max_headcount,
         },
         summary=plan.assistant_summary,
-        source=plan.source_model,
+        source=source_label,
     )
 
 
@@ -476,6 +478,14 @@ def _compile_company_query(
     if include_phone and plan.require_direct_phone:
         where_clauses.append("EXISTS (SELECT 1 FROM master_dataextraction.persons cp WHERE cp.current_primary_org_id = o.org_id AND cp.primary_phone_e164 IS NOT NULL AND cp.primary_phone_e164 != '')")
 
+    # 5. Headcount constraints
+    if plan.min_headcount is not None:
+        where_clauses.append("(o.employee_count_max >= %s OR o.employee_count_min >= %s)")
+        params.extend([plan.min_headcount, plan.min_headcount])
+    if plan.max_headcount is not None:
+        where_clauses.append("o.employee_count_min <= %s")
+        params.append(plan.max_headcount)
+
     where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     return where_sql, params
 
@@ -528,6 +538,14 @@ def _compile_people_query(
 
     if include_phone and plan.require_direct_phone:
         where_clauses.append("(p.primary_phone_e164 IS NOT NULL AND p.primary_phone_e164 != '')")
+
+    # Headcount constraints on employer organization
+    if plan.min_headcount is not None:
+        where_clauses.append("(o.employee_count_max >= %s OR o.employee_count_min >= %s)")
+        params.extend([plan.min_headcount, plan.min_headcount])
+    if plan.max_headcount is not None:
+        where_clauses.append("o.employee_count_min <= %s")
+        params.append(plan.max_headcount)
 
     where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     return where_sql, params
@@ -633,21 +651,8 @@ async def ai_chat_search(
             total_count = cur.fetchone()[0]
 
             summary_note = ""
-            # 2. Progressive fallback: relax location if 0 matches
-            if total_count == 0 and plan.states:
-                where_sql, params = _compile_people_query(plan, clean_query, include_location=False, include_email=True, include_phone=True)
-                cur.execute(f"SELECT count(*) {base_people_from} {where_sql}", tuple(params))
-                total_count = cur.fetchone()[0]
-                if total_count > 0:
-                    summary_note = f" (Expanded to verified leaders nationwide matching your criteria)."
-
-            # 3. Progressive fallback: relax email/phone requirements if still 0
-            if total_count == 0 and (plan.require_verified_email or plan.require_direct_phone):
-                where_sql, params = _compile_people_query(plan, clean_query, include_location=False, include_email=False, include_phone=False)
-                cur.execute(f"SELECT count(*) {base_people_from} {where_sql}", tuple(params))
-                total_count = cur.fetchone()[0]
-                if total_count > 0:
-                    summary_note = " (Showing all leadership contacts matching your criteria)."
+            if total_count == 0:
+                summary_note = " (No verified leaders found matching criteria in target jurisdiction)."
 
             data_sql = f"""
                 SELECT p.person_id, p.full_name, p.current_primary_title, p.seniority_level,
@@ -701,6 +706,8 @@ async def ai_chat_search(
                     "technologies": plan.technologies,
                     "require_verified_email": plan.require_verified_email,
                     "require_direct_phone": plan.require_direct_phone,
+                    "min_headcount": plan.min_headcount,
+                    "max_headcount": plan.max_headcount,
                 },
                 "total_count": total_count,
                 "limit": req.limit,
@@ -815,6 +822,8 @@ async def ai_chat_search(
                     "technologies": plan.technologies,
                     "require_verified_email": plan.require_verified_email,
                     "require_direct_phone": plan.require_direct_phone,
+                    "min_headcount": plan.min_headcount,
+                    "max_headcount": plan.max_headcount,
                 },
                 "total_count": total_count,
                 "limit": req.limit,

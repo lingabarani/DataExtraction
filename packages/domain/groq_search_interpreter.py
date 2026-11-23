@@ -115,6 +115,25 @@ COMMON_NAICS_VERTICALS: Dict[str, List[str]] = {
     "restaurant": ["722511", "722513", "722515"],
     "restaurants": ["722511", "722513", "722515"],
     "hospitality": ["721110", "722511"],
+    "hvac": ["238220"],
+    "plumbing": ["238220"],
+    "electrician": ["238210"],
+    "electrical": ["238210"],
+    "roofing": ["238160"],
+    "cybersecurity": ["541512", "541519"],
+    "cyber": ["541512", "541519"],
+    "security": ["541512", "561621"],
+    "fintech": ["522320", "518210", "523920"],
+    "biotech": ["541714", "541715"],
+    "pharmaceutical": ["325412", "541714"],
+    "insurance": ["524210", "524126"],
+    "automotive": ["441110", "811111", "336111"],
+    "retail": ["448140", "452210", "454110"],
+    "ecommerce": ["454110", "518210"],
+    "e-commerce": ["454110", "518210"],
+    "aerospace": ["336411", "336412"],
+    "energy": ["221111", "221112", "211120"],
+    "solar": ["238210", "221114"],
 }
 
 
@@ -290,14 +309,14 @@ class GroqSearchInterpreter:
             heuristic_plan.source_model = "tier0-deterministic-fastpath"
             return heuristic_plan
 
-        # Wrap external LLM calls with a hard 3.2s deadline budget guard
+        # Wrap external LLM calls with a hard 4.5s deadline budget guard
         try:
             return await asyncio.wait_for(
                 self._execute_llm_chain(clean_query, mode, heuristic_plan),
-                timeout=3.2
+                timeout=4.5
             )
         except asyncio.TimeoutError:
-            logger.warning("LLM query interpretation budget exceeded (3.2s). Returning deterministic heuristic plan.")
+            logger.warning("LLM query interpretation budget exceeded (4.5s). Returning deterministic heuristic plan.")
             heuristic_plan.source_model = "deadline-guard-heuristic"
             return heuristic_plan
 
@@ -387,8 +406,8 @@ class GroqSearchInterpreter:
         if plan_mode not in ("company", "people"):
             plan_mode = "people" if mode == "people" else "company"
 
-        # Expanded keywords
-        raw_keywords = data.get("expanded_keywords") or []
+        # Expanded keywords (supports expanded_keywords, industries, keywords)
+        raw_keywords = data.get("expanded_keywords") or data.get("industries") or data.get("keywords") or []
         if isinstance(raw_keywords, str):
             raw_keywords = [raw_keywords]
         expanded_keywords = [str(k).strip() for k in raw_keywords if str(k).strip()]
@@ -446,7 +465,7 @@ class GroqSearchInterpreter:
         require_direct_phone = bool(data.get("require_direct_phone", False))
 
         # Summary
-        summary = str(data.get("assistant_summary", "")).strip()
+        summary = str(data.get("assistant_summary") or data.get("summary") or "").strip()
         if not summary:
             summary = f"Searching {plan_mode} records matching query criteria."
 
@@ -472,6 +491,35 @@ class GroqSearchInterpreter:
     def _heuristic_fallback(self, query: str, mode: str) -> ParsedSearchPlan:
         """Deterministic entity extraction when all LLM services are offline."""
         q_lower = query.lower()
+
+        # Mode auto-detection if query explicitly targets people or decision-makers
+        effective_mode = mode
+        if any(w in q_lower for w in [
+            "founder", "founders", "ceo", "ceos", "cto", "ctos", "cfo", "cfos",
+            "vp", "vps", "vice president", "director", "directors", "head of",
+            "manager", "managers", "executive", "executives", "decision maker",
+            "decision makers", "people", "contacts", "leads"
+        ]):
+            effective_mode = "people"
+
+        # Extract headcount constraints
+        min_headcount: Optional[int] = None
+        max_headcount: Optional[int] = None
+
+        hc_range = re.search(r"(\d+)\s*(?:-|to)\s*(\d+)\s*(?:employees|staff|people|headcount)?", q_lower)
+        if hc_range:
+            min_headcount = int(hc_range.group(1))
+            max_headcount = int(hc_range.group(2))
+        else:
+            hc_min = re.search(r"(?:over|more than|at least|>|\+)\s*(\d+)\s*(?:employees|staff|people|headcount)?", q_lower)
+            if not hc_min:
+                hc_min = re.search(r"(\d+)\+\s*(?:employees|staff|people|headcount)?", q_lower)
+            if hc_min:
+                min_headcount = int(hc_min.group(1))
+
+            hc_max = re.search(r"(?:under|less than|fewer than|<)\s*(\d+)\s*(?:employees|staff|people|headcount)?", q_lower)
+            if hc_max:
+                max_headcount = int(hc_max.group(1))
 
         # Extract states
         states: List[str] = []
@@ -597,11 +645,18 @@ class GroqSearchInterpreter:
         parts = []
         if ordered_keywords:
             main_term = ordered_keywords[0].title()
-            parts.append(f"{main_term} organizations" if mode == "company" else f"professionals in {main_term}")
+            parts.append(f"{main_term} organizations" if effective_mode == "company" else f"professionals in {main_term}")
         elif ordered_naics:
-            parts.append("Organizations" if mode == "company" else "Professionals")
+            parts.append("Organizations" if effective_mode == "company" else "Professionals")
         if states:
             parts.append(f"in {', '.join(states)}")
+        if min_headcount or max_headcount:
+            if min_headcount and max_headcount:
+                parts.append(f"({min_headcount}-{max_headcount} employees)")
+            elif min_headcount:
+                parts.append(f"(>={min_headcount} employees)")
+            elif max_headcount:
+                parts.append(f"(<={max_headcount} employees)")
         if seniority_tiers:
             parts.append(f"({', '.join(seniority_tiers)})")
         if require_verified_email:
@@ -610,7 +665,7 @@ class GroqSearchInterpreter:
         summary = f"Searching for {' '.join(parts) if parts else query}."
 
         return ParsedSearchPlan(
-            mode="people" if mode == "people" else "company",  # type: ignore
+            mode="people" if effective_mode == "people" else "company",  # type: ignore
             expanded_keywords=ordered_keywords,
             naics_codes=ordered_naics,
             states=states,
@@ -622,8 +677,8 @@ class GroqSearchInterpreter:
             technologies=technologies,
             require_verified_email=require_verified_email,
             require_direct_phone=require_direct_phone,
-            min_headcount=None,
-            max_headcount=None,
+            min_headcount=min_headcount,
+            max_headcount=max_headcount,
             assistant_summary=summary,
             source_model="deterministic-regex-heuristic",
         )

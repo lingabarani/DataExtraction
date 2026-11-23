@@ -17,6 +17,34 @@ import { DetailDrawer } from "@/components/prospecting/detail-drawer";
 import { SearchEngineHub } from "@/components/prospecting/search-engine-hub";
 import { synthesizeSearchQuery } from "@/lib/query-synthesizer";
 
+function deriveHeadcountRanges(min?: number | null, max?: number | null): string[] | undefined {
+  if (min == null && max == null) return undefined;
+  const ranges: string[] = [];
+  if (min != null && max != null) {
+    if (min <= 10 && max >= 1) ranges.push("1-10");
+    if (min <= 50 && max >= 11) ranges.push("11-50");
+    if (min <= 200 && max >= 51) ranges.push("51-200");
+    if (min <= 500 && max >= 201) ranges.push("201-500");
+    if (min <= 1000 && max >= 501) ranges.push("501-1000");
+    if (max >= 1000) ranges.push("1000+");
+  } else if (min != null) {
+    if (min >= 1000) ranges.push("1000+");
+    else if (min >= 501) ranges.push("501-1000", "1000+");
+    else if (min >= 201) ranges.push("201-500", "501-1000", "1000+");
+    else if (min >= 51) ranges.push("51-200", "201-500", "501-1000", "1000+");
+    else if (min >= 11) ranges.push("11-50", "51-200", "201-500", "501-1000", "1000+");
+    else ranges.push("1-10", "11-50", "51-200", "201-500", "501-1000", "1000+");
+  } else if (max != null) {
+    if (max <= 10) ranges.push("1-10");
+    else if (max <= 50) ranges.push("1-10", "11-50");
+    else if (max <= 200) ranges.push("1-10", "11-50", "51-200");
+    else if (max <= 500) ranges.push("1-10", "11-50", "51-200", "201-500");
+    else if (max <= 1000) ranges.push("1-10", "11-50", "51-200", "201-500", "501-1000");
+    else ranges.push("1-10", "11-50", "51-200", "201-500", "501-1000", "1000+");
+  }
+  return ranges.length ? ranges : undefined;
+}
+
 export function ProspectingWorkspace() {
   const [mode, setMode] = useState<ProspectingMode>("company");
   const [hasSearched, setHasSearched] = useState(true);
@@ -93,6 +121,14 @@ export function ProspectingWorkspace() {
 
   // Initial and subsequent searches: only execute if user has searched
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlQ = params.get("q");
+      if (urlQ && !companyFilters.query && !peopleFilters.query) {
+        handleSearchPrompt(urlQ);
+        return;
+      }
+    }
     if (skipNextExecuteSearchRef.current) {
       skipNextExecuteSearchRef.current = false;
       return;
@@ -148,11 +184,17 @@ export function ProspectingWorkspace() {
               .split(/\s+/)
               .filter((w) => w.length > 2);
 
+        const derivedHeadcount = deriveHeadcountRanges(
+          res.applied_filters.min_headcount,
+          res.applied_filters.max_headcount
+        );
+
         setCompanyFilters((prev) => ({
           ...prev,
           query: promptText,
           offset: 0,
           states: res.applied_filters.states?.length ? res.applied_filters.states : undefined,
+          headcount_ranges: derivedHeadcount,
           industries: derivedIndustries.length ? derivedIndustries.slice(0, 5) : undefined,
           technologies: res.applied_filters.technologies?.length ? res.applied_filters.technologies : undefined,
         }));
@@ -169,10 +211,23 @@ export function ProspectingWorkspace() {
           seniority_levels: res.applied_filters.seniority_tiers?.length ? res.applied_filters.seniority_tiers : undefined,
           departments: res.applied_filters.departments?.length ? res.applied_filters.departments : undefined,
           email_statuses: res.applied_filters.require_verified_email ? ["VERIFIED"] : undefined,
+          has_phone: res.applied_filters.require_direct_phone ? true : undefined,
         }));
       }
 
       toast.success(`Search completed via ${res.search_engine}`);
+
+      // Synchronize active search state to URL query parameters
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("q", promptText);
+        if (res.applied_filters.states?.length) {
+          url.searchParams.set("states", res.applied_filters.states.join(","));
+        } else {
+          url.searchParams.delete("states");
+        }
+        window.history.replaceState({}, "", url.toString());
+      }
     } catch (err: any) {
       toast.error("AI query search failed: " + (err?.message || "Unknown error"));
     } finally {

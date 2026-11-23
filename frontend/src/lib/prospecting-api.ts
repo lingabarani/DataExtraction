@@ -183,6 +183,8 @@ export interface ChatSearchResponse {
     technologies: string[];
     require_verified_email: boolean;
     require_direct_phone: boolean;
+    min_headcount?: number | null;
+    max_headcount?: number | null;
   };
   total_count: number;
   limit: number;

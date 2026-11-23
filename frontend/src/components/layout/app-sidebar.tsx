@@ -26,9 +26,9 @@ const PLATFORM_NAV = [
 
 const PRIMARY_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Prospecting Grid", href: "/chat", icon: Sparkles, count: "AI" },
-  { label: "Company Data", href: "/companies", icon: Building2, count: "213K" },
-  { label: "People Data", href: "/people", icon: Users, count: "65K" },
+  { label: "Company Data", href: "/companies", icon: Building2 },
+  { label: "People Data", href: "/people", icon: Users },
+  { label: "Prospecting Grid", href: "/chat", icon: Sparkles },
   { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
 ];
 
@@ -121,17 +121,12 @@ export function SidebarContent() {
   const { user, workspace, logout } = useAuth();
   const { stats } = useDbStats();
 
-  const orgCount = stats?.org_total ? `${Math.round(stats.org_total / 1000)}K` : "213K";
-  const peopleCount = (stats?.us_total && stats.us_total < 100000)
-    ? `${Math.round(stats.us_total / 1000)}K`
-    : (stats?.persons_total ? `${Math.round(stats.persons_total / 1000)}K` : "65K");
-
   const primaryNavItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Company Data", href: "/companies", icon: Building2, count: orgCount },
-    { label: "People Data", href: "/people", icon: Users, count: peopleCount },
+    { label: "Company Data", href: "/companies", icon: Building2 },
+    { label: "People Data", href: "/people", icon: Users },
+    { label: "Prospecting Grid", href: "/chat", icon: Sparkles },
     { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
-    { label: "AI Chatbot", href: "/chat", icon: Sparkles, count: "AI" },
   ];
 
   return (

@@ -81,7 +81,11 @@ function FilterSection({
 }
 
 const DEFAULT_US_STATES = [
-  "TX", "CA", "FL", "NY", "IL", "WA", "MA", "CO", "GA", "NC", "OH", "PA", "NJ", "VA", "AZ", "TN"
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"
 ];
 
 const DEFAULT_INDUSTRIES = [
@@ -265,11 +269,13 @@ export function ProspectingSidebar({
 
   // Filtered State Lists
   const filteredStates = useMemo(() => {
-    if (!locationSearch) return DEFAULT_US_STATES;
-    return DEFAULT_US_STATES.filter((s) =>
+    const activeStates = mode === "company" ? (companyFilters.states || []) : (peopleFilters.states || []);
+    const baseSet = Array.from(new Set([...activeStates, ...DEFAULT_US_STATES]));
+    if (!locationSearch) return baseSet;
+    return baseSet.filter((s) =>
       s.toLowerCase().includes(locationSearch.toLowerCase())
     );
-  }, [locationSearch]);
+  }, [locationSearch, companyFilters.states, peopleFilters.states, mode]);
 
   const filteredIndustries = useMemo(() => {
     if (!industrySearch) return DEFAULT_INDUSTRIES;

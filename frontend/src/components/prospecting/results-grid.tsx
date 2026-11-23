@@ -418,31 +418,34 @@ export function ResultsGrid({
                     <td className="px-3 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          className="h-7 px-2.5 text-xs text-primary hover:text-primary-foreground hover:bg-primary gap-1.5 shadow-2xs font-medium transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             onInspectCompany(company);
                           }}
-                          title="Quick preview in slide-over drawer"
+                          title="View Company Intelligence in slide-over drawer"
                         >
-                          <span>Preview</span>
+                          <Sparkles className="size-3 text-primary group-hover:text-primary-foreground" />
+                          <span>Intelligence</span>
                         </Button>
                         <Button
                           asChild
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs text-primary hover:text-primary-foreground hover:bg-primary gap-1 shadow-2xs font-medium"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          title="Open full dossier in new tab"
                         >
-                          <Link
+                          <a
                             href={`/company/${company.org_id}${company.primary_domain ? `?domain=${encodeURIComponent(company.primary_domain)}` : ""}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            title="Open full Company Intelligence page"
+                            aria-label={`Open ${company.display_name || company.legal_name} dossier in new tab`}
                           >
-                            <span>Intelligence</span>
-                            <ExternalLink className="size-3" />
-                          </Link>
+                            <ExternalLink className="size-3.5" />
+                          </a>
                         </Button>
                       </div>
                     </td>
@@ -589,31 +592,34 @@ export function ResultsGrid({
                     <td className="px-3 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          className="h-7 px-2.5 text-xs text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-600 border-purple-500/30 gap-1.5 shadow-2xs font-medium transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             onInspectPerson(person);
                           }}
-                          title="Quick preview in slide-over drawer"
+                          title="View Lead Intelligence in slide-over drawer"
                         >
-                          <span>Preview</span>
+                          <Sparkles className="size-3 text-purple-500" />
+                          <span>Intelligence</span>
                         </Button>
                         <Button
                           asChild
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-600 border-purple-500/30 gap-1 shadow-2xs font-medium"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          title="Open full lead dossier in new tab"
                         >
-                          <Link
+                          <a
                             href={`/leads/${person.person_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            title="Open full Lead Intelligence Dossier"
+                            aria-label={`Open ${person.full_name} dossier in new tab`}
                           >
-                            <span>Dossier</span>
-                            <ExternalLink className="size-3" />
-                          </Link>
+                            <ExternalLink className="size-3.5" />
+                          </a>
                         </Button>
                       </div>
                     </td>

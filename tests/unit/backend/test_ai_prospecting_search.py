@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from packages.api.dependencies import UserPrincipal, get_current_user
 from packages.api.main import create_app
+from packages.domain.groq_search_interpreter import groq_search_interpreter
 from packages.infrastructure.ollama_client import ollama_client
 
 
@@ -40,6 +41,7 @@ class TestAiProspectingSearch(unittest.TestCase):
 
     # ── Test Layer 1: AI Query Parsing (Ollama & Fallback) ─────────────────
 
+    @patch.object(groq_search_interpreter, "api_keys", [])
     @patch.object(ollama_client, "is_available", return_value=True)
     @patch.object(ollama_client, "generate_structured", new_callable=AsyncMock)
     def test_parse_search_query_company_mode_ollama(self, mock_generate, mock_avail):
@@ -66,6 +68,7 @@ class TestAiProspectingSearch(unittest.TestCase):
         self.assertIn("SOC 2", data["filters"].get("compliance", []))
         self.assertIn("SOC 2", data["summary"])
 
+    @patch.object(groq_search_interpreter, "api_keys", [])
     @patch.object(ollama_client, "is_available", return_value=False)
     def test_parse_search_query_company_mode_fallback(self, mock_avail):
         """Verifies deterministic regex fallback when Ollama is offline."""
@@ -85,6 +88,7 @@ class TestAiProspectingSearch(unittest.TestCase):
         self.assertIn("SOC 2", data["filters"]["compliance"])
         self.assertTrue("TX" in data["summary"] or "Texas" in data["summary"])
 
+    @patch.object(groq_search_interpreter, "api_keys", [])
     @patch.object(ollama_client, "is_available", return_value=False)
     def test_parse_search_query_people_mode_fallback(self, mock_avail):
         """Verifies deterministic regex fallback for decision-maker prospecting."""
