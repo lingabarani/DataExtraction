@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   ProspectingMode,
@@ -20,6 +20,7 @@ import { synthesizeSearchQuery } from "@/lib/query-synthesizer";
 export function ProspectingWorkspace() {
   const [mode, setMode] = useState<ProspectingMode>("company");
   const [hasSearched, setHasSearched] = useState(true);
+  const skipNextExecuteSearchRef = useRef(false);
 
   // Filter States
   const [companyFilters, setCompanyFilters] = useState<CompanySearchParams>({
@@ -92,6 +93,10 @@ export function ProspectingWorkspace() {
 
   // Initial and subsequent searches: only execute if user has searched
   useEffect(() => {
+    if (skipNextExecuteSearchRef.current) {
+      skipNextExecuteSearchRef.current = false;
+      return;
+    }
     if (hasSearched) {
       executeSearch();
     }
@@ -128,6 +133,7 @@ export function ProspectingWorkspace() {
       setExpandedKeywords(res.applied_filters?.expanded_keywords || []);
 
       setSearchStage("rendering");
+      skipNextExecuteSearchRef.current = true;
       if (res.mode === "company") {
         setMode("company");
         setCompanies(res.results || []);
@@ -144,6 +150,7 @@ export function ProspectingWorkspace() {
 
         setCompanyFilters((prev) => ({
           ...prev,
+          query: promptText,
           offset: 0,
           states: res.applied_filters.states?.length ? res.applied_filters.states : undefined,
           industries: derivedIndustries.length ? derivedIndustries.slice(0, 5) : undefined,
@@ -156,6 +163,7 @@ export function ProspectingWorkspace() {
         setFacets(res.facets || {});
         setPeopleFilters((prev) => ({
           ...prev,
+          query: promptText,
           offset: 0,
           states: res.applied_filters.states?.length ? res.applied_filters.states : undefined,
           seniority_levels: res.applied_filters.seniority_tiers?.length ? res.applied_filters.seniority_tiers : undefined,

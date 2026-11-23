@@ -76,7 +76,7 @@ function NavItem({
   return (
     <Link
       href={href}
-      prefetch={true}
+      prefetch={false}
       className={cn(
         "group flex items-center gap-2.5 px-2.5 py-[7px] rounded text-[13px] transition-all duration-100 active:scale-[0.98]",
         depth === 1 && "pl-8",

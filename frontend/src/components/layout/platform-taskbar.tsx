@@ -71,7 +71,7 @@ export function PlatformTaskbar() {
             <Link
               key={tab.label}
               href={tab.href}
-              prefetch={true}
+              prefetch={false}
               onClick={(e) => {
                 if (tab.href.includes("#")) {
                   const targetHash = tab.href.split("#")[1];

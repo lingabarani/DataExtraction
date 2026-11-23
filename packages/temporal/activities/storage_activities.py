@@ -1084,7 +1084,16 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                             domain_last_verified_at, maps_last_verified_at, registry_last_verified_at,
                             created_at, updated_at
                         )
-                        SELECT
+                        SELECT DISTINCT ON (
+                            CASE 
+                                WHEN w.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN w.org_id::uuid
+                                ELSE md5(w.org_id)::uuid
+                            END,
+                            CASE 
+                                WHEN UPPER(w.jurisdiction) IN ('US', 'MX', 'CA', 'GLOBAL') THEN UPPER(w.jurisdiction)::kg_core.jurisdiction_code
+                                ELSE 'US'::kg_core.jurisdiction_code
+                            END
+                        )
                             CASE 
                                 WHEN w.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN w.org_id::uuid
                                 ELSE md5(w.org_id)::uuid
@@ -1117,6 +1126,17 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                             NOW(), NOW()
                         FROM staging_dataextraction.working_organizations w
                         JOIN locked_batch b ON w.org_id = b.org_id
+                        ORDER BY
+                            CASE 
+                                WHEN w.org_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN w.org_id::uuid
+                                ELSE md5(w.org_id)::uuid
+                            END,
+                            CASE 
+                                WHEN UPPER(w.jurisdiction) IN ('US', 'MX', 'CA', 'GLOBAL') THEN UPPER(w.jurisdiction)::kg_core.jurisdiction_code
+                                ELSE 'US'::kg_core.jurisdiction_code
+                            END,
+                            w.data_quality_score DESC NULLS LAST,
+                            w.trust_score DESC NULLS LAST
                         ON CONFLICT (org_id, jurisdiction) DO UPDATE SET
                             legal_name = EXCLUDED.legal_name,
                             display_name = EXCLUDED.display_name,
@@ -1156,7 +1176,12 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                             trust_score, governance_status, last_verified_at, next_verification_at,
                             created_at, updated_at
                         )
-                        SELECT
+                        SELECT DISTINCT ON (
+                            CASE 
+                                WHEN wp.person_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN wp.person_id::uuid
+                                ELSE md5(wp.person_id)::uuid
+                            END
+                        )
                             CASE 
                                 WHEN wp.person_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN wp.person_id::uuid
                                 ELSE md5(wp.person_id)::uuid
@@ -1185,6 +1210,12 @@ async def promote_certified_to_master_activity(config: Any = None, *args) -> dic
                         JOIN staging_dataextraction.working_organizations wo ON wp.org_id = wo.org_id
                         WHERE wo.governance_status = 'PROMOTED'
                           AND wp.governance_status != 'PROMOTED'
+                        ORDER BY
+                            CASE 
+                                WHEN wp.person_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN wp.person_id::uuid
+                                ELSE md5(wp.person_id)::uuid
+                            END,
+                            wp.confidence_score DESC NULLS LAST
                         ON CONFLICT (person_id) DO UPDATE SET
                             full_name = EXCLUDED.full_name,
                             current_primary_title = COALESCE(EXCLUDED.current_primary_title, master_dataextraction.persons.current_primary_title),

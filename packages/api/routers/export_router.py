@@ -134,7 +134,16 @@ def export_leads(
 
     where, params = _build_where(clean_table, seniority, industry, state_code, email_status, api_source)
     col_str = ", ".join(f'"{c}"' for c in safe_cols)
-    limit_clause = f"LIMIT {limit}" if limit else ""
+
+    clean_limit: Optional[int] = None
+    if isinstance(limit, int):
+        clean_limit = max(1, min(limit, 1000000))
+    elif isinstance(limit, str) and limit.strip().isdigit():
+        clean_limit = max(1, min(int(limit.strip()), 1000000))
+
+    limit_clause = "LIMIT %s" if clean_limit is not None else ""
+    if clean_limit is not None:
+        params.append(clean_limit)
 
     if clean_table == "mexico_leads":
         from_source = '"mexico_leads"'
@@ -325,10 +334,11 @@ def export_leads(
 @router.get("/export/leads/csv")
 def export_leads_csv_shortcut(
     table: str = Query("master_organizations"),
+    limit: Optional[int] = Query(None, ge=1, le=1000000),
     user: UserPrincipal = Depends(get_current_user),
 ):
     """Convenience shortcut for quick full-table CSV export."""
-    return export_leads(table=table, format="csv", user=user)
+    return export_leads(table=table, format="csv", limit=limit, user=user)
 
 
 @router.post("/export/onereach")

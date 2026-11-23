@@ -882,12 +882,16 @@ export function CompanyDetail({
                       variant="outline"
                       className={cn(
                         "text-xs px-2.5 py-0.5 font-semibold",
-                        (intel.reviews?.ai_summary?.sentiment || "").toLowerCase().includes("positive") || (intel.reviews?.average_rating || 0) >= 4.0
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                        (intel.reviews?.total_scraped || 0) === 0
+                          ? "bg-muted text-muted-foreground border-border"
+                          : (intel.reviews?.ai_summary?.sentiment || "").toLowerCase().includes("positive") || (intel.reviews?.average_rating || 0) >= 4.0
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
                       )}
                     >
-                      {intel.reviews?.ai_summary?.sentiment || (Number(intel.reviews?.average_rating || 0) >= 4.0 ? "Positive Sentiment" : "Neutral")}
+                      {(intel.reviews?.total_scraped || 0) === 0
+                        ? "Review Data Unavailable"
+                        : (intel.reviews?.ai_summary?.sentiment || (Number(intel.reviews?.average_rating || 0) >= 4.0 ? "Verified Positive Citations" : "Neutral Standing"))}
                     </Badge>
                   </div>
 

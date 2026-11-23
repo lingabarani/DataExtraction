@@ -42,7 +42,7 @@ class CleanRequest(BaseModel):
 def _count_dup_email(cur, table: str) -> tuple[int, int, list]:
     target = "master_dataextraction.persons" if table == "us_leads" else f'"{table}"'
     col = "primary_email" if table == "us_leads" else "email"
-    src_expr = "'MDM_GOLDEN_RECORD'" if table == "us_leads" else "api_source"
+    src_expr = "'MDM_GOLDEN_RECORD'::text" if table == "us_leads" else "api_source::text"
     cur.execute(f"""
         SELECT {col}, COUNT(1) AS cnt, ARRAY_AGG(DISTINCT {src_expr}) AS srcs
         FROM {target}
@@ -72,7 +72,7 @@ def _count_dup_email(cur, table: str) -> tuple[int, int, list]:
 def _count_dup_phone(cur, table: str) -> tuple[int, int, list]:
     target = "master_dataextraction.persons" if table == "us_leads" else f'"{table}"'
     col = "primary_phone_e164" if table == "us_leads" else "phone"
-    src_expr = "'MDM_GOLDEN_RECORD'" if table == "us_leads" else "api_source"
+    src_expr = "'MDM_GOLDEN_RECORD'::text" if table == "us_leads" else "api_source::text"
     cur.execute(f"""
         SELECT {col}, COUNT(1) AS cnt, ARRAY_AGG(DISTINCT {src_expr}) AS srcs
         FROM {target}
@@ -253,8 +253,17 @@ def _delete_dups_chunked(conn, table: str, check: str, batch_size: int = 1000) -
             if not ids_to_delete:
                 break
 
-            cur.execute(f'DELETE FROM "{table}" WHERE id = ANY(%s)', (ids_to_delete,))
-            deleted = cur.rowcount
+            if table == "us_leads":
+                # us_leads is a PostgreSQL View over master_dataextraction; delete from underlying base table
+                cur.execute('DELETE FROM master_dataextraction.persons WHERE person_id::text = ANY(%s)', (ids_to_delete,))
+                deleted = cur.rowcount
+                if deleted == 0:
+                    cur.execute('DELETE FROM master_dataextraction.organizations WHERE org_id::text = ANY(%s)', (ids_to_delete,))
+                    deleted = cur.rowcount
+            else:
+                cur.execute(f'DELETE FROM "{table}" WHERE id = ANY(%s)', (ids_to_delete,))
+                deleted = cur.rowcount
+
             conn.commit()
             total_deleted += deleted
 

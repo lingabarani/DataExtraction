@@ -430,6 +430,8 @@ def _compile_company_query(
         st_clause, st_params = _build_org_state_clause(plan.states)
         where_clauses.append(st_clause)
         params.extend(st_params)
+        if any(s.strip().upper() in US_STATE_MAP.values() for s in plan.states):
+            where_clauses.append("o.jurisdiction = 'US'")
 
     if include_location and plan.cities:
         city_list = [c.strip() for c in plan.cities]
@@ -928,6 +930,8 @@ def search_companies(
                 st_clause, st_params = _build_org_state_clause(req.states)
                 wc.append(st_clause)
                 p.extend(st_params)
+                if any(s.strip().upper() in US_STATE_MAP.values() for s in req.states):
+                    wc.append("o.jurisdiction = 'US'")
 
             if req.cities:
                 city_list = [c.strip() for c in req.cities]
@@ -1076,11 +1080,20 @@ def search_companies(
         cur.execute(count_sql, tuple(params))
         total_records = cur.fetchone()[0]
 
-        # Progressive relaxation fallback if 0 records match strict location
-        if total_records == 0 and req.states:
-            where_sql, params = _build_where(include_states=False)
-            cur.execute(f"SELECT count(*) FROM master_dataextraction.organizations o {where_sql}", tuple(params))
-            total_records = cur.fetchone()[0]
+        if total_records == 0:
+            return {
+                "total": 0,
+                "limit": req.limit,
+                "offset": req.offset,
+                "search_engine": "PostgreSQL-18.6-Sovereign-Master",
+                "results": [],
+                "facets": {
+                    "states": [{"value": s, "count": 0} for s in (req.states or [])],
+                    "industries": [{"value": i, "count": 0} for i in (req.industries or [])],
+                    "technologies": [{"value": t, "count": 0} for t in (req.technologies or [])],
+                    "intent_strengths": [{"value": s, "count": 0} for s in (req.intent_strengths or [])],
+                },
+            }
 
         # Fetch records with subquery limit so lateral joins are only evaluated for 25 rows
         data_sql = f"""
@@ -1335,12 +1348,20 @@ def search_people(
         cur.execute(count_sql, tuple(params))
         total_records = cur.fetchone()[0]
 
-        # Progressive relaxation fallback if 0 records match strict location
-        if total_records == 0 and req.states:
-            where_sql, params = _build_people_where(include_states=False)
-            join_org = "LEFT JOIN master_dataextraction.organizations o ON o.org_id = p.current_primary_org_id" if "o." in where_sql else ""
-            cur.execute(f"SELECT count(*) FROM master_dataextraction.persons p {join_org} {where_sql}", tuple(params))
-            total_records = cur.fetchone()[0]
+        if total_records == 0:
+            return {
+                "total": 0,
+                "limit": req.limit,
+                "offset": req.offset,
+                "search_engine": "PostgreSQL-18.6-Sovereign-Master",
+                "results": [],
+                "facets": {
+                    "seniority_levels": [{"value": s, "count": 0} for s in (req.seniority_levels or [])],
+                    "departments": [{"value": d, "count": 0} for d in (req.departments or [])],
+                    "states": [{"value": s, "count": 0} for s in (req.states or [])],
+                    "email_statuses": [{"value": e, "count": 0} for e in (req.email_statuses or [])],
+                },
+            }
 
         # Fetch records with subquery limit so joins are only evaluated for 25 rows
         data_sql = f"""

@@ -331,7 +331,7 @@ class ChatbotLLMClient:
                         max_tokens=1500,
                         purpose="chatbot_response",
                     )
-                    res = future.result(timeout=3.5)
+                    res = future.result(timeout=7.0)
                     if res and res.text and len(res.text.strip()) > 30:
                         return res.text.strip()
             except (concurrent.futures.TimeoutError, Exception) as exc:

@@ -12,10 +12,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  experimental: {
-    cpus: 1,
-    workerThreads: false,
-  },
+  ...(process.env.CI
+    ? {
+        experimental: {
+          cpus: 1,
+          workerThreads: false,
+        },
+      }
+    : {}),
   async headers() {
     return [
       {

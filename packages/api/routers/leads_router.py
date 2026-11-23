@@ -1011,6 +1011,7 @@ async def crawl_all_company_sources(
     sources_crawled.append("DNS & SSL Handshake (Port 443)")
 
     # 3. Source: Google Maps reviews & Place details
+    has_place = False
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -1022,6 +1023,7 @@ async def crawl_all_company_sources(
             """, (company_id, f"%{clean_dom}%"))
             r = cur.fetchone()
             if r and r[0]:
+                has_place = True
                 sources_crawled.append("Google Maps RPC (Place Verified)")
             else:
                 sources_crawled.append("Google Maps Discovery (Place Sweep)")
@@ -1033,12 +1035,12 @@ async def crawl_all_company_sources(
     # 4. Source: Google Search & Public Registries Verification
     sources_crawled.append("Google Search & Sovereign Business Registries")
 
-    has_live_findings = bool(intel.get("live_crawl_summary", {}).get("pages_crawled", 0) > 0 or ssl_res.get("valid"))
+    has_live_findings = bool(intel.get("live_crawl_summary", {}).get("pages_crawled", 0) > 0 or has_place)
     overall_status = "COMPLETED" if has_live_findings else "UNAVAILABLE"
     overall_msg = (
-        f"Multi-source crawl completed across {len(sources_crawled)} channels."
+        f"Multi-source crawl completed across {len(sources_crawled)} channels: live intelligence verified."
         if has_live_findings
-        else "Multi-source crawl completed: target website and public registries currently have no live narrative for this domain."
+        else "Multi-source crawl completed: target website and public registries currently have no live narrative for this domain (Data Unavailable)."
     )
 
     intel["overall_crawl"] = {
