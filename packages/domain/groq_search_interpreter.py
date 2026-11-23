@@ -76,12 +76,31 @@ COMMON_NAICS_VERTICALS: Dict[str, List[str]] = {
     "homecare": ["621610", "624120", "623312", "623110", "624190"],
     "home care": ["621610", "624120", "623312", "623110", "624190"],
     "eldercare": ["624120", "623312", "623110", "621610"],
+    "elder care": ["624120", "623312", "623110", "621610"],
+    "senior care": ["624120", "623312", "623110", "621610"],
+    "assisted living": ["623312", "623110", "624120"],
+    "nursing home": ["623110", "623312"],
+    "childcare": ["624410"],
+    "child care": ["624410"],
+    "daycare": ["624410"],
+    "day care": ["624410"],
+    "preschool": ["624410"],
+    "nursery school": ["624410"],
     "healthcare": ["621111", "621112", "621210", "621310", "621610", "622110"],
     "medical": ["621111", "621112", "621210", "621310", "621610"],
+    "dental": ["621210"],
+    "clinic": ["621111", "621112", "621210", "621310"],
+    "hospital": ["622110", "622210"],
     "software": ["511210", "518210", "541511", "541512"],
     "saas": ["511210", "518210", "541511"],
+    "technology": ["541512", "541511", "518210", "511210"],
+    "tech": ["541512", "541511", "518210", "511210"],
+    "it services": ["541512", "541513"],
+    "information technology": ["541512", "541511", "518210"],
     "logistics": ["484110", "484121", "488510", "493110"],
     "freight": ["484110", "484121", "488510"],
+    "trucking": ["484110", "484121"],
+    "warehousing": ["493110"],
     "manufacturing": ["332710", "334418", "333999", "311999", "332312"],
     "manufacture": ["332710", "334418", "333999", "311999", "332312"],
     "industrial": ["333120", "333999", "332710", "332999"],
@@ -90,6 +109,12 @@ COMMON_NAICS_VERTICALS: Dict[str, List[str]] = {
     "banking": ["522110", "522291", "523920"],
     "construction": ["236220", "238210", "238220"],
     "real estate": ["531210", "531311", "531312"],
+    "legal": ["541110", "541199"],
+    "law firm": ["541110"],
+    "accounting": ["541211", "541213"],
+    "restaurant": ["722511", "722513", "722515"],
+    "restaurants": ["722511", "722513", "722515"],
+    "hospitality": ["721110", "722511"],
 }
 
 
@@ -466,12 +491,13 @@ class GroqSearchInterpreter:
                 if tier not in seniority_tiers:
                     seniority_tiers.append(tier)
 
-        # Extract departments
+        # Extract departments (only active in people search mode to prevent polluting company industry searches)
         departments: List[str] = []
-        for term, dep in DEPARTMENT_KEYWORDS.items():
-            if re.search(r"\b" + re.escape(term) + r"\b", q_lower):
-                if dep not in departments:
-                    departments.append(dep)
+        if mode == "people":
+            for term, dep in DEPARTMENT_KEYWORDS.items():
+                if re.search(r"\b" + re.escape(term) + r"\b", q_lower):
+                    if dep not in departments:
+                        departments.append(dep)
 
         # Extract tech
         technologies: List[str] = []
@@ -485,11 +511,21 @@ class GroqSearchInterpreter:
         for term, codes in COMMON_NAICS_VERTICALS.items():
             if term in q_lower:
                 naics_codes.extend(codes)
-                if term in ("homecare", "home care", "eldercare"):
+                if term in ("childcare", "child care", "daycare", "day care", "preschool", "nursery school"):
+                    expanded_keywords.extend([
+                        "child care", "child day care", "preschool", "early childhood education",
+                        "childcare center", "daycare center", "infant care"
+                    ])
+                elif term in ("homecare", "home care", "eldercare", "elder care", "senior care", "assisted living", "nursing home"):
                     expanded_keywords.extend([
                         "home health care", "senior care", "elderly assistance",
                         "skilled nursing", "assisted living", "personal care aide",
                         "in-home hospice", "caregiving services"
+                    ])
+                elif term in ("technology", "tech", "it services", "information technology"):
+                    expanded_keywords.extend([
+                        "information technology", "technology services", "it solutions",
+                        "cloud services", "software systems", "tech enterprise"
                     ])
                 elif term in ("software", "saas"):
                     expanded_keywords.extend([
@@ -501,11 +537,11 @@ class GroqSearchInterpreter:
                         "manufacturing", "industrial manufacturing", "machinery",
                         "fabricated metal", "production plant", "equipment manufacturer"
                     ])
-                elif term in ("healthcare", "medical"):
+                elif term in ("healthcare", "medical", "clinic", "hospital", "dental"):
                     expanded_keywords.extend([
                         "healthcare", "medical services", "clinic", "health system"
                     ])
-                elif term in ("logistics", "freight"):
+                elif term in ("logistics", "freight", "trucking", "warehousing"):
                     expanded_keywords.extend([
                         "logistics", "freight transport", "supply chain", "warehousing"
                     ])
@@ -521,11 +557,27 @@ class GroqSearchInterpreter:
                     expanded_keywords.extend([
                         "commercial real estate", "property management", "brokerage"
                     ])
+                elif term in ("legal", "law firm"):
+                    expanded_keywords.extend([
+                        "legal services", "law firm", "attorneys", "litigation"
+                    ])
+                elif term in ("accounting",):
+                    expanded_keywords.extend([
+                        "accounting services", "cpa firm", "tax advisory", "bookkeeping"
+                    ])
+                elif term in ("restaurant", "restaurants", "hospitality"):
+                    expanded_keywords.extend([
+                        "restaurant", "dining", "hospitality", "food service", "catering"
+                    ])
 
-        # Dynamic query keyword token retention
+        # Dynamic query keyword token retention with generic noise word suppression
         STOP_WORDS = {
             "companies", "company", "in", "the", "for", "and", "or", "of", "with", "a", "an",
-            "at", "by", "from", "to", "all", "top", "find", "get", "show", "search", "list"
+            "at", "by", "from", "to", "all", "top", "find", "get", "show", "search", "list",
+            "services", "service", "agencies", "agency", "providers", "provider", "centers",
+            "center", "solutions", "group", "businesses", "business", "firms", "firm",
+            "corporation", "corp", "inc", "llc", "organizations", "organization", "care", "child",
+            "near", "best", "verified", "data"
         }
         for tok in re.findall(r"[a-zA-Z]{3,}", q_lower):
             if (tok not in STOP_WORDS and tok not in US_STATE_MAP 
@@ -537,11 +589,17 @@ class GroqSearchInterpreter:
         require_verified_email = any(w in q_lower for w in ["email", "emails", "deliverable", "contact details"])
         require_direct_phone = any(w in q_lower for w in ["phone", "direct dial", "mobile", "cell", "call"])
 
+        # Order-preserving deduplication so primary vertical keyword remains at index 0
+        ordered_keywords = list(dict.fromkeys(expanded_keywords))
+        ordered_naics = list(dict.fromkeys(naics_codes))
+
         # Construct assistant summary
         parts = []
-        if expanded_keywords:
-            main_term = expanded_keywords[0].title()
+        if ordered_keywords:
+            main_term = ordered_keywords[0].title()
             parts.append(f"{main_term} organizations" if mode == "company" else f"professionals in {main_term}")
+        elif ordered_naics:
+            parts.append("Organizations" if mode == "company" else "Professionals")
         if states:
             parts.append(f"in {', '.join(states)}")
         if seniority_tiers:
@@ -553,8 +611,8 @@ class GroqSearchInterpreter:
 
         return ParsedSearchPlan(
             mode="people" if mode == "people" else "company",  # type: ignore
-            expanded_keywords=list(set(expanded_keywords)),
-            naics_codes=list(set(naics_codes)),
+            expanded_keywords=ordered_keywords,
+            naics_codes=ordered_naics,
             states=states,
             cities=[],
             countries=["US"],
