@@ -497,18 +497,32 @@ export function CompanyDetail({
 
                 {/* About block */}
                 <div className="pt-2 border-t border-border/40">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                     <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">About</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLiveDeepCrawl}
-                      disabled={isCrawling || isRefreshing}
-                      className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
-                    >
-                      <RefreshCw className={cn("w-2.5 h-2.5 text-primary", isCrawling && "animate-spin")} />
-                      <span>{intel.overview ? "Re-crawl website" : "Run Live Deep Crawl"}</span>
-                    </Button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLiveDeepCrawl}
+                        disabled={isCrawling || isOverallCrawling || isRefreshing}
+                        className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                        title="Scrape company website homepage, /about, and contact page"
+                      >
+                        <RefreshCw className={cn("w-2.5 h-2.5 text-primary", isCrawling && "animate-spin")} />
+                        <span>{intel.overview ? "Re-crawl website" : "Run Live Deep Crawl"}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleOverallCrawl}
+                        disabled={isOverallCrawling || isCrawling || isRefreshing}
+                        className="h-6 px-2 text-[10px] gap-1 text-indigo-600 dark:text-indigo-400 hover:text-foreground"
+                        title="Multi-source crawl: Website + Google Maps RPC + DNS/SSL + Sovereign Registries"
+                      >
+                        <Radar className={cn("w-2.5 h-2.5 text-indigo-500", isOverallCrawling && "animate-spin")} />
+                        <span>Overall Multi-Source Crawl</span>
+                      </Button>
+                    </div>
                   </div>
                   {intel.overview ? (
                     <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-line">
@@ -517,18 +531,30 @@ export function CompanyDetail({
                   ) : (
                     <div className="rounded-md border border-dashed border-border/80 p-3 bg-muted/10 text-muted-foreground flex flex-col gap-2">
                       <p className="text-[11px]">
-                        No website or regulatory About summary crawled yet. Click below to trigger live website crawl.
+                        No verified About summary crawled yet. Use the crawlers below to discover verified intelligence from the website, Google Maps, or sovereign registries.
                       </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleLiveDeepCrawl}
-                        disabled={isCrawling || isRefreshing}
-                        className="w-fit h-7 text-[11px] gap-1.5"
-                      >
-                        <RefreshCw className={cn("w-3 h-3 text-primary", isCrawling && "animate-spin")} />
-                        <span>Run Live Deep Crawl</span>
-                      </Button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleLiveDeepCrawl}
+                          disabled={isCrawling || isOverallCrawling || isRefreshing}
+                          className="w-fit h-7 text-[11px] gap-1.5"
+                        >
+                          <RefreshCw className={cn("w-3 h-3 text-primary", isCrawling && "animate-spin")} />
+                          <span>Run Live Deep Crawl</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleOverallCrawl}
+                          disabled={isOverallCrawling || isCrawling || isRefreshing}
+                          className="w-fit h-7 text-[11px] gap-1.5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                        >
+                          <Radar className={cn("w-3 h-3 text-indigo-500", isOverallCrawling && "animate-spin")} />
+                          <span>Overall Multi-Source Crawl</span>
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

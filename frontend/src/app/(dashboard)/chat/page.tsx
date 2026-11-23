@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { ConversationalWorkspace } from "@/components/chat/conversational-workspace";
+import { ProspectingWorkspace } from "@/components/prospecting/prospecting-workspace";
 
 export const metadata: Metadata = {
-  title: "AI Chatbot & Prospecting Intelligence | DataExtraction",
+  title: "Prospecting Grid | DataExtraction Enterprise",
   description:
-    "Enterprise Conversational B2B Intelligence powered by 305K+ verified organizations, Apollo-grade faceted filters, and zero-hallucination semantic search.",
+    "Apollo-grade B2B Prospecting Grid with sub-second AI search, faceted filters, and 305K+ verified organizations.",
 };
 
 export default function ChatbotPage() {
-  return <ConversationalWorkspace />;
+  return <ProspectingWorkspace />;
 }

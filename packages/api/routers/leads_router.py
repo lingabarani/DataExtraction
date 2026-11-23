@@ -812,8 +812,62 @@ async def live_deep_crawl_company(
         release_connection(conn)
 
     clean_dom = clean_domain(target_domain or domain or "")
+
+    # ── Automated Domain Resolution Fallback ──────────────────────────────────
     if not clean_dom or "example.com" in clean_dom:
-        raise HTTPException(status_code=400, detail="Cannot crawl: no valid company website domain found for this entity.")
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                # 1. Check Google Maps places table for website
+                if target_name:
+                    try:
+                        cur.execute("""
+                            SELECT website FROM places
+                            WHERE name ILIKE %s AND website IS NOT NULL AND website != ''
+                            LIMIT 1
+                        """, (f"%{target_name[:30]}%",))
+                        p_res = cur.fetchone()
+                        if p_res and p_res[0]:
+                            clean_dom = clean_domain(p_res[0])
+                            target_domain = clean_dom
+                    except Exception:
+                        conn.rollback()
+
+                # 2. Check contact_emails for company domain
+                if (not clean_dom or "example.com" in clean_dom) and org_uuid:
+                    try:
+                        cur.execute("""
+                            SELECT email FROM master_dataextraction.contact_emails
+                            WHERE org_id = %s AND email NOT LIKE '%example.com%'
+                            LIMIT 1
+                        """, (org_uuid,))
+                        e_res = cur.fetchone()
+                        if e_res and e_res[0] and "@" in e_res[0]:
+                            cand_dom = e_res[0].split("@")[-1].strip()
+                            if cand_dom and "." in cand_dom and cand_dom not in ("gmail.com", "yahoo.com", "hotmail.com", "outlook.com"):
+                                clean_dom = clean_domain(cand_dom)
+                                target_domain = clean_dom
+                    except Exception:
+                        conn.rollback()
+
+                # If domain discovered, persist back to organization record
+                if clean_dom and "example.com" not in clean_dom and org_uuid:
+                    cur.execute("""
+                        UPDATE master_dataextraction.organizations
+                        SET primary_domain = %s, updated_at = NOW()
+                        WHERE org_id = %s
+                    """, (clean_dom, org_uuid))
+                    conn.commit()
+        except Exception as res_err:
+            logger.warning("Automated domain resolution error: %s", res_err)
+        finally:
+            release_connection(conn)
+
+    if not clean_dom or "example.com" in clean_dom:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot crawl: No verified domain discovered for '{target_name or company_id}'. Trigger Overall Multi-Source Crawl to sweep Google Maps and SERP registries."
+        )
 
     crawled_overview = None
     discovered_techs: list[str] = []

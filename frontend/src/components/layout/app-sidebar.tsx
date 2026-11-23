@@ -26,11 +26,10 @@ const PLATFORM_NAV = [
 
 const PRIMARY_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "AI Chatbot", href: "/chat", icon: Sparkles, count: "AI" },
+  { label: "Prospecting Grid", href: "/chat", icon: Sparkles, count: "AI" },
   { label: "Company Data", href: "/companies", icon: Building2, count: "213K" },
   { label: "People Data", href: "/people", icon: Users, count: "65K" },
   { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
-  { label: "AI Chatbot", href: "/chat", icon: Bot, count: "COPILOT" },
 ];
 
 const TOOLS_NAV = [

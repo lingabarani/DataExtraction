@@ -207,7 +207,7 @@ export interface DecisionMaker {
 
 export const prospectingApi = {
   async chatSearch(req: ChatSearchRequest): Promise<ChatSearchResponse> {
-    return api.post<ChatSearchResponse>("/ai/chat-search", req);
+    return api.post<ChatSearchResponse>("/ai/chat-search", req, { timeoutMs: 30000 });
   },
 
   async parseSearchQuery(query: string, mode: ProspectingMode): Promise<ParseQueryResponse> {

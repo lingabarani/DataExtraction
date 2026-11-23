@@ -187,3 +187,57 @@ def cancel_execution(
     """Cancels active Live Discovery or query execution for the session."""
     _orchestrator.cancel_session(session_id)
     return {"status": "cancelled", "session_id": session_id}
+
+
+# ── Staged Review Queue Endpoints ─────────────────────────────────────────────
+
+@router.get("/reviews", response_model=List[ReviewItemResponse])
+def list_review_queue(
+    status: Optional[str] = Query(None, description="Filter by status: PENDING, APPROVED, REJECTED"),
+    session_id: Optional[str] = Query(None),
+    company_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user: UserPrincipal = Depends(get_current_user),
+):
+    """Lists staged discovery items awaiting human verification or audit history."""
+    return _review_repo.list_review_items(
+        status=status,
+        session_id=session_id,
+        company_id=company_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/reviews/stats")
+def get_review_queue_stats(
+    user: UserPrincipal = Depends(get_current_user),
+):
+    """Returns summary counts of pending, approved, and rejected reviews."""
+    return _review_repo.get_review_stats()
+
+
+@router.post("/reviews/{item_id}/action", response_model=ReviewItemResponse)
+def execute_review_action(
+    item_id: str,
+    body: ReviewActionRequest,
+    user: UserPrincipal = Depends(get_current_user),
+):
+    """Applies human review decision (approve or reject) to a staged discovery item."""
+    item = _review_repo.get_review_item(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Review item not found")
+
+    if body.action.upper() == "APPROVE":
+        success = _review_repo.approve_review_item(item_id, reviewer=user.email, notes=body.reason)
+    elif body.action.upper() == "REJECT":
+        success = _review_repo.reject_review_item(item_id, reviewer=user.email, reason=body.reason)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Must be APPROVE or REJECT.")
+
+    if not success:
+        raise HTTPException(status_code=400, detail="Could not apply action. Item may have already been resolved.")
+
+    updated_item = _review_repo.get_review_item(item_id)
+    return updated_item

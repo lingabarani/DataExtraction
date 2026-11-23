@@ -320,3 +320,23 @@ class ReviewRepository:
             updated = cur.rowcount > 0
             conn.commit()
             return updated
+
+    def get_review_stats(self) -> Dict[str, int]:
+        """Returns aggregate counts of pending, approved, and rejected reviews."""
+        sql = """
+            SELECT review_status, count(*)
+            FROM chat_dataextraction.chat_review_items
+            GROUP BY review_status;
+        """
+        counts = {"pending": 0, "approved": 0, "rejected": 0, "total": 0}
+        try:
+            with get_db_cursor() as (conn, cur):
+                cur.execute(sql)
+                for status_val, cnt in cur.fetchall():
+                    key = str(status_val).lower()
+                    if key in counts:
+                        counts[key] = cnt
+                    counts["total"] += cnt
+        except Exception as exc:
+            logger.warning("Could not fetch review stats: %s", exc)
+        return counts
