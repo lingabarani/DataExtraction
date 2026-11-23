@@ -114,3 +114,48 @@ def test_start_and_signal_orchestration_saga():
     assert halt_res.status_code == 200
     assert halt_res.json()["signal_delivered"] == "emergency_halt"
 
+
+def test_start_orchestration_saga_with_new_presets():
+    """Validates starting a saga with 20 and 50 target count presets."""
+    import time
+    for count in (20, 50):
+        unique_wf_id = f"test-preset-{count}-{int(time.time() * 1000)}"
+        res = client.post(
+            "/api/orchestration/start",
+            json={
+                "workflow_id": unique_wf_id,
+                "data_count": count,
+                "countries": ["US"],
+                "sources": ["google_maps"],
+                "execution_mode": "INCREMENTAL",
+            },
+        )
+        assert res.status_code == 202
+        data = res.json()
+        assert data["workflow_id"] == unique_wf_id
+        assert data["status"] == "ACCEPTED"
+
+
+def test_get_extracted_data_and_export():
+    """Validates /extracted-data and /extracted-data/export (xlsx and csv)."""
+    # 1. JSON records endpoint
+    res = client.get("/api/orchestration/extracted-data?limit=10")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "SUCCESS"
+    assert "records" in data
+    assert "total_staging_records" in data
+    assert isinstance(data["records"], list)
+
+    # 2. Excel (.xlsx) export stream
+    res_xlsx = client.get("/api/orchestration/extracted-data/export?format=xlsx&limit=25")
+    assert res_xlsx.status_code == 200
+    assert "application/vnd.openxmlformats" in res_xlsx.headers.get("content-type", "")
+    assert len(res_xlsx.content) > 1000
+
+    # 3. CSV export stream
+    res_csv = client.get("/api/orchestration/extracted-data/export?format=csv&limit=25")
+    assert res_csv.status_code == 200
+    assert "text/csv" in res_csv.headers.get("content-type", "")
+    assert b"Company Name" in res_csv.content
+

@@ -22,7 +22,7 @@ interface StartScrapingModalProps {
   isSubmitting: boolean;
 }
 
-const DATA_COUNT_OPTIONS = [100, 500, 1000, 5000, 10000, 50000, 100000];
+const DATA_COUNT_OPTIONS = [20, 50, 100, 500, 1000, 5000, 10000, 50000, 100000];
 const COUNTRY_OPTIONS = [
   { id: "US", label: "United States", flag: "🇺🇸" },
   { id: "Mexico", label: "Mexico", flag: "🇲🇽" },
@@ -97,7 +97,7 @@ export function StartScrapingModal({
                 {dataCount.toLocaleString()} targets
               </span>
             </div>
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-1.5">
               {DATA_COUNT_OPTIONS.map((count) => {
                 const isSelected = dataCount === count;
                 return (

@@ -16,7 +16,7 @@ import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -554,7 +554,7 @@ async def _run_direct_saga(wf_id: str, config: Dict[str, Any]) -> None:
 
 class StartSagaRequest(BaseModel):
     workflow_id: Optional[str] = None
-    data_count: int = Field(1000, description="Presets: 100, 500, 1000, 5000, 10000, 50000, 100000")
+    data_count: int = Field(1000, description="Presets: 20, 50, 100, 500, 1000, 5000, 10000, 50000, 100000")
     countries: List[str] = Field(default_factory=lambda: ["US"], description="US, Mexico, Canada, Global")
     sources: Union[List[str], Dict[str, bool]] = Field(
         default_factory=lambda: ["registry_sources", "google_maps", "openstreetmap"],
@@ -1149,3 +1149,313 @@ def list_orchestrator_queues(
 ) -> Dict[str, str]:
     """Returns mapping of all dedicated agent task queues."""
     return get_task_queues()
+
+
+@router.get("/extracted-data")
+def get_recent_extracted_data(
+    source: str = Query("ALL", description="Source filter (ALL, GOOGLE_MAPS, OPENSTREETMAP, REGISTRY, OPEN_DIRECTORIES, etc.)"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of recent records to return"),
+    search: Optional[str] = Query(None, description="Search query across name, domain, city"),
+    current_user: UserPrincipal = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Returns recently harvested records from staging_dataextraction.staging_companies
+    with exact scraping timestamps, quality score, contact info, and sources.
+    """
+    from packages.infrastructure.db_connector import get_db_cursor
+
+    records: List[Dict[str, Any]] = []
+    total_staging_count = 0
+    sources_distribution: Dict[str, int] = {}
+
+    clean_source = (source or "ALL").strip().upper()
+    clean_search = (search or "").strip()
+
+    try:
+        with get_db_cursor() as (conn, cur):
+            # Total count
+            cur.execute("SELECT COUNT(*) FROM staging_dataextraction.staging_companies;")
+            total_staging_count = cur.fetchone()[0]
+
+            # Sources breakdown
+            cur.execute("""
+                SELECT source, COUNT(*) 
+                FROM staging_dataextraction.staging_companies 
+                GROUP BY source 
+                ORDER BY COUNT(*) DESC;
+            """)
+            for row in cur.fetchall():
+                sources_distribution[str(row[0])] = int(row[1])
+
+            # Query recent records
+            sql = """
+                SELECT id, name, legal_name, website, domain, phone,
+                       city, state, state_code, zip_code, country, industry,
+                       source, data_quality_score, created_at, updated_at
+                FROM staging_dataextraction.staging_companies
+                WHERE 1=1
+            """
+            params: List[Any] = []
+
+            if clean_source != "ALL":
+                sql += " AND UPPER(source) = %s"
+                params.append(clean_source)
+
+            if clean_search:
+                sql += " AND (name ILIKE %s OR domain ILIKE %s OR city ILIKE %s OR phone ILIKE %s)"
+                search_param = f"%{clean_search}%"
+                params.extend([search_param, search_param, search_param, search_param])
+
+            sql += " ORDER BY updated_at DESC NULLS LAST, created_at DESC LIMIT %s;"
+            params.append(limit)
+
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+            for r in rows:
+                updated_at_iso = r[15].isoformat() if r[15] is not None else (r[14].isoformat() if r[14] is not None else None)
+                records.append({
+                    "id": str(r[0]),
+                    "name": r[1] or "Unknown Organization",
+                    "legal_name": r[2],
+                    "website": r[3],
+                    "domain": r[4],
+                    "phone": r[5],
+                    "city": r[6],
+                    "state": r[7] or r[8],
+                    "state_code": r[8],
+                    "zip_code": r[9],
+                    "country": r[10] or "US",
+                    "industry": r[11] or "Commercial / B2B",
+                    "source": str(r[12] or "HARVESTER").upper(),
+                    "data_quality_score": float(r[13]) if r[13] is not None else 0.85,
+                    "created_at": r[14].isoformat() if r[14] is not None else None,
+                    "scraped_at": updated_at_iso,
+                    "status": "STAGING_VERIFIED",
+                })
+
+    except Exception as exc:
+        logger.exception("Failed to fetch extracted staging data: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving extracted data: {exc}",
+        )
+
+    return {
+        "status": "SUCCESS",
+        "total_staging_records": total_staging_count,
+        "returned_records": len(records),
+        "active_source_filter": clean_source,
+        "sources_distribution": sources_distribution,
+        "records": records,
+        "timestamp": now_ts(),
+    }
+
+
+@router.get("/extracted-data/export")
+def export_recent_extracted_data(
+    format: str = Query("xlsx", pattern="^(xlsx|csv)$", description="Export format: xlsx or csv"),
+    source: str = Query("ALL", description="Filter by source or ALL"),
+    limit: int = Query(1000, ge=1, le=25000, description="Record count (defaults to top 1,000 for sub-2s download)"),
+    search: Optional[str] = Query(None, description="Optional search filter"),
+    current_user: UserPrincipal = Depends(get_current_user),
+):
+    """
+    Streams the top most recently scraped records across all sources as a styled Excel (.xlsx) spreadsheet or CSV.
+    """
+    from packages.infrastructure.db_connector import get_db_cursor
+    import io
+
+    clean_source = (source or "ALL").strip().upper()
+    clean_search = (search or "").strip()
+    clean_format = format.lower().strip()
+
+    sql = """
+        SELECT id, name, domain, website, phone,
+               city, state, country, industry, source,
+               data_quality_score, updated_at, created_at
+        FROM staging_dataextraction.staging_companies
+        WHERE 1=1
+    """
+    params: List[Any] = []
+
+    if clean_source != "ALL":
+        sql += " AND UPPER(source) = %s"
+        params.append(clean_source)
+
+    if clean_search:
+        sql += " AND (name ILIKE %s OR domain ILIKE %s OR city ILIKE %s OR phone ILIKE %s)"
+        search_param = f"%{clean_search}%"
+        params.extend([search_param, search_param, search_param, search_param])
+
+    sql += " ORDER BY updated_at DESC NULLS LAST, created_at DESC LIMIT %s;"
+    params.append(limit)
+
+    rows: List[tuple] = []
+    try:
+        with get_db_cursor() as (conn, cur):
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+    except Exception as exc:
+        logger.exception("Failed to query staging records for export: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database query error during export: {exc}",
+        )
+
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    file_prefix = f"recent_scraped_data_{clean_source.lower()}_{date_str}"
+
+    headers = [
+        "Entity ID",
+        "Company Name",
+        "Domain",
+        "Website URL",
+        "Phone Number",
+        "City",
+        "State / Region",
+        "Country",
+        "Industry",
+        "Harvester Source",
+        "Quality Score",
+        "Scraped At (UTC)",
+    ]
+
+    if clean_format == "xlsx":
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Recent Extracted Data"
+
+            # Append headers
+            ws.append(headers)
+
+            # Header styling: Dark Slate/Navy background, bold white text, centered
+            header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+            header_font = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
+            header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+            thin_border = Border(
+                left=Side(style="thin", color="E2E8F0"),
+                right=Side(style="thin", color="E2E8F0"),
+                top=Side(style="thin", color="E2E8F0"),
+                bottom=Side(style="thin", color="E2E8F0"),
+            )
+
+            ws.row_dimensions[1].height = 28
+            for col_idx in range(1, len(headers) + 1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = header_align
+                cell.border = thin_border
+
+            # Data rows
+            row_font = Font(name="Segoe UI", size=9)
+            center_align = Alignment(horizontal="center", vertical="center")
+            left_align = Alignment(horizontal="left", vertical="center")
+
+            for r in rows:
+                scraped_ts = r[11] or r[12]
+                scraped_str = scraped_ts.strftime("%Y-%m-%d %H:%M:%S") if scraped_ts else ""
+                score_str = f"{float(r[10]) * 100:.0f}%" if r[10] is not None else "85%"
+
+                row_vals = [
+                    str(r[0] or ""),
+                    str(r[1] or ""),
+                    str(r[2] or ""),
+                    str(r[3] or ""),
+                    str(r[4] or ""),
+                    str(r[5] or ""),
+                    str(r[6] or ""),
+                    str(r[7] or "US"),
+                    str(r[8] or ""),
+                    str(r[9] or "").upper(),
+                    score_str,
+                    scraped_str,
+                ]
+                ws.append(row_vals)
+                cur_row = ws.max_row
+                ws.row_dimensions[cur_row].height = 20
+                for c_idx in range(1, len(headers) + 1):
+                    c = ws.cell(row=cur_row, column=c_idx)
+                    c.font = row_font
+                    c.border = thin_border
+                    if c_idx in (1, 5, 7, 8, 10, 11, 12):
+                        c.alignment = center_align
+                    else:
+                        c.alignment = left_align
+
+            # Auto-fit columns with safety bounds
+            for col in ws.columns:
+                max_len = max(len(str(cell.value or "")) for cell in col)
+                col_letter = get_column_letter(col[0].column)
+                ws.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 40)
+
+            ws.freeze_panes = "A2"
+
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+
+            return StreamingResponse(
+                buf,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{file_prefix}.xlsx"',
+                    "Access-Control-Expose-Headers": "Content-Disposition",
+                },
+            )
+        except Exception as exc:
+            logger.exception("Error generating Excel export: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Excel generation failed: {exc}",
+            )
+
+    # Fallback to CSV stream
+    import csv
+    def _csv_generator():
+        out = io.StringIO()
+        # UTF-8 BOM so Excel opens accented characters cleanly
+        out.write("\ufeff")
+        writer = csv.writer(out)
+        writer.writerow(headers)
+        yield out.getvalue()
+        out.seek(0)
+        out.truncate(0)
+
+        for r in rows:
+            scraped_ts = r[11] or r[12]
+            scraped_str = scraped_ts.strftime("%Y-%m-%d %H:%M:%S") if scraped_ts else ""
+            score_str = f"{float(r[10]) * 100:.0f}%" if r[10] is not None else "85%"
+            writer.writerow([
+                str(r[0] or ""),
+                str(r[1] or ""),
+                str(r[2] or ""),
+                str(r[3] or ""),
+                str(r[4] or ""),
+                str(r[5] or ""),
+                str(r[6] or ""),
+                str(r[7] or "US"),
+                str(r[8] or ""),
+                str(r[9] or "").upper(),
+                score_str,
+                scraped_str,
+            ])
+            yield out.getvalue()
+            out.seek(0)
+            out.truncate(0)
+
+    return StreamingResponse(
+        _csv_generator(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_prefix}.csv"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )

@@ -28,12 +28,14 @@ import { QueueTelemetryMonitor } from "./operations/queue-telemetry-monitor";
 import { OneReachDeliveryCenter } from "./operations/onereach-delivery-center";
 import { LiveMonospaceTerminal } from "./terminal/live-monospace-terminal";
 import { DLQErrorIsolationCenter } from "./terminal/dlq-error-isolation-center";
+import { ExtractedDataViewer } from "./operations/extracted-data-viewer";
 import {
   GitMerge,
   Layers,
   ListFilter,
   Send,
   Terminal,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export function OrchestrationCommandCenter() {
@@ -117,6 +119,8 @@ export function OrchestrationCommandCenter() {
         setActiveTab("working-layer");
       } else if (hash === "topology" || hash === "orchestration") {
         setActiveTab("topology");
+      } else if (hash === "extracted-data" || hash === "extracted" || hash === "scraped") {
+        setActiveTab("extracted-data");
       }
     };
     syncWithHash();
@@ -430,14 +434,14 @@ export function OrchestrationCommandCenter() {
           onValueChange={(val) => {
             setActiveTab(val);
             if (typeof window !== "undefined") {
-              const hashKey = val === "queues-sla" ? "freshness" : val === "terminal" ? "observability" : val;
+              const hashKey = val === "queues-sla" ? "freshness" : val === "terminal" ? "observability" : val === "extracted-data" ? "extracted" : val;
               window.history.replaceState(null, "", `#${hashKey}`);
             }
           }}
           className="w-full space-y-6"
         >
           <div className="flex items-center justify-between border-b border-border/60 pb-2">
-            <TabsList className="bg-muted/50 p-1">
+            <TabsList className="bg-muted/50 p-1 flex-wrap">
               <TabsTrigger value="topology" className="text-xs gap-1.5 font-medium">
                 <GitMerge className="h-3.5 w-3.5" />
                 Topology & Execution
@@ -457,6 +461,10 @@ export function OrchestrationCommandCenter() {
               <TabsTrigger value="terminal" className="text-xs gap-1.5 font-medium">
                 <Terminal className="h-3.5 w-3.5" />
                 Logs & Error Center
+              </TabsTrigger>
+              <TabsTrigger value="extracted-data" className="text-xs gap-1.5 font-medium">
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
+                Extracted Data
               </TabsTrigger>
             </TabsList>
 
@@ -516,6 +524,11 @@ export function OrchestrationCommandCenter() {
 
             {/* DLQ & Error Isolation Center */}
             <DLQErrorIsolationCenter />
+          </TabsContent>
+
+          {/* TAB 6: Extracted Staging Data & Excel Export */}
+          <TabsContent value="extracted-data" className="space-y-6 mt-0">
+            <ExtractedDataViewer />
           </TabsContent>
         </Tabs>
       </main>
