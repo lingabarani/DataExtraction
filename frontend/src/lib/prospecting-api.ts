@@ -53,8 +53,9 @@ export interface CompanyRecord {
   jurisdiction: string;
   city: string;
   state_code: string;
-  employee_count_min: number;
-  employee_count_max: number;
+  employee_count_min?: number | null;
+  employee_count_max?: number | null;
+  formatted_address?: string | null;
   annual_revenue_usd: number;
   data_quality_score: number;
   trust_score: number;

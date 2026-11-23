@@ -326,7 +326,7 @@ export function ConversationalWorkspace() {
             </TabsTrigger>
             <TabsTrigger value="table" className="flex items-center gap-2 text-xs">
               <Table className="w-3.5 h-3.5" />
-              Prospecting Grid
+              DE Chatbot Grid
             </TabsTrigger>
           </TabsList>
         </Tabs>

@@ -163,6 +163,8 @@ export function DetailDrawer({
             </span>
             <Link
               href={`/company/${company.org_id}${company.primary_domain ? `?domain=${encodeURIComponent(company.primary_domain)}` : ""}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline hover:opacity-80 transition-opacity shrink-0 ml-2"
             >
               <span>Full Intelligence Page</span>
@@ -177,6 +179,8 @@ export function DetailDrawer({
             </span>
             <Link
               href={`/leads/${person.person_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400 hover:underline hover:opacity-80 transition-opacity shrink-0 ml-2"
             >
               <span>Full Lead Dossier</span>
@@ -258,7 +262,13 @@ export function DetailDrawer({
                   <div className="p-3 rounded-lg border border-border/70 bg-card/40">
                     <span className="text-[11px] text-muted-foreground">Headcount</span>
                     <p className="text-sm font-bold font-mono mt-1 text-foreground">
-                      {company.employee_count_min} - {company.employee_count_max}
+                      {company.employee_count_min && company.employee_count_max
+                        ? `${company.employee_count_min.toLocaleString()} - ${company.employee_count_max.toLocaleString()}`
+                        : company.employee_count_min
+                        ? `${company.employee_count_min.toLocaleString()}+ employees`
+                        : company.employee_count_max
+                        ? `< ${company.employee_count_max.toLocaleString()} employees`
+                        : "SMB / Unreported"}
                     </p>
                   </div>
                 </div>

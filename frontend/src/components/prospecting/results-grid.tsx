@@ -100,7 +100,7 @@ export function ResultsGrid({
         ? (currentItems as CompanyRecord[])
             .map(
               (c) =>
-                `"${c.org_id}","${c.legal_name}","${c.primary_domain}","${c.industry}",${c.rating || "N/A"},${c.review_count || 0},"${c.state_code}",${c.employee_count_min},${c.employee_count_max},${c.trust_score},${c.intent_score},"${c.updated_at || ""}"`
+                `"${c.org_id}","${c.legal_name}","${c.primary_domain}","${c.industry}",${c.rating || "N/A"},${c.review_count || 0},"${c.state_code}",${c.employee_count_min ?? ""},${c.employee_count_max ?? ""},${c.trust_score},${c.intent_score},"${c.updated_at || ""}"`
             )
             .join("\n")
         : (currentItems as PeopleRecord[])
@@ -326,9 +326,11 @@ export function ResultsGrid({
                           {company.primary_domain ? (
                             <Link
                               href={`/company/${company.org_id}?domain=${encodeURIComponent(company.primary_domain)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                               className="text-[11px] text-muted-foreground hover:text-primary hover:underline truncate font-mono block"
-                              title="Open Company Intelligence"
+                              title="Open Company Intelligence in new tab"
                             >
                               {company.primary_domain}
                             </Link>
@@ -360,13 +362,26 @@ export function ResultsGrid({
                       )}
                     </td>
                     <td className="px-3 py-3">
-                      <span className="font-mono text-foreground/80">
+                      <span className="font-mono text-foreground/80 block">
                         {company.city ? `${company.city}, ` : ""}
                         {company.state_code || company.jurisdiction || "US"}
                       </span>
+                      {company.formatted_address ? (
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[170px] block" title={company.formatted_address}>
+                          {company.formatted_address}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-3 py-3 font-mono tabnum text-muted-foreground">
-                      <div>{company.employee_count_min} - {company.employee_count_max}</div>
+                      <div>
+                        {company.employee_count_min && company.employee_count_max
+                          ? `${company.employee_count_min.toLocaleString()} - ${company.employee_count_max.toLocaleString()}`
+                          : company.employee_count_min
+                          ? `${company.employee_count_min.toLocaleString()}+`
+                          : company.employee_count_max
+                          ? `< ${company.employee_count_max.toLocaleString()}`
+                          : <span className="text-muted-foreground/60 font-sans text-xs">SMB / Unreported</span>}
+                      </div>
                       {company.decision_maker_count && company.decision_maker_count > 0 ? (
                         <span className="text-[10px] text-purple-600 dark:text-purple-400 font-sans font-medium flex items-center gap-0.5 mt-0.5">
                           <Users className="size-2.5" />
@@ -505,9 +520,11 @@ export function ResultsGrid({
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Link
                               href={`/leads/${person.person_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                               className="font-semibold text-foreground hover:text-purple-600 dark:hover:text-purple-400 hover:underline transition-colors truncate flex items-center gap-1 group/pname"
-                              title="Open full Lead Intelligence Dossier"
+                              title="Open full Lead Intelligence Dossier in new tab"
                             >
                               <span className="truncate">{person.full_name}</span>
                               <ExternalLink className="size-2.5 opacity-0 group-hover/pname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
@@ -530,9 +547,11 @@ export function ResultsGrid({
                       <div className="truncate max-w-[160px]">
                         <Link
                           href={`/company/${person.company_id || encodeURIComponent(person.company_name)}${person.company_domain ? `?domain=${encodeURIComponent(person.company_domain)}` : ""}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="font-medium text-foreground hover:text-primary hover:underline transition-colors truncate block"
-                          title="Open Company Intelligence"
+                          title="Open Company Intelligence in new tab"
                         >
                           {person.company_name}
                         </Link>

@@ -223,11 +223,11 @@ EXISTING DATABASE SCHEMA COLUMNS:
 RULES:
 1. ALWAYS output a single STRICT valid JSON object with the exact keys:
    - "mode": "company" or "people"
-   - "expanded_keywords": list of 8 to 12 high-signal synonyms, industry terms, sub-verticals, and Spanish/English variants.
+   - "expanded_keywords": list of 8 to 12 high-signal synonyms, industry terms, sub-verticals, and Spanish/English variants. Do NOT include city names, state codes, or generic location tokens (e.g. "metro", "area", "county") in expanded_keywords!
      Example for "home care": ["home health care", "senior care", "elderly assistance", "skilled nursing", "in-home hospice", "assisted living", "personal care aide", "caregiving services", "home care services", "elder care", "senior living", "adult day care"]
    - "naics_codes": list of 4-to-6 digit NAICS industry codes (e.g. ["621610", "624120", "623312", "623110"])
-   - "states": list of 2-letter uppercase US state codes (e.g. ["TX", "CA"])
-   - "cities": list of city names
+   - "states": list of 2-letter uppercase US state codes (e.g. ["TX", "CA"], or for Charlotte metro area: ["NC", "SC"])
+   - "cities": list of city names. For metro areas (e.g. "Charlotte metro area"), include the principal central city and primary satellite cities (e.g. ["Charlotte", "Concord", "Gastonia", "Matthews", "Rock Hill"])
    - "countries": list of country codes (e.g. ["US"])
    - "target_titles": list of job titles (for people mode, e.g. ["CEO", "Director of Sales"])
    - "seniority_tiers": list from ["C_SUITE", "VP", "DIRECTOR", "MANAGER", "FOUNDER", "SENIOR"]
@@ -303,8 +303,12 @@ class GroqSearchInterpreter:
         # ── Tier 0: Deterministic Fast-Path (<1ms) for Common Prospecting Prompts ──
         heuristic_plan = self._heuristic_fallback(clean_query, mode)
         has_strong_entities = bool(heuristic_plan.states or heuristic_plan.naics_codes or heuristic_plan.seniority_tiers or heuristic_plan.technologies)
-        # If query has concise structure with strong entities and is under 8 words, return instantly
-        if has_strong_entities and len(clean_query.split()) <= 7 and not any(w in clean_query.lower() for w in ["why", "explain", "analyze", "compare"]):
+        # Check if user query contains an explicit location prompt (e.g. in, near, at, metro, area)
+        has_location_prompt = bool(re.search(r"\b(in|near|around|at|metro|area|city)\b", clean_query, re.I))
+        location_resolved = not has_location_prompt or bool(heuristic_plan.states or heuristic_plan.cities)
+        
+        # If query has concise structure with strong entities, resolved location, and is under 8 words, return instantly
+        if has_strong_entities and location_resolved and len(clean_query.split()) <= 7 and not any(w in clean_query.lower() for w in ["why", "explain", "analyze", "compare"]):
             logger.info("Tier-0 fast-path resolved query in <1ms: %s", clean_query)
             heuristic_plan.source_model = "tier0-deterministic-fastpath"
             return heuristic_plan
@@ -521,8 +525,12 @@ class GroqSearchInterpreter:
             if hc_max:
                 max_headcount = int(hc_max.group(1))
 
-        # Extract states
+        # Extract states and regional geography
         states: List[str] = []
+        cities: List[str] = []
+        geo_display_name: Optional[str] = None
+
+        # 1. Check direct US state mapping
         for state_name, code in US_STATE_MAP.items():
             if re.search(r"\b" + re.escape(state_name) + r"\b", q_lower):
                 if code not in states:
@@ -531,6 +539,34 @@ class GroqSearchInterpreter:
             if re.search(r"\b" + code + r"\b", query):
                 if code not in states:
                     states.append(code)
+
+        # 2. Comprehensive Geography & Metro Resolution via Census gazetteer
+        loc_match = re.search(r"\b(?:in|near|around|at)\s+([a-zA-Z\s,.-]+)$", query, re.IGNORECASE)
+        loc_candidate = loc_match.group(1).strip() if loc_match else None
+        if not loc_candidate and re.search(r"\b(metro|metropolitan|area|region)\b", query, re.IGNORECASE):
+            loc_candidate = query
+
+        if loc_candidate:
+            try:
+                from packages.discovery.geo import resolve_geography
+                geo_res = resolve_geography(loc_candidate)
+                if geo_res and geo_res.get("type") in ("msa", "city", "county", "state"):
+                    for gs in geo_res.get("states", []):
+                        if gs not in states:
+                            states.append(gs)
+                    c_main = geo_res.get("city")
+                    if c_main and c_main not in cities:
+                        cities.append(c_main)
+                    for c in geo_res.get("centers", []):
+                        cn = c.get("name") if isinstance(c, dict) else str(c)
+                        if cn and cn not in cities:
+                            cities.append(cn)
+                    for c in geo_res.get("cities", [])[:10]:
+                        if c not in cities:
+                            cities.append(c)
+                    geo_display_name = geo_res.get("name")
+            except Exception as e:
+                logger.debug("Geography resolution skipped in heuristic: %s", e)
 
         # Extract seniorities
         seniority_tiers: List[str] = []
@@ -627,9 +663,19 @@ class GroqSearchInterpreter:
             "corporation", "corp", "inc", "llc", "organizations", "organization", "care", "child",
             "near", "best", "verified", "data"
         }
+        # Exclude location terms and geographic noise from expanded keyword tokens
+        location_noise_words = {
+            "metro", "area", "region", "county", "city", "state", "district", "metropolitan"
+        }
+        city_tokens = {c.lower() for c in cities}
+        state_tokens = {s.lower() for s in states}
+
         for tok in re.findall(r"[a-zA-Z]{3,}", q_lower):
             if (tok not in STOP_WORDS and tok not in US_STATE_MAP 
-                and tok not in SENIORITY_KEYWORDS and tok not in DEPARTMENT_KEYWORDS):
+                and tok not in SENIORITY_KEYWORDS and tok not in DEPARTMENT_KEYWORDS
+                and tok not in location_noise_words
+                and tok not in city_tokens
+                and tok not in state_tokens):
                 if tok not in expanded_keywords:
                     expanded_keywords.append(tok)
 
@@ -648,7 +694,11 @@ class GroqSearchInterpreter:
             parts.append(f"{main_term} organizations" if effective_mode == "company" else f"professionals in {main_term}")
         elif ordered_naics:
             parts.append("Organizations" if effective_mode == "company" else "Professionals")
-        if states:
+        if geo_display_name:
+            parts.append(f"in {geo_display_name}")
+        elif cities and states:
+            parts.append(f"in {', '.join(cities[:2])}, {', '.join(states)}")
+        elif states:
             parts.append(f"in {', '.join(states)}")
         if min_headcount or max_headcount:
             if min_headcount and max_headcount:
@@ -669,7 +719,7 @@ class GroqSearchInterpreter:
             expanded_keywords=ordered_keywords,
             naics_codes=ordered_naics,
             states=states,
-            cities=[],
+            cities=cities,
             countries=["US"],
             target_titles=[],
             seniority_tiers=seniority_tiers,

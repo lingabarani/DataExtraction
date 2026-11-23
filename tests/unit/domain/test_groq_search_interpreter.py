@@ -75,3 +75,21 @@ async def test_live_or_fallback_interpret_query():
     assert plan.require_verified_email is True
     assert len(plan.assistant_summary) > 10
     assert plan.source_model is not None
+
+
+def test_metro_geography_resolution():
+    """Verifies that metro area queries accurately resolve states, cities, and clean keywords."""
+    interpreter = GroqSearchInterpreter()
+    plan = interpreter._heuristic_fallback(
+        "child care in Charlotte metro area",
+        mode="company"
+    )
+    assert plan.mode == "company"
+    assert "NC" in plan.states
+    assert "SC" in plan.states
+    assert "Charlotte" in plan.cities
+    assert "624410" in plan.naics_codes
+    # Location tokens should NOT pollute expanded_keywords
+    assert "charlotte" not in [kw.lower() for kw in plan.expanded_keywords]
+    assert "metro" not in [kw.lower() for kw in plan.expanded_keywords]
+    assert "area" not in [kw.lower() for kw in plan.expanded_keywords]

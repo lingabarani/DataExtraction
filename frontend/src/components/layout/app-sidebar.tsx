@@ -28,7 +28,7 @@ const PRIMARY_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Company Data", href: "/companies", icon: Building2 },
   { label: "People Data", href: "/people", icon: Users },
-  { label: "Prospecting Grid", href: "/chat", icon: Sparkles },
+  { label: "DE Chatbot", href: "/chat", icon: Sparkles },
   { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
 ];
 
@@ -125,7 +125,7 @@ export function SidebarContent() {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Company Data", href: "/companies", icon: Building2 },
     { label: "People Data", href: "/people", icon: Users },
-    { label: "Prospecting Grid", href: "/chat", icon: Sparkles },
+    { label: "DE Chatbot", href: "/chat", icon: Sparkles },
     { label: "Live Discovery", href: "/search", icon: Search, count: "LIVE" },
   ];
 
