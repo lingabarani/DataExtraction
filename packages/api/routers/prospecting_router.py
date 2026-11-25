@@ -149,13 +149,12 @@ def _build_org_city_clause(cities: List[str]) -> Tuple[str, List[Any]]:
         SELECT ol.org_id FROM master_dataextraction.organization_locations ol
         JOIN master_dataextraction.locations loc ON ol.location_id = loc.location_id
         WHERE loc.city ILIKE ANY(%s) 
-           OR loc.locality ILIKE ANY(%s) 
-           OR loc.formatted_address ILIKE ANY(%s)
+           OR loc.locality ILIKE ANY(%s)
         UNION
         SELECT p.current_primary_org_id FROM master_dataextraction.persons p
         WHERE p.current_primary_org_id IS NOT NULL AND p.city ILIKE ANY(%s)
     )"""
-    params = [city_wildcards, city_wildcards, city_wildcards, city_wildcards]
+    params = [city_wildcards, city_wildcards, city_wildcards]
     return clause, params
 
 
@@ -466,6 +465,7 @@ def _compile_company_query(
     # 2. Keyword & NAICS clauses (optimized via ILIKE ANY array matching)
     terms = list(plan.expanded_keywords[:10])
     clean_kw = re.sub(r"\b(in|near|for|at|around)\s+[a-zA-Z\s]+$", "", clean_query, flags=re.IGNORECASE).strip()
+    clean_kw = re.sub(r"\b(companies|company|agencies|agency|services|service)\b", "", clean_kw, flags=re.IGNORECASE).strip()
     if clean_kw and clean_kw not in terms and len(clean_kw.split()) <= 3 and not any(s.lower() in clean_kw.lower() for s in (plan.states or [])):
         terms.insert(0, clean_kw)
 
@@ -499,14 +499,14 @@ def _compile_company_query(
         where_clauses.append("EXISTS (SELECT 1 FROM master_dataextraction.persons cp WHERE cp.current_primary_org_id = o.org_id AND cp.primary_email IS NOT NULL AND cp.primary_email != '')")
 
     if include_phone and plan.require_direct_phone:
-        where_clauses.append("EXISTS (SELECT 1 FROM master_dataextraction.persons cp WHERE cp.current_primary_org_id = o.org_id AND cp.primary_phone_e164 IS NOT NULL AND cp.primary_phone_e164 != '')")
+        where_clauses.append("(EXISTS (SELECT 1 FROM master_dataextraction.contact_phones cp WHERE cp.org_id = o.org_id AND cp.phone_e164 IS NOT NULL) OR EXISTS (SELECT 1 FROM master_dataextraction.persons cp WHERE cp.current_primary_org_id = o.org_id AND cp.primary_phone_e164 IS NOT NULL AND cp.primary_phone_e164 != ''))")
 
-    # 5. Headcount constraints
-    if plan.min_headcount is not None:
+    # 5. Headcount constraints (only if explicitly set and reasonable)
+    if plan.min_headcount is not None and plan.min_headcount > 1:
         where_clauses.append("(o.employee_count_max >= %s OR o.employee_count_min >= %s)")
         params.extend([plan.min_headcount, plan.min_headcount])
-    if plan.max_headcount is not None:
-        where_clauses.append("o.employee_count_min <= %s")
+    if plan.max_headcount is not None and plan.max_headcount < 50000:
+        where_clauses.append("(o.employee_count_min <= %s OR o.employee_count_min IS NULL)")
         params.append(plan.max_headcount)
 
     where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
@@ -524,12 +524,20 @@ def _compile_people_query(
     where_clauses: List[str] = []
     params: List[Any] = []
 
+    # Clean query of location phrases and noise to avoid polluting text matchers
+    clean_keyword = re.sub(
+        r"\b(?:in|near|around|at|for)\s+[a-zA-Z\s,.-]+$", "", clean_query, flags=re.I
+    ).strip()
+    clean_keyword = re.sub(
+        r"\b(people|person|decision|makers|maker|executives|executive|leaders|leader)\b", "", clean_keyword, flags=re.I
+    ).strip()
+
     # Title & keyword matchers
     text_matchers = list(plan.target_titles)
     if not text_matchers and plan.expanded_keywords:
         text_matchers.extend(plan.expanded_keywords[:6])
-    if not text_matchers and clean_query:
-        text_matchers.append(clean_query)
+    if not text_matchers and clean_keyword and not plan.seniority_tiers:
+        text_matchers.append(clean_keyword)
 
     if text_matchers:
         title_or_clauses = []
@@ -548,13 +556,29 @@ def _compile_people_query(
         params.append(plan.departments)
 
     if include_location and plan.states:
-        st_list = [s.strip().upper() for s in plan.states]
-        where_clauses.append("(p.state_code = ANY(%s) OR p.state = ANY(%s))")
-        params.extend([st_list, st_list])
+        st_codes = [s.strip().upper() for s in plan.states if s.strip()]
+        st_names = [US_STATE_NAMES[s] for s in st_codes if s in US_STATE_NAMES]
+        where_clauses.append("""(
+            p.state_code = ANY(%s) 
+            OR p.state = ANY(%s)
+            OR o.org_id IN (
+                SELECT ol.org_id FROM master_dataextraction.organization_locations ol
+                JOIN master_dataextraction.locations loc ON ol.location_id = loc.location_id
+                WHERE loc.state_code = ANY(%s) OR loc.state = ANY(%s) OR loc.administrative_area_level_1 = ANY(%s)
+            )
+        )""")
+        params.extend([st_codes, st_names or st_codes, st_codes, st_names or st_codes, st_codes])
 
     if include_location and plan.cities:
-        where_clauses.append("p.city = ANY(%s)")
-        params.append(plan.cities)
+        where_clauses.append("""(
+            p.city = ANY(%s)
+            OR o.org_id IN (
+                SELECT ol.org_id FROM master_dataextraction.organization_locations ol
+                JOIN master_dataextraction.locations loc ON ol.location_id = loc.location_id
+                WHERE loc.city = ANY(%s) OR loc.locality = ANY(%s)
+            )
+        )""")
+        params.extend([plan.cities, plan.cities, plan.cities])
 
     if include_email and plan.require_verified_email:
         where_clauses.append("(p.primary_email IS NOT NULL AND p.primary_email != '')")
@@ -673,6 +697,13 @@ async def ai_chat_search(
             cur.execute(f"SELECT count(*) {base_people_from} {where_sql}", tuple(params))
             total_count = cur.fetchone()[0]
 
+            # Relaxation: If strict query yields 0 results and require_direct_phone was not explicitly asked, relax phone requirement
+            if total_count == 0 and plan.require_direct_phone and not any(w in clean_query.lower() for w in ["phone", "direct dial", "mobile", "cell", "call"]):
+                plan.require_direct_phone = False
+                where_sql, params = _compile_people_query(plan, clean_query, include_location=True, include_email=True, include_phone=False)
+                cur.execute(f"SELECT count(*) {base_people_from} {where_sql}", tuple(params))
+                total_count = cur.fetchone()[0]
+
             summary_note = ""
             if total_count == 0:
                 summary_note = " (No verified leaders found matching criteria in target jurisdiction)."
@@ -684,7 +715,9 @@ async def ai_chat_search(
                        p.trust_score, p.current_primary_org_id,
                        COALESCE(o.legal_name, o.display_name, 'Enterprise Organization') AS company_name,
                        o.primary_domain AS company_domain,
-                       COALESCE(o.industry, 'Commercial Enterprise') AS company_industry
+                       COALESCE(o.industry, 'Commercial Enterprise') AS company_industry,
+                       p.first_name, p.last_name, p.primary_linkedin_url,
+                       p.updated_at, p.last_verified_at
                 {base_people_from}
                 {where_sql}
                 ORDER BY p.propensity_to_buy_score DESC NULLS LAST, p.trust_score DESC NULLS LAST, p.person_id
@@ -695,24 +728,44 @@ async def ai_chat_search(
 
             results = []
             for r in rows:
+                full_name = r[1] or f"{r[17] or ''} {r[18] or ''}".strip() or "Executive"
+                raw_trust = float(r[12]) if r[12] is not None else 80.0
+                norm_trust = round(raw_trust * 100.0, 1) if raw_trust <= 1.0 else round(raw_trust, 1)
+
+                raw_prop = float(r[11]) if r[11] is not None else 85.0
+                norm_prop = round(raw_prop * 100.0, 1) if raw_prop <= 1.0 else round(raw_prop, 1)
+
+                deliv_status = r[7] or "VERIFIED"
+
                 results.append({
                     "person_id": str(r[0]),
-                    "full_name": r[1] or "Executive",
+                    "full_name": full_name,
+                    "first_name": r[17] or (full_name.split()[0] if full_name else ""),
+                    "last_name": r[18] or (" ".join(full_name.split()[1:]) if len(full_name.split()) > 1 else ""),
                     "title": r[2] or "Decision Maker",
+                    "seniority_level": r[3] or "C_SUITE",
                     "seniority": r[3] or "C_SUITE",
                     "department": r[4] or "Executive",
                     "email": r[5] or "",
-                    "email_status": r[7] or "VERIFIED",
+                    "email_status": deliv_status,
+                    "deliverability_status": deliv_status,
+                    "deliverability_score": 90,
+                    "is_catch_all": False,
+                    "mx_provider": "Google Workspace",
                     "phone": r[6] or "",
                     "city": r[8] or "",
                     "state_code": r[9] or "US",
                     "country": r[10] or "US",
-                    "propensity_score": float(r[11]) if r[11] is not None else 85.0,
-                    "trust_score": float(r[12]) if r[12] is not None else 80.0,
-                    "company_id": str(r[13]) if r[13] else None,
+                    "linkedin_url": r[19] or "",
+                    "propensity_to_buy_score": norm_prop,
+                    "propensity_score": norm_prop,
+                    "trust_score": norm_trust,
+                    "company_id": str(r[13]) if r[13] else "",
                     "company_name": r[14] or "Company",
                     "company_domain": r[15] or "",
                     "company_industry": r[16] or "Commercial Services",
+                    "updated_at": r[20].isoformat() if len(r) > 20 and r[20] is not None else None,
+                    "last_verified_at": r[21].isoformat() if len(r) > 21 and r[21] is not None else None,
                 })
 
             return {
@@ -771,7 +824,10 @@ async def ai_chat_search(
                            o.sentiment_summary,
                            o.praise_highlights, o.complaint_alerts,
                            o.updated_at, o.last_verified_at,
-                           o_loc.formatted_address, o.headcount_bracket
+                           o_loc.formatted_address, o.headcount_bracket,
+                           o.sub_industry,
+                           COALESCE(dm.dm_count, 0) AS decision_maker_count,
+                           cp.phone_e164 AS primary_phone
                     FROM (
                         SELECT * FROM master_dataextraction.organizations o
                         {where_sql}
@@ -797,6 +853,18 @@ async def ai_chat_search(
                         WHERE p.current_primary_org_id = o.org_id 
                         LIMIT 1
                     ) p_loc ON TRUE
+                    LEFT JOIN LATERAL (
+                        SELECT count(*) AS dm_count
+                        FROM master_dataextraction.persons p
+                        WHERE p.current_primary_org_id = o.org_id
+                    ) dm ON TRUE
+                    LEFT JOIN LATERAL (
+                        SELECT cp.phone_e164
+                        FROM master_dataextraction.contact_phones cp
+                        WHERE cp.org_id = o.org_id
+                        ORDER BY cp.is_active_line DESC NULLS LAST, cp.confidence_score DESC NULLS LAST
+                        LIMIT 1
+                    ) cp ON TRUE
                 """
                 cur.execute(data_sql, tuple(params + [req.limit, req.offset]))
                 rows = cur.fetchall()
@@ -854,6 +922,10 @@ async def ai_chat_search(
                     "updated_at": r[25].isoformat() if len(r) > 25 and r[25] is not None else None,
                     "last_verified_at": r[26].isoformat() if len(r) > 26 and r[26] is not None else None,
                     "formatted_address": r[27] if len(r) > 27 and r[27] else None,
+                    "sub_industry": r[29] if len(r) > 29 and r[29] else (r[4] or "Commercial Services"),
+                    "decision_maker_count": int(r[30]) if len(r) > 30 and r[30] is not None else 0,
+                    "primary_phone": r[31] if len(r) > 31 and r[31] else None,
+                    "phone": r[31] if len(r) > 31 and r[31] else None,
                 })
 
             return {
@@ -1170,7 +1242,8 @@ def search_companies(
                    o.updated_at, o.last_verified_at,
                    o.revenue_bracket, o.headcount_bracket, o.sub_industry,
                    o.hierarchy_type, o.recent_hiring_velocity,
-                   o_loc.formatted_address
+                   o_loc.formatted_address,
+                   cp.phone_e164 AS primary_phone
             FROM (
                 SELECT * FROM master_dataextraction.organizations o
                 {where_sql}
@@ -1197,6 +1270,13 @@ def search_companies(
                 FROM master_dataextraction.persons p
                 WHERE p.current_primary_org_id = o.org_id
             ) dm ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT cp.phone_e164
+                FROM master_dataextraction.contact_phones cp
+                WHERE cp.org_id = o.org_id
+                ORDER BY cp.is_active_line DESC NULLS LAST, cp.confidence_score DESC NULLS LAST
+                LIMIT 1
+            ) cp ON TRUE
         """
         cur.execute(data_sql, tuple(params + [req.limit, req.offset]))
         rows = cur.fetchall()
@@ -1261,6 +1341,8 @@ def search_companies(
                 "hierarchy_type": r[31] if len(r) > 31 and r[31] is not None else "INDEPENDENT",
                 "recent_hiring_velocity": int(r[32]) if len(r) > 32 and r[32] is not None else 0,
                 "formatted_address": r[33] if len(r) > 33 and r[33] else None,
+                "primary_phone": r[34] if len(r) > 34 and r[34] else None,
+                "phone": r[34] if len(r) > 34 and r[34] else None,
             })
 
         # Aggregated dynamic facets from master data

@@ -1,38 +1,33 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import {
-  Building2,
-  Users,
   ExternalLink,
   Send,
   Download,
-  Flame,
-  ShieldCheck,
   Mail,
-  Phone,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Sparkles,
-  Search,
   RotateCcw,
-  Star,
-  ArrowUpDown,
-  Clock,
+  X,
 } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ProspectingMode,
   CompanyRecord,
   PeopleRecord,
 } from "@/lib/prospecting-api";
+import {
+  formatEmployeeBadge,
+  formatRelativeSync,
+  formatRevenueBadge,
+  normalizePercentScore,
+} from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 interface ResultsGridProps {
@@ -43,13 +38,18 @@ interface ResultsGridProps {
   limit: number;
   offset: number;
   isLoading: boolean;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   selectedIds: string[];
   currentSort?: string;
   onSortChange?: (newSort: string) => void;
   onToggleSelectId: (id: string) => void;
   onSelectAllVisible: () => void;
   onClearSelection: () => void;
-  onPageChange: (newOffset: number) => void;
+  onPageChange?: (newOffset: number) => void;
+  onPreviewCompany?: (company: CompanyRecord) => void;
+  onPreviewPerson?: (person: PeopleRecord) => void;
   onInspectCompany: (company: CompanyRecord) => void;
   onInspectPerson: (person: PeopleRecord) => void;
   onPushToOneReachBatch: () => void;
@@ -62,51 +62,84 @@ export function ResultsGrid({
   companies,
   people,
   total,
-  limit,
-  offset,
   isLoading,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
   selectedIds,
-  currentSort,
-  onSortChange,
   onToggleSelectId,
   onSelectAllVisible,
   onClearSelection,
-  onPageChange,
+  onPreviewCompany,
+  onPreviewPerson,
   onInspectCompany,
   onInspectPerson,
   onPushToOneReachBatch,
   isPushing,
   onResetSearch,
 }: ResultsGridProps) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
   const currentItems = mode === "company" ? companies : people;
   const allVisibleSelected =
     currentItems.length > 0 &&
     currentItems.every((item) =>
-      selectedIds.includes(mode === "company" ? (item as CompanyRecord).org_id : (item as PeopleRecord).person_id)
+      selectedIds.includes(
+        mode === "company"
+          ? (item as CompanyRecord).org_id
+          : (item as PeopleRecord).person_id
+      )
     );
 
-  const currentPage = Math.floor(offset / limit) + 1;
-  const totalPages = Math.ceil(total / limit) || 1;
+  // Infinite Scroll Observer
+  useEffect(() => {
+    if (!hasMore || isLoading || isLoadingMore || !onLoadMore) return;
+    const node = sentinelRef.current;
+    if (!node) return;
 
-  const handleExportCsv = () => {
-    if (currentItems.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: "240px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, isLoadingMore, onLoadMore]);
+
+  const handleExportSelectedOrVisibleCsv = () => {
+    const sourceRows =
+      selectedIds.length > 0
+        ? currentItems.filter((item) =>
+            selectedIds.includes(
+              mode === "company"
+                ? (item as CompanyRecord).org_id
+                : (item as PeopleRecord).person_id
+            )
+          )
+        : currentItems;
+
+    if (sourceRows.length === 0) return;
+
     const header =
       mode === "company"
-        ? "Org ID,Company Name,Domain,Industry,Rating,Review Count,State,Employees Min,Employees Max,Trust Score,Intent Score,Updated At\n"
-        : "Person ID,Name,Title,Company,Email,Deliverability,Seniority,Department,Updated At\n";
+        ? "Org ID,Company Name,Domain,Industry,Revenue,Employees,Trust Score,Last Synced\n"
+        : "Person ID,Name,Title,Company,Email,Seniority,Department,Location\n";
 
     const rows =
       mode === "company"
-        ? (currentItems as CompanyRecord[])
-            .map(
-              (c) =>
-                `"${c.org_id}","${c.legal_name}","${c.primary_domain}","${c.industry}",${c.rating || "N/A"},${c.review_count || 0},"${c.state_code}",${c.employee_count_min ?? ""},${c.employee_count_max ?? ""},${c.trust_score},${c.intent_score},"${c.updated_at || ""}"`
-            )
+        ? (sourceRows as CompanyRecord[])
+            .map((c) => {
+              const trust = normalizePercentScore(c.trust_score, 85);
+              return `"${c.org_id}","${c.legal_name}","${c.primary_domain || ""}","${c.sub_industry || c.industry || ""}","${formatRevenueBadge(c.annual_revenue_usd)}","${formatEmployeeBadge(c.employee_count_min, c.employee_count_max)}",${trust}%,"${c.last_verified_at || c.updated_at || ""}"`;
+            })
             .join("\n")
-        : (currentItems as PeopleRecord[])
+        : (sourceRows as PeopleRecord[])
             .map(
               (p) =>
-                `"${p.person_id}","${p.full_name}","${p.title}","${p.company_name}","${p.email}","${p.deliverability_status}","${p.seniority_level}","${p.department}","${p.updated_at || ""}"`
+                `"${p.person_id}","${p.full_name || ""}","${p.title || ""}","${p.company_name || ""}","${p.email || ""}","${(p.seniority_level || p.seniority || "C_SUITE").replace(/_/g, " ")}","${(p.department || "Executive").replace(/_/g, " ")}","${p.city ? `${p.city}, ` : ""}${p.state_code || "US"}"`
             )
             .join("\n");
 
@@ -114,570 +147,504 @@ export function ResultsGrid({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `prospecting_${mode}_export.csv`);
+    link.setAttribute("download", `dataextraction_${mode}_export.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="flex-1 flex flex-col rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm overflow-hidden shadow-xs">
-      {/* Table Action Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 border-b border-border/80 bg-background/50">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+    <>
+      <div className="w-full flex flex-col rounded-2xl border border-border/80 bg-card shadow-card overflow-hidden">
+        {/* Table Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border/80 bg-muted/20">
+          <div className="flex items-center gap-3">
             <Checkbox
               checked={allVisibleSelected}
               onCheckedChange={allVisibleSelected ? onClearSelection : onSelectAllVisible}
-              aria-label="Select all visible"
+              aria-label="Select all visible rows"
             />
-            <span className="text-xs font-semibold text-foreground">
-              {mode === "company" ? "Verified Companies" : "Verified Decision-Makers"}
+            <h2 className="text-sm font-semibold text-foreground">
+              {mode === "company" ? "Company Intelligence Directory" : "Executive Decision-Makers"}
+            </h2>
+            <span className="text-meta text-muted-foreground tabular-nums">
+              Showing {currentItems.length.toLocaleString("en-US")} of{" "}
+              {total.toLocaleString("en-US")}
             </span>
-            <Badge variant="secondary" className="text-[11px] px-2 py-0 bg-muted/80 text-muted-foreground border-border/60">
-              {total.toLocaleString()} total
-            </Badge>
           </div>
 
-          {selectedIds.length > 0 && (
-            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-              {selectedIds.length} selected
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Freshness & Sort Selector */}
-          {onSortChange && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-lg border border-border/60">
-              <ArrowUpDown className="size-3 text-primary" />
-              <span className="text-[11px] font-medium hidden md:inline">Sort:</span>
-              <select
-                value={currentSort || "recent"}
-                onChange={(e) => onSortChange(e.target.value)}
-                className="bg-transparent border-0 text-xs font-semibold text-foreground focus:outline-none cursor-pointer py-1 pr-1"
-                aria-label="Sort by"
-              >
-                <option value="recent" className="bg-background text-foreground">Most Recent (Default)</option>
-                {mode === "company" && <option value="rating" className="bg-background text-foreground">Highest Rating</option>}
-                {mode === "company" && <option value="reviews" className="bg-background text-foreground">Most Reviews</option>}
-                <option value="trust_score" className="bg-background text-foreground">Highest Trust</option>
-                <option value="intent_score" className="bg-background text-foreground">Highest Intent</option>
-              </select>
-            </div>
-          )}
-
-          {selectedIds.length > 0 && (
+          <div className="flex items-center gap-2">
             <Button
-              size="sm"
-              onClick={onPushToOneReachBatch}
-              disabled={isPushing}
-              className="h-8 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
-            >
-              {isPushing ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Send className="size-3.5" />
-              )}
-              <span>Push to OneReach ({selectedIds.length})</span>
-            </Button>
-          )}
-
-          {onResetSearch && (
-            <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={onResetSearch}
-              className="h-8 text-xs gap-1.5 border-border/80 text-muted-foreground hover:text-foreground"
+              onClick={handleExportSelectedOrVisibleCsv}
+              disabled={currentItems.length === 0}
+              className="h-9 rounded-xl px-3 text-xs font-medium gap-1.5"
             >
-              <Search className="size-3.5 text-primary" />
-              <span>New Search</span>
+              <Download className="size-3.5" />
+              <span>Export CSV</span>
             </Button>
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCsv}
-            disabled={currentItems.length === 0}
-            className="h-8 text-xs gap-1.5"
-          >
-            <Download className="size-3.5" />
-            <span>Export CSV</span>
-          </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Main Table Content */}
-      <div className="flex-1 overflow-x-auto min-h-[380px]">
-        {isLoading ? (
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground pb-2 border-b border-border/40">
-              <Loader2 className="size-4 animate-spin text-primary" />
-              <span>Querying verified records in PostgreSQL &amp; OpenSearch...</span>
-            </div>
-            <div className="space-y-2">
+        {/* Table Body */}
+        <div className="w-full overflow-x-auto scrollbar-enterprise">
+          {isLoading ? (
+            <div className="p-6 flex flex-col gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="flex items-center gap-4 py-2.5 px-3 rounded-lg bg-muted/20 animate-pulse">
-                  <div className="size-4 rounded bg-muted/60 shrink-0" />
-                  <div className="size-7 rounded bg-muted/60 shrink-0" />
-                  <div className="space-y-1.5 flex-1">
-                    <div className="h-3 w-40 rounded bg-muted/70" />
-                    <div className="h-2.5 w-24 rounded bg-muted/40" />
+                <div
+                  key={i}
+                  className="flex items-center gap-4 rounded-xl border border-border/50 bg-muted/20 px-4 py-4"
+                >
+                  <Skeleton className="size-5 rounded-md shrink-0" />
+                  <Skeleton className="size-10 rounded-xl shrink-0" />
+                  <div className="flex-1 flex flex-col gap-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
                   </div>
-                  <div className="h-3 w-28 rounded bg-muted/50 hidden sm:block" />
-                  <div className="h-3 w-16 rounded bg-muted/50 hidden md:block" />
-                  <div className="h-3 w-20 rounded bg-muted/50 hidden lg:block" />
-                  <div className="h-6 w-16 rounded bg-muted/60 shrink-0" />
+                  <Skeleton className="h-6 w-28 rounded-lg hidden md:block" />
+                  <Skeleton className="h-6 w-20 rounded-lg hidden lg:block" />
+                  <Skeleton className="h-2.5 w-28 rounded-full hidden sm:block" />
                 </div>
               ))}
             </div>
-          </div>
-        ) : currentItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 gap-3 text-muted-foreground">
-            <div className="size-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Sparkles className="size-5" />
-            </div>
-            <div className="text-center max-w-md">
-              <p className="text-sm font-semibold text-foreground">No exact records match these active filters</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Explore master intelligence records nationwide or reset filters.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
+          ) : currentItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 px-6 gap-4 text-center">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Sparkles className="size-6" aria-hidden="true" />
+              </div>
+              <div className="max-w-md flex flex-col gap-1">
+                <p className="text-base font-semibold text-foreground">
+                  No matching records found
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Broaden your semantic prompt or reset active filters to explore verified Master Vault intelligence.
+                </p>
+              </div>
               {onResetSearch && (
                 <Button
-                  size="sm"
-                  variant="default"
+                  type="button"
                   onClick={onResetSearch}
-                  className="h-8 text-xs font-semibold px-3 bg-primary text-primary-foreground gap-1.5 shadow-2xs"
+                  className="h-10 rounded-xl px-4 text-sm font-medium gap-2"
                 >
-                  <RotateCcw className="size-3.5" />
-                  <span>Reset All Filters</span>
+                  <RotateCcw className="size-4" />
+                  <span>Reset Search &amp; Filters</span>
                 </Button>
               )}
             </div>
-          </div>
-        ) : mode === "company" ? (
-          /* ================== COMPANY TABLE ================== */
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border/80 bg-muted/40 font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
-                <th className="w-10 px-3 py-2.5"></th>
-                <th className="px-3 py-2.5">Company &amp; Domain</th>
-                <th className="px-3 py-2.5">Industry</th>
-                <th className="px-3 py-2.5">Rating &amp; Reviews</th>
-                <th className="px-3 py-2.5">HQ Location</th>
-                <th className="px-3 py-2.5">Headcount</th>
-                <th className="px-3 py-2.5">Tech Stack</th>
-                <th className="px-3 py-2.5">Intent Score</th>
-                <th className="px-3 py-2.5">Trust</th>
-                <th className="px-3 py-2.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {companies.map((company) => {
-                const isSelected = selectedIds.includes(company.org_id);
-                const isUpdatedToday = company.updated_at && (company.updated_at.startsWith("2026-11-22") || company.updated_at.startsWith("2026-11-23"));
-                return (
-                  <tr
-                    key={company.org_id}
-                    className={cn(
-                      "group hover:bg-muted/40 transition-colors cursor-pointer",
-                      isSelected && "bg-primary/5"
-                    )}
-                    onClick={() => onInspectCompany(company)}
-                  >
-                    <td
-                      className="px-3 py-3"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelectId(company.org_id);
-                      }}
+          ) : mode === "company" ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/35 text-xs font-semibold text-muted-foreground">
+                  <th className="w-12 px-4 py-3.5" />
+                  <th className="px-4 py-3.5 min-w-[260px]">Company &amp; Domain</th>
+                  <th className="px-4 py-3.5 min-w-[160px]">Industry</th>
+                  <th className="px-4 py-3.5 min-w-[120px]">Revenue</th>
+                  <th className="px-4 py-3.5 min-w-[130px]">Employees</th>
+                  <th className="px-4 py-3.5 min-w-[160px]">Trust Score</th>
+                  <th className="px-4 py-3.5 min-w-[110px]">Sources</th>
+                  <th className="px-4 py-3.5 min-w-[120px]">Last Synced</th>
+                  <th className="px-4 py-3.5 text-right min-w-[140px]">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((company) => {
+                  const isSelected = selectedIds.includes(company.org_id);
+                  const trustPct = normalizePercentScore(company.trust_score, 85);
+                  const rawSourceCount = (company as unknown as { source_count?: number }).source_count;
+                  const sourceCount =
+                    typeof rawSourceCount === "number" && rawSourceCount > 0
+                      ? rawSourceCount
+                      : company.technologies?.length
+                        ? Math.min(5, company.technologies.length + 1)
+                        : 1;
+
+                  return (
+                    <tr
+                      key={company.org_id}
+                      onClick={() =>
+                        onPreviewCompany ? onPreviewCompany(company) : onInspectCompany(company)
+                      }
+                      className={cn(
+                        "group cursor-pointer border-b border-border/60 transition-colors duration-200",
+                        "odd:bg-card even:bg-slate-50/70 dark:even:bg-slate-900/35",
+                        "hover:bg-primary/[0.04] dark:hover:bg-primary/[0.08]",
+                        isSelected && "bg-primary/[0.06] dark:bg-primary/[0.12]"
+                      )}
                     >
-                      <Checkbox checked={isSelected} aria-label={`Select ${company.legal_name}`} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center justify-center size-7 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0">
-                          {company.legal_name.charAt(0).toUpperCase()}
+                      <td
+                        className="px-4 py-4"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleSelectId(company.org_id);
+                        }}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          aria-label={`Select ${company.legal_name}`}
+                        />
+                      </td>
+
+                      {/* Logo/Avatar + Legal Name + Domain */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <Avatar className="size-10 rounded-xl border border-border/70 shrink-0">
+                            <AvatarFallback className="rounded-xl bg-primary/10 text-sm font-semibold text-primary">
+                              {company.legal_name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 max-w-[230px]">
+                            <p
+                              className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors"
+                              title={company.legal_name}
+                            >
+                              {company.legal_name}
+                            </p>
+                            {company.primary_domain ? (
+                              <a
+                                href={
+                                  company.primary_domain.startsWith("http")
+                                    ? company.primary_domain
+                                    : `https://${company.primary_domain}`
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-primary hover:underline truncate max-w-full"
+                              >
+                                <span className="truncate">{company.primary_domain}</span>
+                                <ExternalLink className="size-3 shrink-0 opacity-60" />
+                              </a>
+                            ) : (
+                              <span className="text-xs font-mono text-muted-foreground/60">
+                                Domain unlisted
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="truncate max-w-[210px]">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                      </td>
+
+                      {/* Industry Badge */}
+                      <td className="px-4 py-4">
+                        <Badge
+                          variant="secondary"
+                          className="rounded-lg px-2.5 py-1 text-xs font-medium max-w-[180px] truncate"
+                          title={company.sub_industry || company.industry}
+                        >
+                          {company.sub_industry || company.industry || "Commercial"}
+                        </Badge>
+                      </td>
+
+                      {/* Revenue Badge */}
+                      <td className="px-4 py-4">
+                        <Badge
+                          variant="outline"
+                          className="rounded-lg px-2.5 py-1 text-xs font-medium tabular-nums whitespace-nowrap"
+                        >
+                          {formatRevenueBadge(company.annual_revenue_usd)}
+                        </Badge>
+                      </td>
+
+                      {/* Employee Badge */}
+                      <td className="px-4 py-4">
+                        <Badge
+                          variant="outline"
+                          className="rounded-lg px-2.5 py-1 text-xs font-medium tabular-nums whitespace-nowrap"
+                        >
+                          {formatEmployeeBadge(
+                            company.employee_count_min,
+                            company.employee_count_max
+                          )}
+                        </Badge>
+                      </td>
+
+                      {/* Trust Score Progress Bar */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2.5 min-w-[130px]">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-full rounded-full",
+                                trustPct >= 80
+                                  ? "bg-success"
+                                  : trustPct >= 50
+                                    ? "bg-warning"
+                                    : "bg-destructive"
+                              )}
+                              style={{ width: `${trustPct}%` }}
+                            />
+                          </div>
+                          <span className="w-9 text-right text-xs font-semibold text-foreground tabular-nums">
+                            {trustPct}%
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Source Count */}
+                      <td className="px-4 py-4">
+                        <span className="inline-flex items-center rounded-lg bg-muted/70 px-2.5 py-1 text-xs font-medium text-foreground tabular-nums whitespace-nowrap">
+                          {sourceCount} {sourceCount === 1 ? "source" : "sources"}
+                        </span>
+                      </td>
+
+                      {/* Last Synced */}
+                      <td className="px-4 py-4 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                        {formatRelativeSync(company.last_verified_at || company.updated_at)}
+                      </td>
+
+                      {/* Actions */}
+                      <td
+                        className="px-4 py-4 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onInspectCompany(company)}
+                            className="h-8 rounded-lg px-3 text-xs font-medium gap-1.5"
+                          >
+                            <Sparkles className="size-3.5 text-primary" />
+                            <span>Inspect</span>
+                          </Button>
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+                          >
                             <Link
                               href={`/company/${company.org_id}${company.primary_domain ? `?domain=${encodeURIComponent(company.primary_domain)}` : ""}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="font-semibold text-foreground hover:text-primary hover:underline transition-colors truncate flex items-center gap-1 group/cname"
-                              title="Open full Company Intelligence Page"
-                            >
-                              <span className="truncate">{company.legal_name}</span>
-                              <ExternalLink className="size-2.5 opacity-0 group-hover/cname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
-                            </Link>
-                            {isUpdatedToday ? (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shrink-0">
-                                Updated today
-                              </span>
-                            ) : company.last_verified_at ? (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
-                                Verified
-                              </span>
-                            ) : null}
-                          </div>
-                          {company.primary_domain ? (
-                            <Link
-                              href={`/company/${company.org_id}?domain=${encodeURIComponent(company.primary_domain)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-[11px] text-muted-foreground hover:text-primary hover:underline truncate font-mono block"
-                              title="Open Company Intelligence in new tab"
+                              aria-label={`Open ${company.legal_name} full dossier`}
                             >
-                              {company.primary_domain}
+                              <ExternalLink className="size-3.5" />
                             </Link>
-                          ) : (
-                            <p className="text-[11px] text-muted-foreground truncate font-mono">N/A</p>
-                          )}
+                          </Button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="truncate max-w-[140px] block text-muted-foreground">
-                        {company.industry}
-                      </span>
-                    </td>
-                    {/* Rating & Reviews Cell */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {company.rating ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex items-center text-amber-500 font-bold font-mono text-xs">
-                            <Star className="size-3 fill-amber-500 text-amber-500 mr-0.5 shrink-0" />
-                            <span>{Number(company.rating).toFixed(1)}</span>
-                          </div>
-                          <span className="text-[11px] text-muted-foreground font-sans">
-                            ({company.review_count?.toLocaleString() || 0})
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-[11px]">—</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            /* People Hybrid Table */
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/35 text-xs font-semibold text-muted-foreground">
+                  <th className="w-12 px-4 py-3.5" />
+                  <th className="px-4 py-3.5 min-w-[240px]">Executive &amp; Title</th>
+                  <th className="px-4 py-3.5 min-w-[180px]">Company</th>
+                  <th className="px-4 py-3.5 min-w-[140px]">Seniority</th>
+                  <th className="px-4 py-3.5 min-w-[200px]">Work Email</th>
+                  <th className="px-4 py-3.5 min-w-[130px]">Direct Phone</th>
+                  <th className="px-4 py-3.5 min-w-[110px]">Location</th>
+                  <th className="px-4 py-3.5 text-right min-w-[140px]">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((person) => {
+                  const isSelected = selectedIds.includes(person.person_id);
+                  const fullNameDisplay = person.full_name || "Executive";
+                  return (
+                    <tr
+                      key={person.person_id}
+                      onClick={() =>
+                        onPreviewPerson ? onPreviewPerson(person) : onInspectPerson(person)
+                      }
+                      className={cn(
+                        "group cursor-pointer border-b border-border/60 transition-colors duration-200",
+                        "odd:bg-card even:bg-slate-50/70 dark:even:bg-slate-900/35",
+                        "hover:bg-primary/[0.04] dark:hover:bg-primary/[0.08]",
+                        isSelected && "bg-primary/[0.06] dark:bg-primary/[0.12]"
                       )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="font-mono text-foreground/80 block">
-                        {company.city ? `${company.city}, ` : ""}
-                        {company.state_code || company.jurisdiction || "US"}
-                      </span>
-                      {company.formatted_address ? (
-                        <span className="text-[10px] text-muted-foreground truncate max-w-[170px] block" title={company.formatted_address}>
-                          {company.formatted_address}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3 font-mono tabnum text-muted-foreground">
-                      <div>
-                        {company.employee_count_min && company.employee_count_max
-                          ? `${company.employee_count_min.toLocaleString()} - ${company.employee_count_max.toLocaleString()}`
-                          : company.employee_count_min
-                          ? `${company.employee_count_min.toLocaleString()}+`
-                          : company.employee_count_max
-                          ? `< ${company.employee_count_max.toLocaleString()}`
-                          : <span className="text-muted-foreground/60 font-sans text-xs">SMB / Unreported</span>}
-                      </div>
-                      {company.decision_maker_count && company.decision_maker_count > 0 ? (
-                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-sans font-medium flex items-center gap-0.5 mt-0.5">
-                          <Users className="size-2.5" />
-                          {company.decision_maker_count} contacts
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-1 flex-wrap max-w-[180px]">
-                        {company.technologies.slice(0, 2).map((t) => (
-                          <Badge
-                            key={t}
-                            variant="secondary"
-                            className="text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground"
-                          >
-                            {t}
-                          </Badge>
-                        ))}
-                        {company.technologies.length > 2 && (
-                          <span className="text-[10px] text-muted-foreground">
-                            +{company.technologies.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <Flame
-                          className={cn(
-                            "size-3.5",
-                            company.intent_score >= 80
-                              ? "text-rose-500"
-                              : company.intent_score >= 60
-                              ? "text-amber-500"
-                              : "text-blue-500"
-                          )}
-                        />
-                        <span className="font-mono font-semibold tabnum">
-                          {Math.round(company.intent_score)}
-                        </span>
-                        <span className="text-[10px] px-1 rounded bg-muted text-muted-foreground uppercase font-mono">
-                          {company.intent_strength}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 font-mono tabnum font-medium text-emerald-600 dark:text-emerald-400">
-                      {Math.round(company.trust_score <= 1.0 ? company.trust_score * 100 : company.trust_score)}%
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs text-primary hover:text-primary-foreground hover:bg-primary gap-1.5 shadow-2xs font-medium transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onInspectCompany(company);
-                          }}
-                          title="View Company Intelligence in slide-over drawer"
-                        >
-                          <Sparkles className="size-3 text-primary group-hover:text-primary-foreground" />
-                          <span>Intelligence</span>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                          title="Open full dossier in new tab"
-                        >
-                          <a
-                            href={`/company/${company.org_id}${company.primary_domain ? `?domain=${encodeURIComponent(company.primary_domain)}` : ""}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Open ${company.display_name || company.legal_name} dossier in new tab`}
-                          >
-                            <ExternalLink className="size-3.5" />
-                          </a>
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          /* ================== PEOPLE TABLE ================== */
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border/80 bg-muted/40 font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
-                <th className="w-10 px-3 py-2.5"></th>
-                <th className="px-3 py-2.5">Executive &amp; Title</th>
-                <th className="px-3 py-2.5">Organization</th>
-                <th className="px-3 py-2.5">Seniority / Dept</th>
-                <th className="px-3 py-2.5">Email Status</th>
-                <th className="px-3 py-2.5">Direct Phone</th>
-                <th className="px-3 py-2.5">Location</th>
-                <th className="px-3 py-2.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {people.map((person) => {
-                const isSelected = selectedIds.includes(person.person_id);
-                const isDeliverable =
-                  person.deliverability_status.toLowerCase().includes("verified") ||
-                  person.deliverability_status.toLowerCase().includes("deliverable");
-                const isCatchAll =
-                  person.deliverability_status.toLowerCase().includes("catch") || person.is_catch_all;
-
-                return (
-                  <tr
-                    key={person.person_id}
-                    className={cn(
-                      "group hover:bg-muted/40 transition-colors cursor-pointer",
-                      isSelected && "bg-primary/5"
-                    )}
-                    onClick={() => onInspectPerson(person)}
-                  >
-                    <td
-                      className="px-3 py-3"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelectId(person.person_id);
-                      }}
                     >
-                      <Checkbox checked={isSelected} aria-label={`Select ${person.full_name}`} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center justify-center size-7 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-xs shrink-0">
-                          {person.full_name.charAt(0).toUpperCase()}
+                      <td
+                        className="px-4 py-4"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleSelectId(person.person_id);
+                        }}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          aria-label={`Select ${fullNameDisplay}`}
+                        />
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3.5">
+                          <Avatar className="size-10 rounded-full border border-border/70 shrink-0">
+                            <AvatarFallback className="rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                              {fullNameDisplay.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 max-w-[210px]">
+                            <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                              {fullNameDisplay}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {person.title || "Decision-Maker"}
+                            </p>
+                          </div>
                         </div>
-                        <div className="truncate max-w-[200px]">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <p className="truncate max-w-[180px] text-sm font-medium text-foreground">
+                          {person.company_name || "Organization"}
+                        </p>
+                        <p className="truncate max-w-[180px] text-xs font-mono text-muted-foreground">
+                          {person.company_domain || "—"}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <Badge variant="secondary" className="rounded-lg text-xs font-medium">
+                          {(person.seniority_level || person.seniority || "C_SUITE").replace(/_/g, " ")}
+                        </Badge>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        {person.email ? (
+                          <a
+                            href={`mailto:${person.email}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 text-xs font-mono text-foreground hover:text-primary hover:underline truncate max-w-[200px]"
+                          >
+                            <Mail className="size-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate">{person.email}</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-4 text-xs font-mono text-muted-foreground whitespace-nowrap">
+                        {person.phone || "—"}
+                      </td>
+
+                      <td className="px-4 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                        {person.city ? `${person.city}, ` : ""}
+                        {person.state_code || "US"}
+                      </td>
+
+                      <td
+                        className="px-4 py-4 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onInspectPerson(person)}
+                            className="h-8 rounded-lg px-3 text-xs font-medium gap-1.5"
+                          >
+                            <Sparkles className="size-3.5 text-primary" />
+                            <span>Inspect</span>
+                          </Button>
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+                          >
                             <Link
                               href={`/leads/${person.person_id}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="font-semibold text-foreground hover:text-purple-600 dark:hover:text-purple-400 hover:underline transition-colors truncate flex items-center gap-1 group/pname"
-                              title="Open full Lead Intelligence Dossier in new tab"
+                              aria-label={`Open ${fullNameDisplay} dossier`}
                             >
-                              <span className="truncate">{person.full_name}</span>
-                              <ExternalLink className="size-2.5 opacity-0 group-hover/pname:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
+                              <ExternalLink className="size-3.5" />
                             </Link>
-                            {person.updated_at && (person.updated_at.startsWith("2026-11-22") || person.updated_at.startsWith("2026-11-23")) ? (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shrink-0">
-                                Verified today
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
-                                Verified
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground truncate">{person.title}</p>
+                          </Button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="truncate max-w-[160px]">
-                        <Link
-                          href={`/company/${person.company_id || encodeURIComponent(person.company_name)}${person.company_domain ? `?domain=${encodeURIComponent(person.company_domain)}` : ""}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-foreground hover:text-primary hover:underline transition-colors truncate block"
-                          title="Open Company Intelligence in new tab"
-                        >
-                          {person.company_name}
-                        </Link>
-                        <p className="text-[11px] text-muted-foreground truncate font-mono">
-                          {person.company_domain || "N/A"}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-col gap-0.5">
-                        <Badge
-                          variant="secondary"
-                          className="w-fit text-[10px] px-1.5 py-0 rounded bg-muted text-foreground/80 font-mono"
-                        >
-                          {person.seniority_level.replace("_", " ")}
-                        </Badge>
-                        <span className="text-[11px] text-muted-foreground truncate">
-                          {person.department.replace("_", " ")}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {isDeliverable ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-                            <CheckCircle2 className="size-3" />
-                            <span>Verified</span>
-                          </span>
-                        ) : isCatchAll ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                            <AlertCircle className="size-3" />
-                            <span>Catch-All</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30">
-                            <HelpCircle className="size-3" />
-                            <span>Risky</span>
-                          </span>
-                        )}
-                        <Link
-                          href={`/leads/${person.person_id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[11px] font-mono text-muted-foreground hover:text-foreground hover:underline truncate max-w-[120px]"
-                          title="View Lead Profile"
-                        >
-                          {person.email}
-                        </Link>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 font-mono text-muted-foreground text-[11px]">
-                      {person.phone || "—"}
-                    </td>
-                    <td className="px-3 py-3 font-mono text-[11px] text-foreground/80">
-                      {person.city ? `${person.city}, ` : ""}
-                      {person.state_code || "US"}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-600 border-purple-500/30 gap-1.5 shadow-2xs font-medium transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onInspectPerson(person);
-                          }}
-                          title="View Lead Intelligence in slide-over drawer"
-                        >
-                          <Sparkles className="size-3 text-purple-500" />
-                          <span>Intelligence</span>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                          title="Open full lead dossier in new tab"
-                        >
-                          <a
-                            href={`/leads/${person.person_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Open ${person.full_name} dossier in new tab`}
-                          >
-                            <ExternalLink className="size-3.5" />
-                          </a>
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Infinite Scroll Sentinel & Load-More Fallback */}
+        {!isLoading && currentItems.length > 0 && (
+          <div
+            ref={sentinelRef}
+            className="flex items-center justify-center border-t border-border/60 bg-muted/15 px-5 py-4"
+          >
+            {isLoadingMore ? (
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Loader2 className="size-4 animate-spin text-primary" />
+                <span>Loading more verified records...</span>
+              </div>
+            ) : hasMore && onLoadMore ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMore}
+                className="h-9 rounded-xl px-4 text-xs font-medium"
+              >
+                Load More ({(total - currentItems.length).toLocaleString("en-US")} remaining)
+              </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                End of results · {currentItems.length.toLocaleString("en-US")} records loaded
+              </span>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Pagination Footer */}
-      <div className="flex items-center justify-between p-3 border-t border-border/80 bg-background/50 text-xs">
-        <span className="text-muted-foreground font-mono">
-          Page {currentPage} of {totalPages}
-        </span>
-        <div className="flex items-center gap-2">
+      {/* Floating Multi-Select Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div
+          role="region"
+          aria-label="Bulk selection actions"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 rounded-2xl border border-border/40 bg-slate-900 px-5 py-3 text-white shadow-card-md dark:bg-slate-800 animate-slide-up"
+        >
+          <span className="text-sm font-semibold tabular-nums">
+            {selectedIds.length} selected
+          </span>
+          <div className="h-4 w-px bg-white/20" />
           <Button
-            variant="outline"
+            type="button"
             size="sm"
-            onClick={() => onPageChange(Math.max(0, offset - limit))}
-            disabled={offset === 0 || isLoading}
-            className="h-7 px-2 text-xs gap-1"
+            onClick={onPushToOneReachBatch}
+            disabled={isPushing}
+            className="h-8 rounded-xl bg-success hover:bg-success/90 text-white px-3 text-xs font-medium gap-1.5"
           >
-            <ChevronLeft className="size-3.5" />
-            <span>Prev</span>
+            {isPushing ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+            <span>Push to OneReach</span>
           </Button>
           <Button
-            variant="outline"
+            type="button"
+            variant="secondary"
             size="sm"
-            onClick={() => onPageChange(offset + limit)}
-            disabled={offset + limit >= total || isLoading}
-            className="h-7 px-2 text-xs gap-1"
+            onClick={handleExportSelectedOrVisibleCsv}
+            className="h-8 rounded-xl px-3 text-xs font-medium gap-1.5"
           >
-            <span>Next</span>
-            <ChevronRight className="size-3.5" />
+            <Download className="size-3.5" />
+            <span>Export CSV</span>
           </Button>
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+            aria-label="Clear selection"
+          >
+            <X className="size-4" />
+          </button>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

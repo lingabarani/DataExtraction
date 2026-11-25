@@ -1,20 +1,29 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Search, X, Download, ChevronLeft, ChevronRight,
-  SlidersHorizontal, Loader2, Building2, Globe, RefreshCw,
+  Search,
+  X,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useLeads } from "@/hooks/use-leads";
 import { CompaniesTable } from "./companies-table";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const INDUSTRIES = [
   "All",
@@ -33,7 +42,6 @@ export function CompaniesList() {
   const [inputValue, setInputValue] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string>("all");
   const [selectedIndustry, setSelectedIndustry] = useState<string>("all");
-  const [minScore, setMinScore] = useState<number | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const limit = 25;
@@ -46,7 +54,6 @@ export function CompaniesList() {
     q: q || undefined,
     country: countryParam,
     industry: industryParam,
-    min_score: minScore,
     page,
     limit,
   });
@@ -87,158 +94,147 @@ export function CompaniesList() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* ── Search & Filter Bar ─────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-card border border-border p-3 rounded-lg shadow-2xs">
-        {/* Search input */}
-        <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="flex flex-col gap-6">
+      {/* Search & Filter Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-4 shadow-card">
+        <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-lg">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Search company name, domain, EIN, industry..."
-            className="pl-9 pr-8 h-9 text-[13px] bg-background"
+            placeholder="Search company name, domain, EIN, or industry..."
+            className="h-11 rounded-xl pl-10 pr-9 text-sm bg-muted/35"
           />
           {inputValue && (
             <button
               type="button"
               onClick={handleClearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="size-4" />
             </button>
           )}
         </form>
 
-        {/* Quick Country Switcher Tabs */}
-        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-md border border-border/80 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => handleCountryToggle("all")}
-            className={`px-2.5 py-1 text-[11.5px] font-medium rounded transition-all ${
-              selectedCountry === "all"
-                ? "bg-background text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All <span className="text-[10px] opacity-70 font-mono">213K</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCountryToggle("United States")}
-            className={`px-2.5 py-1 text-[11.5px] font-medium rounded transition-all ${
-              selectedCountry === "United States"
-                ? "bg-background text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            United States <span className="text-[10px] opacity-70 font-mono">208K</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCountryToggle("Mexico")}
-            className={`px-2.5 py-1 text-[11.5px] font-medium rounded transition-all ${
-              selectedCountry === "Mexico"
-                ? "bg-background text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Mexico <span className="text-[10px] opacity-70 font-mono">5K</span>
-          </button>
+        {/* Country Filter Pills (Dynamic — No Hardcoded Counts) */}
+        <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/50 p-1 self-start lg:self-auto">
+          {[
+            { id: "all", label: "All Regions" },
+            { id: "United States", label: "United States" },
+            { id: "Mexico", label: "Mexico" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleCountryToggle(tab.id)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                selectedCountry === tab.id
+                  ? "bg-card text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {/* Industry dropdown */}
-          <Select value={selectedIndustry} onValueChange={(val) => { setSelectedIndustry(val); setPage(1); }}>
-            <SelectTrigger className="h-9 text-[12px] min-w-[130px]">
+        {/* Actions */}
+        <div className="flex items-center gap-2.5">
+          <Select
+            value={selectedIndustry}
+            onValueChange={(val) => {
+              setSelectedIndustry(val);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 rounded-xl text-xs min-w-[160px]">
               <SelectValue placeholder="Industry" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl">
               {INDUSTRIES.map((ind) => (
-                <SelectItem key={ind} value={ind} className="text-[12px]">
+                <SelectItem key={ind} value={ind === "All" ? "all" : ind} className="text-xs">
                   {ind}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {/* Refresh Button */}
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => refresh()}
-            className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-            title="Refresh organizations"
+            className="size-10 rounded-xl"
+            aria-label="Refresh organizations"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-4 ${loading ? "animate-spin text-primary" : ""}`} />
           </Button>
 
-          {/* Export CSV Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleExport}
             disabled={isExporting}
-            className="h-9 gap-1.5 text-xs font-medium"
+            className="h-10 rounded-xl px-4 gap-2 text-xs font-medium"
           >
             {isExporting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Download className="w-3.5 h-3.5" />
+              <Download className="size-4" />
             )}
-            <span>Export</span>
+            <span>Export CSV</span>
           </Button>
         </div>
       </div>
 
-      {/* ── Table Container ────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
+      {/* Card-Table Container */}
+      <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-card">
+        <div className="overflow-x-auto scrollbar-enterprise">
           <CompaniesTable companies={companies} loading={loading} />
         </div>
 
-        {/* ── Pagination Footer ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20 text-[12.5px] text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span>
-              Showing{" "}
-              <strong className="font-semibold text-foreground tabnum font-mono">
-                {total > 0 ? (page - 1) * limit + 1 : 0}
-              </strong>
-              –
-              <strong className="font-semibold text-foreground tabnum font-mono">
-                {Math.min(page * limit, total)}
-              </strong>{" "}
-              of{" "}
-              <strong className="font-semibold text-foreground tabnum font-mono">
-                {total.toLocaleString("en-US")}
-              </strong>{" "}
-              organizations
-            </span>
-          </div>
+        {/* Pagination Footer */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border/80 bg-muted/20 text-xs text-muted-foreground">
+          <span>
+            Showing{" "}
+            <strong className="font-semibold text-foreground tabular-nums">
+              {total > 0 ? (page - 1) * limit + 1 : 0}
+            </strong>
+            –
+            <strong className="font-semibold text-foreground tabular-nums">
+              {Math.min(page * limit, total)}
+            </strong>{" "}
+            of{" "}
+            <strong className="font-semibold text-foreground tabular-nums">
+              {total.toLocaleString("en-US")}
+            </strong>{" "}
+            organizations
+          </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1 || loading}
-              className="h-7 w-7 p-0"
+              className="size-8 rounded-lg"
+              aria-label="Previous page"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="size-4" />
             </Button>
-            <span className="px-2 font-mono text-[11.5px] font-medium text-foreground tabnum">
+            <span className="px-2 font-mono text-xs font-medium text-foreground tabular-nums">
               {page} / {totalPages}
             </span>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages || loading}
-              className="h-7 w-7 p-0"
+              className="size-8 rounded-lg"
+              aria-label="Next page"
             >
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="size-4" />
             </Button>
           </div>
         </div>

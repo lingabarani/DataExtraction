@@ -7,10 +7,7 @@ import {
   MapPin,
   Briefcase,
   Users,
-  DollarSign,
   Cpu,
-  ShieldCheck,
-  Flame,
   UserCheck,
   Mail,
   Building,
@@ -19,6 +16,8 @@ import {
   Search,
   Globe,
   Award,
+  Star,
+  Clock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -170,44 +169,12 @@ export function ProspectingSidebar({
     onCompanyFiltersChange({ ...companyFilters, headcount_ranges: next.length ? next : undefined, offset: 0 });
   };
 
-  const toggleRevenue = (range: string) => {
-    const current = companyFilters.revenue_ranges || [];
-    const next = current.includes(range)
-      ? current.filter((r) => r !== range)
-      : [...current, range];
-    onCompanyFiltersChange({ ...companyFilters, revenue_ranges: next.length ? next : undefined, offset: 0 });
-  };
-
-  const toggleFundingStage = (stage: string) => {
-    const current = companyFilters.funding_stages || [];
-    const next = current.includes(stage)
-      ? current.filter((s) => s !== stage)
-      : [...current, stage];
-    onCompanyFiltersChange({ ...companyFilters, funding_stages: next.length ? next : undefined, offset: 0 });
-  };
-
   const toggleTechnology = (tech: string) => {
     const current = companyFilters.technologies || [];
     const next = current.includes(tech)
       ? current.filter((t) => t !== tech)
       : [...current, tech];
     onCompanyFiltersChange({ ...companyFilters, technologies: next.length ? next : undefined, offset: 0 });
-  };
-
-  const toggleCompliance = (badge: string) => {
-    const current = companyFilters.compliance_badges || [];
-    const next = current.includes(badge)
-      ? current.filter((b) => b !== badge)
-      : [...current, badge];
-    onCompanyFiltersChange({ ...companyFilters, compliance_badges: next.length ? next : undefined, offset: 0 });
-  };
-
-  const toggleIntentStrength = (strength: string) => {
-    const current = companyFilters.intent_strengths || [];
-    const next = current.includes(strength)
-      ? current.filter((s) => s !== strength)
-      : [...current, strength];
-    onCompanyFiltersChange({ ...companyFilters, intent_strengths: next.length ? next : undefined, offset: 0 });
   };
 
   // Helpers for People Mode
@@ -405,88 +372,60 @@ export function ProspectingSidebar({
             </div>
           </FilterSection>
 
-          {/* Employee Headcount */}
+          {/* Google Star Rating */}
           <FilterSection
-            title="Employee Headcount"
-            icon={Users}
-            activeCount={companyFilters.headcount_ranges?.length || 0}
+            title="Google Rating"
+            icon={Star}
+            activeCount={companyFilters.min_rating ? 1 : 0}
           >
             {[
-              { value: "1-10", label: "1 - 10" },
-              { value: "11-50", label: "11 - 50" },
-              { value: "51-200", label: "51 - 200" },
-              { value: "201-500", label: "201 - 500" },
-              { value: "501-1000", label: "501 - 1,000" },
-              { value: "1000+", label: "1,000+" },
-            ].map((hc) => (
+              { value: 4.5, label: "★ 4.5 & up (Top Rated)" },
+              { value: 4.0, label: "★ 4.0 & up (Great)" },
+              { value: 3.5, label: "★ 3.5 & up (Good)" },
+              { value: 3.0, label: "★ 3.0 & up (Satisfactory)" },
+            ].map((opt) => (
               <label
-                key={hc.value}
+                key={opt.value}
                 className="flex items-center text-xs cursor-pointer py-1 px-1 rounded hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <Checkbox
-                    checked={(companyFilters.headcount_ranges || []).includes(hc.value)}
-                    onCheckedChange={() => toggleHeadcount(hc.value)}
+                    checked={companyFilters.min_rating === opt.value}
+                    onCheckedChange={() =>
+                      onCompanyFiltersChange({
+                        ...companyFilters,
+                        min_rating: companyFilters.min_rating === opt.value ? undefined : opt.value,
+                        offset: 0,
+                      })
+                    }
                   />
-                  <span>{hc.label}</span>
+                  <span className="font-medium">{opt.label}</span>
                 </div>
               </label>
             ))}
           </FilterSection>
 
-          {/* Annual Revenue */}
+          {/* Freshness SLA */}
           <FilterSection
-            title="Annual Revenue"
-            icon={DollarSign}
-            activeCount={companyFilters.revenue_ranges?.length || 0}
+            title="Freshness SLA"
+            icon={Clock}
+            activeCount={companyFilters.recent_only ? 1 : 0}
           >
-            {[
-              { value: "0-1M", label: "< $1M" },
-              { value: "1M-10M", label: "$1M - $10M" },
-              { value: "10M-50M", label: "$10M - $50M" },
-              { value: "50M+", label: "$50M+" },
-            ].map((rev) => (
-              <label
-                key={rev.value}
-                className="flex items-center text-xs cursor-pointer py-1 px-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={(companyFilters.revenue_ranges || []).includes(rev.value)}
-                    onCheckedChange={() => toggleRevenue(rev.value)}
-                  />
-                  <span>{rev.label}</span>
-                </div>
-              </label>
-            ))}
-          </FilterSection>
-
-          {/* Funding Stage */}
-          <FilterSection
-            title="Funding Stage"
-            icon={Award}
-            activeCount={companyFilters.funding_stages?.length || 0}
-          >
-            {[
-              { value: "Seed", label: "Seed / Angel" },
-              { value: "Series A", label: "Series A / Early" },
-              { value: "Series B", label: "Series B & Later" },
-              { value: "Public", label: "Public / IPO" },
-              { value: "Bootstrapped", label: "Bootstrapped / Private" },
-            ].map((stg) => (
-              <label
-                key={stg.value}
-                className="flex items-center text-xs cursor-pointer py-1 px-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={(companyFilters.funding_stages || []).includes(stg.value)}
-                    onCheckedChange={() => toggleFundingStage(stg.value)}
-                  />
-                  <span>{stg.label}</span>
-                </div>
-              </label>
-            ))}
+            <label className="flex items-center text-xs cursor-pointer py-1 px-1 rounded hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={Boolean(companyFilters.recent_only)}
+                  onCheckedChange={(checked) =>
+                    onCompanyFiltersChange({
+                      ...companyFilters,
+                      recent_only: Boolean(checked) ? true : undefined,
+                      offset: 0,
+                    })
+                  }
+                />
+                <span>Verified in Past 30 Days</span>
+              </div>
+            </label>
           </FilterSection>
 
           {/* Technologies */}
@@ -520,55 +459,6 @@ export function ProspectingSidebar({
                 </label>
               ))}
             </div>
-          </FilterSection>
-
-          {/* Compliance & Security */}
-          <FilterSection
-            title="Compliance & Security"
-            icon={ShieldCheck}
-            activeCount={companyFilters.compliance_badges?.length || 0}
-          >
-            {[
-              { value: "SOC 2", label: "SOC 2 Certified" },
-              { value: "HIPAA", label: "HIPAA Compliant" },
-              { value: "ISO 27001", label: "ISO 27001" },
-              { value: "GDPR", label: "GDPR Ready" },
-            ].map((badge) => (
-              <label
-                key={badge.value}
-                className="flex items-center text-xs cursor-pointer py-1 px-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={(companyFilters.compliance_badges || []).includes(badge.value)}
-                    onCheckedChange={() => toggleCompliance(badge.value)}
-                  />
-                  <span>{badge.label}</span>
-                </div>
-              </label>
-            ))}
-          </FilterSection>
-
-          {/* Buyer Intent Signals */}
-          <FilterSection
-            title="Buyer Intent Signals"
-            icon={Flame}
-            activeCount={companyFilters.intent_strengths?.length || 0}
-          >
-            {["SURGING", "HIGH", "MEDIUM"].map((strength) => (
-              <label
-                key={strength}
-                className="flex items-center text-xs cursor-pointer py-1 px-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={(companyFilters.intent_strengths || []).includes(strength)}
-                    onCheckedChange={() => toggleIntentStrength(strength)}
-                  />
-                  <span>{strength} Intent</span>
-                </div>
-              </label>
-            ))}
           </FilterSection>
         </div>
       ) : (

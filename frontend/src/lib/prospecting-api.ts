@@ -50,6 +50,8 @@ export interface CompanyRecord {
   display_name: string;
   primary_domain: string;
   industry: string;
+  sub_industry?: string | null;
+  primary_phone?: string | null;
   jurisdiction: string;
   city: string;
   state_code: string;
@@ -99,21 +101,24 @@ export interface PeopleSearchParams {
 export interface PeopleRecord {
   person_id: string;
   full_name: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
   title: string;
   seniority_level: string;
+  seniority?: string;
   department: string;
   city: string;
   state_code: string;
   email: string;
+  email_status?: string;
   phone: string;
-  linkedin_url: string;
-  deliverability_status: string;
-  deliverability_score: number;
-  is_catch_all: boolean;
-  mx_provider: string;
+  linkedin_url?: string;
+  deliverability_status?: string;
+  deliverability_score?: number;
+  is_catch_all?: boolean;
+  mx_provider?: string;
   propensity_to_buy_score: number;
+  propensity_score?: number;
   trust_score: number;
   company_id: string;
   company_name: string;
@@ -218,11 +223,11 @@ export const prospectingApi = {
   },
 
   async searchCompanies(params: CompanySearchParams): Promise<CompanySearchResults> {
-    return api.post<CompanySearchResults>("/search/companies", params);
+    return api.post<CompanySearchResults>("/search/companies", params, { timeoutMs: 35000 });
   },
 
   async searchPeople(params: PeopleSearchParams): Promise<PeopleSearchResults> {
-    return api.post<PeopleSearchResults>("/search/people", params);
+    return api.post<PeopleSearchResults>("/search/people", params, { timeoutMs: 35000 });
   },
 
   async pushToOneReach(

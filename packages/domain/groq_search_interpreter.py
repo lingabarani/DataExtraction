@@ -46,12 +46,53 @@ US_STATE_MAP: Dict[str, str] = {
 
 SENIORITY_KEYWORDS: Dict[str, str] = {
     "c-suite": "C_SUITE", "csuite": "C_SUITE", "c suite": "C_SUITE", "chief": "C_SUITE",
-    "ceo": "C_SUITE", "cto": "C_SUITE", "cfo": "C_SUITE", "coo": "C_SUITE", "cmo": "C_SUITE", "cro": "C_SUITE",
+    "ceo": "C_SUITE", "ceos": "C_SUITE", "cto": "C_SUITE", "ctos": "C_SUITE", "cfo": "C_SUITE", "cfos": "C_SUITE",
+    "coo": "C_SUITE", "coos": "C_SUITE", "cmo": "C_SUITE", "cmos": "C_SUITE", "cro": "C_SUITE", "cros": "C_SUITE",
     "vp": "VP", "vps": "VP", "vice president": "VP", "vice presidents": "VP",
     "director": "DIRECTOR", "directors": "DIRECTOR", "head of": "DIRECTOR",
     "manager": "MANAGER", "managers": "MANAGER", "lead": "MANAGER",
     "founder": "FOUNDER", "founders": "FOUNDER", "owner": "FOUNDER", "co-founder": "FOUNDER",
     "senior": "SENIOR", "principal": "SENIOR", "staff": "SENIOR",
+}
+
+COMMON_EXECUTIVE_TITLES: Dict[str, List[str]] = {
+    "cto": ["CTO", "Chief Technology Officer"],
+    "ctos": ["CTO", "Chief Technology Officer"],
+    "chief technology officer": ["CTO", "Chief Technology Officer"],
+    "ceo": ["CEO", "Chief Executive Officer"],
+    "ceos": ["CEO", "Chief Executive Officer"],
+    "chief executive officer": ["CEO", "Chief Executive Officer"],
+    "cfo": ["CFO", "Chief Financial Officer"],
+    "cfos": ["CFO", "Chief Financial Officer"],
+    "chief financial officer": ["CFO", "Chief Financial Officer"],
+    "coo": ["COO", "Chief Operating Officer"],
+    "coos": ["COO", "Chief Operating Officer"],
+    "chief operating officer": ["COO", "Chief Operating Officer"],
+    "cmo": ["CMO", "Chief Marketing Officer"],
+    "cmos": ["CMO", "Chief Marketing Officer"],
+    "chief marketing officer": ["CMO", "Chief Marketing Officer"],
+    "cro": ["CRO", "Chief Revenue Officer"],
+    "cros": ["CRO", "Chief Revenue Officer"],
+    "chief revenue officer": ["CRO", "Chief Revenue Officer"],
+    "cso": ["CSO", "Chief Security Officer"],
+    "csos": ["CSO", "Chief Security Officer"],
+    "chief security officer": ["CSO", "Chief Security Officer"],
+    "vp": ["VP", "Vice President"],
+    "vps": ["VP", "Vice President"],
+    "vice president": ["VP", "Vice President"],
+    "vice presidents": ["VP", "Vice President"],
+    "founder": ["Founder", "Co-Founder", "Owner"],
+    "founders": ["Founder", "Co-Founder", "Owner"],
+    "owner": ["Owner", "Founder"],
+    "owners": ["Owner", "Founder"],
+    "co-founder": ["Co-Founder", "Founder"],
+    "co-founders": ["Co-Founder", "Founder"],
+    "director": ["Director"],
+    "directors": ["Director"],
+    "head of": ["Head", "Director", "VP"],
+    "manager": ["Manager"],
+    "managers": ["Manager"],
+    "lead": ["Lead", "Principal"],
 }
 
 DEPARTMENT_KEYWORDS: Dict[str, str] = {
@@ -302,7 +343,13 @@ class GroqSearchInterpreter:
 
         # ── Tier 0: Deterministic Fast-Path (<1ms) for Common Prospecting Prompts ──
         heuristic_plan = self._heuristic_fallback(clean_query, mode)
-        has_strong_entities = bool(heuristic_plan.states or heuristic_plan.naics_codes or heuristic_plan.seniority_tiers or heuristic_plan.technologies)
+        has_strong_entities = bool(
+            heuristic_plan.states
+            or heuristic_plan.naics_codes
+            or heuristic_plan.seniority_tiers
+            or heuristic_plan.target_titles
+            or heuristic_plan.technologies
+        )
         # Check if user query contains an explicit location prompt (e.g. in, near, at, metro, area)
         has_location_prompt = bool(re.search(r"\b(in|near|around|at|metro|area|city)\b", clean_query, re.I))
         location_resolved = not has_location_prompt or bool(heuristic_plan.states or heuristic_plan.cities)
@@ -575,6 +622,14 @@ class GroqSearchInterpreter:
                 if tier not in seniority_tiers:
                     seniority_tiers.append(tier)
 
+        # Extract target executive titles
+        target_titles: List[str] = []
+        for term, titles in COMMON_EXECUTIVE_TITLES.items():
+            if re.search(r"\b" + re.escape(term) + r"\b", q_lower):
+                for t in titles:
+                    if t not in target_titles:
+                        target_titles.append(t)
+
         # Extract departments (only active in people search mode to prevent polluting company industry searches)
         departments: List[str] = []
         if mode == "people":
@@ -661,7 +716,9 @@ class GroqSearchInterpreter:
             "services", "service", "agencies", "agency", "providers", "provider", "centers",
             "center", "solutions", "group", "businesses", "business", "firms", "firm",
             "corporation", "corp", "inc", "llc", "organizations", "organization", "care", "child",
-            "near", "best", "verified", "data"
+            "near", "best", "verified", "data", "rated", "rating", "ratings", "stars", "star",
+            "above", "people", "person", "decision", "makers", "maker", "executives", "executive",
+            "leaders", "leader", "professionals", "professional"
         }
         # Exclude location terms and geographic noise from expanded keyword tokens
         location_noise_words = {
@@ -673,6 +730,7 @@ class GroqSearchInterpreter:
         for tok in re.findall(r"[a-zA-Z]{3,}", q_lower):
             if (tok not in STOP_WORDS and tok not in US_STATE_MAP 
                 and tok not in SENIORITY_KEYWORDS and tok not in DEPARTMENT_KEYWORDS
+                and tok not in COMMON_EXECUTIVE_TITLES
                 and tok not in location_noise_words
                 and tok not in city_tokens
                 and tok not in state_tokens):
@@ -689,7 +747,9 @@ class GroqSearchInterpreter:
 
         # Construct assistant summary
         parts = []
-        if ordered_keywords:
+        if target_titles:
+            parts.append(f"{', '.join(target_titles[:2])}")
+        elif ordered_keywords:
             main_term = ordered_keywords[0].title()
             parts.append(f"{main_term} organizations" if effective_mode == "company" else f"professionals in {main_term}")
         elif ordered_naics:
@@ -707,7 +767,7 @@ class GroqSearchInterpreter:
                 parts.append(f"(>={min_headcount} employees)")
             elif max_headcount:
                 parts.append(f"(<={max_headcount} employees)")
-        if seniority_tiers:
+        if seniority_tiers and not target_titles:
             parts.append(f"({', '.join(seniority_tiers)})")
         if require_verified_email:
             parts.append("with verified emails")
@@ -721,7 +781,7 @@ class GroqSearchInterpreter:
             states=states,
             cities=cities,
             countries=["US"],
-            target_titles=[],
+            target_titles=target_titles,
             seniority_tiers=seniority_tiers,
             departments=departments,
             technologies=technologies,

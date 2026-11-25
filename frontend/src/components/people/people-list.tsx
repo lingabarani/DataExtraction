@@ -4,24 +4,33 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Search, X, Download, ChevronLeft, ChevronRight,
-  SlidersHorizontal, Loader2, Users, RefreshCw, ShieldCheck,
+  Search,
+  X,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useLeads } from "@/hooks/use-leads";
 import { PeopleTable } from "./people-table";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const SENIORITY_PILLS = [
   { label: "All Seniority", value: "all" },
-  { label: "C-Suite",       value: "C_SUITE" },
-  { label: "VP",            value: "VP" },
-  { label: "Director",      value: "DIRECTOR" },
-  { label: "Founder",       value: "FOUNDER" },
+  { label: "C-Suite", value: "C_SUITE" },
+  { label: "VP", value: "VP" },
+  { label: "Director", value: "DIRECTOR" },
+  { label: "Founder", value: "FOUNDER" },
 ];
 
 export function PeopleList() {
@@ -34,7 +43,8 @@ export function PeopleList() {
   const [isExporting, setIsExporting] = useState(false);
   const limit = 25;
 
-  const currentTable: "us_leads" | "mexico_leads" = countryTab === "mexico" ? "mexico_leads" : "us_leads";
+  const currentTable: "us_leads" | "mexico_leads" =
+    countryTab === "mexico" ? "mexico_leads" : "us_leads";
 
   const { leads: people, total, loading, refresh } = useLeads({
     table: currentTable,
@@ -81,177 +91,167 @@ export function PeopleList() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* ── Search & Filter Controls ────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-card border border-border p-3 rounded-lg shadow-2xs">
-        {/* Search input */}
-        <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="flex flex-col gap-6">
+      {/* Search & Filter Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-4 shadow-card">
+        <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-lg">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Search full name, job title, company, or email..."
-            className="pl-9 pr-8 h-9 text-[13px] bg-background"
+            className="h-11 rounded-xl pl-10 pr-9 text-sm bg-muted/35"
           />
           {inputValue && (
             <button
               type="button"
               onClick={handleClearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="size-4" />
             </button>
           )}
         </form>
 
-        {/* Quick Country Switcher Tabs */}
-        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-md border border-border/80 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => handleCountryToggle("all")}
-            className={`px-2.5 py-1 text-[11.5px] font-medium rounded transition-all ${
-              countryTab === "all"
-                ? "bg-background text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All Executive Leads <span className="text-[10px] opacity-70 font-mono">115K</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCountryToggle("us")}
-            className={`px-2.5 py-1 text-[11.5px] font-medium rounded transition-all ${
-              countryTab === "us"
-                ? "bg-background text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            United States <span className="text-[10px] opacity-70 font-mono">65K</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCountryToggle("mexico")}
-            className={`px-2.5 py-1 text-[11.5px] font-medium rounded transition-all ${
-              countryTab === "mexico"
-                ? "bg-background text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Mexico <span className="text-[10px] opacity-70 font-mono">50K</span>
-          </button>
+        {/* Country Tabs (Dynamic — No Hardcoded Counts) */}
+        <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/50 p-1 self-start lg:self-auto">
+          {[
+            { id: "all" as const, label: "All Leads" },
+            { id: "us" as const, label: "United States" },
+            { id: "mexico" as const, label: "Mexico" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleCountryToggle(tab.id)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                countryTab === tab.id
+                  ? "bg-card text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Actions & Filters */}
-        <div className="flex items-center gap-2">
-          {/* Deliverability Status Filter */}
-          <Select value={emailStatus} onValueChange={(val) => { setEmailStatus(val); setPage(1); }}>
-            <SelectTrigger className="h-9 text-[12px] min-w-[130px]">
+        <div className="flex items-center gap-2.5">
+          <Select
+            value={emailStatus}
+            onValueChange={(val) => {
+              setEmailStatus(val);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 rounded-xl text-xs min-w-[155px]">
               <SelectValue placeholder="Email Status" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-[12px]">All Deliverability</SelectItem>
-              <SelectItem value="VERIFIED" className="text-[12px]">Verified Deliverable</SelectItem>
-              <SelectItem value="MX_CONFIRMED" className="text-[12px]">MX Confirmed</SelectItem>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all" className="text-xs">All Deliverability</SelectItem>
+              <SelectItem value="VERIFIED" className="text-xs">Verified Deliverable</SelectItem>
+              <SelectItem value="MX_CONFIRMED" className="text-xs">MX Confirmed</SelectItem>
             </SelectContent>
           </Select>
 
-          {/* Refresh Button */}
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => refresh()}
-            className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-            title="Refresh leads"
+            className="size-10 rounded-xl"
+            aria-label="Refresh leads"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-4 ${loading ? "animate-spin text-primary" : ""}`} />
           </Button>
 
-          {/* Export CSV Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleExport}
             disabled={isExporting}
-            className="h-9 gap-1.5 text-xs font-medium"
+            className="h-10 rounded-xl px-4 gap-2 text-xs font-medium"
           >
             {isExporting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Download className="w-3.5 h-3.5" />
+              <Download className="size-4" />
             )}
-            <span>Export</span>
+            <span>Export CSV</span>
           </Button>
         </div>
       </div>
 
-      {/* ── Seniority Quick Filter Pills ─────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mr-1">
-          Seniority:
-        </span>
+      {/* Seniority Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <span className="text-meta text-muted-foreground mr-1">Seniority:</span>
         {SENIORITY_PILLS.map((pill) => (
           <button
             key={pill.value}
             type="button"
-            onClick={() => { setSeniority(pill.value); setPage(1); }}
-            className={`px-2.5 py-1 rounded text-[11.5px] font-medium transition-all ${
+            onClick={() => {
+              setSeniority(pill.value);
+              setPage(1);
+            }}
+            className={cn(
+              "rounded-xl px-3.5 py-1.5 text-xs font-medium transition-colors",
               seniority === pill.value
-                ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/60"
-            }`}
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/60"
+            )}
           >
             {pill.label}
           </button>
         ))}
       </div>
 
-      {/* ── Table Container ────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
+      {/* Table Container */}
+      <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-card">
+        <div className="overflow-x-auto scrollbar-enterprise">
           <PeopleTable people={people} loading={loading} table={currentTable} />
         </div>
 
-        {/* ── Pagination Footer ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20 text-[12.5px] text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span>
-              Showing{" "}
-              <strong className="font-semibold text-foreground tabnum font-mono">
-                {total > 0 ? (page - 1) * limit + 1 : 0}
-              </strong>
-              –
-              <strong className="font-semibold text-foreground tabnum font-mono">
-                {Math.min(page * limit, total)}
-              </strong>{" "}
-              of{" "}
-              <strong className="font-semibold text-foreground tabnum font-mono">
-                {total.toLocaleString("en-US")}
-              </strong>{" "}
-              decision-makers
-            </span>
-          </div>
+        {/* Pagination Footer */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border/80 bg-muted/20 text-xs text-muted-foreground">
+          <span>
+            Showing{" "}
+            <strong className="font-semibold text-foreground tabular-nums">
+              {total > 0 ? (page - 1) * limit + 1 : 0}
+            </strong>
+            –
+            <strong className="font-semibold text-foreground tabular-nums">
+              {Math.min(page * limit, total)}
+            </strong>{" "}
+            of{" "}
+            <strong className="font-semibold text-foreground tabular-nums">
+              {total.toLocaleString("en-US")}
+            </strong>{" "}
+            decision-makers
+          </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1 || loading}
-              className="h-7 w-7 p-0"
+              className="size-8 rounded-lg"
+              aria-label="Previous page"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="size-4" />
             </Button>
-            <span className="px-2 font-mono text-[11.5px] font-medium text-foreground tabnum">
+            <span className="px-2 font-mono text-xs font-medium text-foreground tabular-nums">
               {page} / {totalPages}
             </span>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages || loading}
-              className="h-7 w-7 p-0"
+              className="size-8 rounded-lg"
+              aria-label="Next page"
             >
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="size-4" />
             </Button>
           </div>
         </div>

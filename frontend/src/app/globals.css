@@ -4,171 +4,193 @@
 
 @layer base {
   :root {
-    /* ── Core surfaces ─────────────────────────────────────────── */
-    --background:        210 20% 98%;          /* #f8fafc cool mist canvas */
-    --foreground:        222 47% 11%;          /* #0f172a enterprise slate text */
+    /* ── Core Slate Surfaces (Stripe + Linear + Notion aesthetic) ─── */
+    --background:          210 40% 98%;          /* #F8FAFC Slate-50 canvas */
+    --foreground:          222.2 47.4% 11.2%;    /* #0F172A Slate-900 ink */
 
-    --card:              0 0% 100%;            /* #ffffff pure white elevated card */
-    --card-foreground:   222 47% 11%;
+    --card:                0 0% 100%;            /* #FFFFFF pure elevated surface */
+    --card-foreground:     222.2 47.4% 11.2%;
 
-    --popover:           0 0% 100%;
-    --popover-foreground:222 47% 11%;
+    --popover:             0 0% 100%;
+    --popover-foreground:  222.2 47.4% 11.2%;
 
-    /* ── Brand — slate-based, no blue gradient ─────────────────── */
-    --primary:           222 47% 11%;
-    --primary-foreground:0 0% 98%;
+    /* ── Enterprise Primary (#2563EB) ─────────────────────────────── */
+    --primary:             221.2 83.2% 53.3%;    /* #2563EB */
+    --primary-foreground:  210 40% 98%;
 
-    --secondary:         210 20% 94%;
-    --secondary-foreground:222 47% 18%;
+    --secondary:           210 40% 96.1%;        /* #F1F5F9 Slate-100 */
+    --secondary-foreground:222.2 47.4% 11.2%;
 
-    --muted:             210 20% 95%;
-    --muted-foreground:  215 16% 47%;
+    --muted:               210 40% 96.1%;
+    --muted-foreground:    215.4 16.3% 46.9%;    /* #64748B Slate-500 */
 
-    /* ── Accent — single understated teal ─────────────────────── */
-    --accent:            174 60% 36%;
-    --accent-foreground: 0 0% 100%;
+    --accent:              214.3 31.8% 91.4%;    /* Subtle slate hover surface */
+    --accent-foreground:   222.2 47.4% 11.2%;
 
-    /* ── Semantic ──────────────────────────────────────────────── */
-    --success:           142 72% 29%;
-    --success-foreground:0 0% 100%;
-    --warning:           38 92% 40%;
-    --warning-foreground:0 0% 100%;
-    --info:              210 90% 40%;
-    --info-foreground:   0 0% 100%;
-    --destructive:       0 72% 46%;
-    --destructive-foreground:0 0% 100%;
+    /* ── Semantic Feedback Palette ────────────────────────────────── */
+    --success:             142.1 70.6% 45.3%;    /* #22C55E */
+    --success-foreground:  0 0% 100%;
+    --warning:             37.7 92.1% 50.2%;     /* #F59E0B */
+    --warning-foreground:  0 0% 100%;
+    --info:                221.2 83.2% 53.3%;    /* #2563EB */
+    --info-foreground:     0 0% 100%;
+    --destructive:         0 84.2% 60.2%;      /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
 
-    /* ── Chrome ────────────────────────────────────────────────── */
-    --border:            215 20% 88%;          /* #dbe2ea crisp defined structural border */
-    --input:             215 20% 88%;
-    --ring:              174 60% 36%;
-    --radius:            0.5rem;               /* 8px clean enterprise radius */
+    /* ── Structural Chrome & Controls ─────────────────────────────── */
+    --border:              214.3 31.8% 90%;      /* #E2E8F0 crisp Slate-200 */
+    --input:               214.3 31.8% 88%;
+    --ring:                221.2 83.2% 53.3%;
+    --radius:              0.75rem;              /* 12px base radius */
 
-    /* ── Sidebar — high-contrast enterprise anchor surface ──────── */
-    --sidebar-background:    222 47% 7%;       /* #090e17 deep obsidian navy anchor */
-    --sidebar-foreground:    215 20% 80%;      /* #cbd5e1 high-contrast readable slate typography */
-    --sidebar-primary:       160 84% 39%;      /* #10b981 emerald active accent */
+    /* ── Collapsible Sidebar (Same-Canvas Slate Continuity) ───────── */
+    --sidebar-background:         0 0% 100%;
+    --sidebar-foreground:         215.4 20% 35%;
+    --sidebar-primary:            221.2 83.2% 53.3%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent:        222 35% 13%;      /* #131c2e elevated hover/active background */
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border:        222 25% 16%;      /* #162032 crisp structural boundary */
-    --sidebar-ring:          160 84% 39%;
+    --sidebar-accent:             214.3 95% 96%;
+    --sidebar-accent-foreground:  221.2 83.2% 45%;
+    --sidebar-border:             214.3 31.8% 91.4%;
+    --sidebar-ring:               221.2 83.2% 53.3%;
 
-    /* ── Data colours (charts/badges) ─────────────────────────── */
-    --data-1: 220 13% 20%;
-    --data-2: 174 60% 36%;
-    --data-3: 38 92% 40%;
-    --data-4: 0 72% 46%;
-    --data-5: 270 60% 50%;
-    --data-6: 199 80% 40%;
+    /* ── Data Viz Palette ─────────────────────────────────────────── */
+    --data-1: 221.2 83.2% 53.3%;
+    --data-2: 142.1 70.6% 45.3%;
+    --data-3: 37.7 92.1% 50.2%;
+    --data-4: 262.1 83.3% 57.8%;
+    --data-5: 199 89% 48%;
+    --data-6: 0 84.2% 60.2%;
 
-    /* ── Remove gradients ─────────────────────────────────────── */
-    --gradient-brand:    none;
-    --gradient-warm:     none;
-    --shadow-glow:       none;
+    --ease-enterprise: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dark {
-    --background:        220 20% 7%;
-    --foreground:        220 10% 92%;
-    --card:              220 17% 10%;
-    --card-foreground:   220 10% 92%;
-    --popover:           220 17% 10%;
-    --popover-foreground:220 10% 92%;
-    --primary:           220 10% 90%;
-    --primary-foreground:220 20% 7%;
-    --secondary:         220 14% 15%;
-    --secondary-foreground:220 10% 86%;
-    --muted:             220 14% 15%;
-    --muted-foreground:  220 8% 52%;
-    --accent:            174 55% 42%;
-    --accent-foreground: 0 0% 100%;
-    --success:           142 66% 38%;
-    --success-foreground:0 0% 100%;
-    --warning:           38 88% 48%;
-    --warning-foreground:0 0% 100%;
-    --info:              210 85% 52%;
-    --info-foreground:   0 0% 100%;
-    --destructive:       0 68% 52%;
-    --destructive-foreground:0 0% 100%;
-    --border:            220 14% 17%;
-    --input:             220 14% 17%;
-    --ring:              220 10% 70%;
-    --sidebar-background:222 47% 7%;
-    --sidebar-foreground:220 10% 84%;
-    --sidebar-primary:   174 55% 42%;
-    --sidebar-primary-foreground:0 0% 100%;
-    --sidebar-accent:    222 35% 12%;
-    --sidebar-accent-foreground:220 10% 95%;
-    --sidebar-border:    222 30% 14%;
-    --sidebar-ring:      174 55% 42%;
+    --background:          222 47% 6%;           /* #080D17 Deep Obsidian Slate */
+    --foreground:          210 40% 98%;          /* #F8FAFC */
+
+    --card:                222 40% 9%;           /* #0E1525 */
+    --card-foreground:     210 40% 98%;
+
+    --popover:             222 40% 10%;
+    --popover-foreground:  210 40% 98%;
+
+    --primary:             217.2 91.2% 59.8%;    /* Brighter Cobalt for Dark contrast */
+    --primary-foreground:  222.2 47.4% 11.2%;
+
+    --secondary:           217.2 32.6% 14%;
+    --secondary-foreground:210 40% 96%;
+
+    --muted:               217.2 32.6% 14%;
+    --muted-foreground:    215 20.2% 65.1%;
+
+    --accent:              217.2 32.6% 16%;
+    --accent-foreground:   210 40% 98%;
+
+    --success:             142.1 70.6% 45.3%;
+    --success-foreground:  0 0% 100%;
+    --warning:             37.7 92.1% 50.2%;
+    --warning-foreground:  0 0% 100%;
+    --info:                217.2 91.2% 59.8%;
+    --info-foreground:     0 0% 100%;
+    --destructive:         0 74% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:              217.2 32.6% 17.5%;    /* Crisp subtle hairline */
+    --input:               217.2 32.6% 19%;
+    --ring:                217.2 91.2% 59.8%;
+
+    --sidebar-background:         222 47% 7%;
+    --sidebar-foreground:         215 20% 72%;
+    --sidebar-primary:            217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent:             217.2 45% 15%;
+    --sidebar-accent-foreground:  210 40% 98%;
+    --sidebar-border:             217.2 32.6% 15%;
+    --sidebar-ring:               217.2 91.2% 59.8%;
   }
 }
 
 @layer base {
-  * { @apply border-border; }
+  * {
+    @apply border-border;
+  }
 
   html {
-    font-feature-settings: "cv02","cv03","cv04","cv11";
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
   }
 
-  /* ── Monospace for data values ─────────────────────────────────── */
+  /* ── Enterprise Type Scale ─────────────────────────────────────── */
+  .text-page-header {
+    font-size: 2rem; /* 32px */
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  .text-section-title {
+    font-size: 1.5rem; /* 24px */
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  .text-body-base {
+    font-size: 1rem; /* 16px */
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .text-secondary-label {
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
+  .text-meta {
+    font-size: 0.75rem; /* 12px */
+    line-height: 1.35;
+    font-weight: 500;
+  }
+
   .mono {
-    font-family: "Berkeley Mono", "JetBrains Mono", "Fira Code",
-                 ui-monospace, "Cascadia Code", "Consolas", monospace;
+    font-family: var(--font-mono), "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
     font-variant-numeric: tabular-nums;
   }
 
-  /* ── Data number — tabular + slightly smaller ──────────────────── */
   .tabnum {
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
-  }
-
-  /* ── Tight label style used on filter rows ─────────────────────── */
-  .label-xs {
-    @apply text-[11px] font-medium uppercase tracking-widest text-muted-foreground;
   }
 }
 
 @layer utilities {
-  /* ── Strip old gradient utilities ─────────────────────────────── */
-  .bg-gradient-brand { background: hsl(var(--primary)); }
-  .bg-gradient-warm  { background: hsl(var(--warning)); }
-  .text-gradient-brand { color: hsl(var(--primary)); }
-  .shadow-glow       { box-shadow: none; }
-
-  /* ── Enterprise divider ────────────────────────────────────────── */
-  .divide-table > * + * { border-top: 1px solid hsl(var(--border)); }
-
-  /* ── Subtle inset surface (used in filter bars) ────────────────── */
-  .surface-inset {
-    @apply bg-muted/60 border border-border rounded-md;
+  .bg-gradient-brand {
+    background: hsl(var(--primary));
+  }
+  .bg-gradient-warm {
+    background: hsl(var(--warning));
+  }
+  .text-gradient-brand {
+    color: hsl(var(--primary));
+  }
+  .shadow-glow {
+    box-shadow: 0 8px 24px -6px hsl(var(--primary) / 0.25);
   }
 
-  /* ── Tight data row hover ──────────────────────────────────────── */
-  .row-hover {
-    @apply transition-colors duration-100 hover:bg-muted/50 cursor-default;
-  }
-
-  /* ── Status dot ────────────────────────────────────────────────── */
-  .dot-green  { @apply inline-block w-1.5 h-1.5 rounded-full bg-green-500; }
-  .dot-amber  { @apply inline-block w-1.5 h-1.5 rounded-full bg-amber-500; }
-  .dot-red    { @apply inline-block w-1.5 h-1.5 rounded-full bg-red-500; }
-  .dot-muted  { @apply inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40; }
-
-  /* ── Scrollbars & Viewport Polish ──────────────────────────────── */
-  ::-webkit-scrollbar-button {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
+  .glass-surface {
+    @apply bg-card/85 backdrop-blur-md;
   }
 
   .scrollbar-none {
@@ -183,20 +205,36 @@
 
   .scrollbar-enterprise {
     scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
   }
   .scrollbar-enterprise::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
   }
   .scrollbar-enterprise::-webkit-scrollbar-track {
     background: transparent;
   }
   .scrollbar-enterprise::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.25);
+    background: hsl(var(--muted-foreground) / 0.22);
     border-radius: 9999px;
   }
   .scrollbar-enterprise::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.45);
+    background: hsl(var(--muted-foreground) / 0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-surface {
+    backdrop-filter: none !important;
+    background-color: hsl(var(--card)) !important;
   }
 }

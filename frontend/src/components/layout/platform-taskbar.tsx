@@ -27,8 +27,8 @@ interface PlatformNavTab {
 const PLATFORM_TABS: PlatformNavTab[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "DE Chatbot", href: "/chat", icon: Sparkles, badge: "AI", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-  { label: "Company Data", href: "/companies", icon: Building2, badge: "213K", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-  { label: "People Data", href: "/people", icon: Users, badge: "65K", badgeColor: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30" },
+  { label: "Company Data", href: "/companies", icon: Building2 },
+  { label: "People Data", href: "/people", icon: Users },
   { label: "Live Discovery", href: "/search", icon: Search, badge: "LIVE", badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
   { label: "Orchestration", href: "/orchestration", icon: Cpu, badge: "LIVE", badgeColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
   { label: "Data Pipeline", href: "/pipeline", icon: Layers },
